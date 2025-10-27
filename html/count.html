@@ -6,7 +6,7 @@
   <title>Afreshtrip - Header</title>
   
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="../Css/count-3.css"/>
+  <link rel="stylesheet" href="../Css/count.css"/>
   
 </head>
 <body>
@@ -67,35 +67,48 @@
           </div>
         </div>
 
-        <!-- Notification Section -->
-<div class="notification-container">
-  <h2>Messages</h2>
+        <!-- Profile Information Form -->
+        <div class="profile-info">
+          <h2>Edit Profile Informations</h2>
+          <form>
+            <div class="input-group">
+              <label for="username">Username</label>
+              <input type="text" id="username" placeholder="Your username" required />
+            </div>
+            <div class="input-group">
+              <label for="email">Email</label>
+              <input type="email" id="email" placeholder="yourname@company.com" required />
+            </div>
+            <div class="input-group">
+              <label for="mobile">Mobile Number</label>
+              <input type="text" id="mobile" placeholder="Your mobile number" required />
+            </div>
+            <div class="input-group">
+              <label for="dob">Date of Birth</label>
+              <input type="date" id="dob" required />
+            </div>
+            <div class="input-group">
+              <label for="password">Password</label>
+              <input type="password" id="password" placeholder="Your password" required />
+            </div>
+            <div class="input-group">
+              <label for="confirm-password">Confirmed Password</label>
+              <input type="password" id="confirm-password" placeholder="Confirm your password" required />
+            </div>
 
-  <div class="notification-item">
-      <h3>Changes in Service</h3>
-      <p>We just updated our privacy policy here to better service our customers. We recommend reviewing the changes.</p>
-  </div>
-  <div class="notification-item">
-      <h3>Changes in Service</h3>
-      <p>We just updated our privacy policy here to better service our customers. We recommend reviewing the changes.</p>
-  </div>
-  <div class="notification-item">
-      <h3>Changes in Service</h3>
-      <p>We just updated our privacy policy here to better service our customers. We recommend reviewing the changes.</p>
-  </div>
-  <div class="notification-item">
-      <h3>Changes in Service</h3>
-      <p>We just updated our privacy policy here to better service our customers. We recommend reviewing the changes.</p>
-  </div>
-  <div class="notification-item">
-      <h3>Changes in Service</h3>
-      <p>We just updated our privacy policy here to better service our customers. We recommend reviewing the changes.</p>
-  </div>
-</div>
+            <div class="gender-group">
+              <label>Gender</label>
+              <div>
+                <input type="radio" id="male" name="gender" value="Male" />
+                <label for="male">Male</label>
+                <input type="radio" id="female" name="gender" value="Female" />
+                <label for="female">Female</label>
+              </div>
+            </div>
 
-
-
-
+            <button type="submit" class="update-btn">Update</button>
+          </form>
+        </div>
       </div> 
 
     </div> 

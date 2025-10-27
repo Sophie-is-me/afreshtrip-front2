@@ -4,6 +4,23 @@ const logoutModal = document.getElementById("logout-modal");
 const confirmLogout = document.getElementById("confirm-logout");
 const cancelLogout = document.getElementById("cancel-logout");
 
+// 获取所有工具栏按钮
+const toolbarButtons = document.querySelectorAll('.toolbar button');
+let activeButton = null;
+
+toolbarButtons.forEach(button => {
+  button.addEventListener('click', () => {
+    // 移除所有按钮的 active 类
+    toolbarButtons.forEach(btn => btn.classList.remove('active'));
+    
+    // 给当前点击的按钮添加 active 类
+    button.classList.add('active');
+    
+    // 更新 activeButton 变量
+    activeButton = button;
+  });
+});
+
 avatarBtn.addEventListener("click", () => {
   logoutModal.classList.remove("hidden");
 });

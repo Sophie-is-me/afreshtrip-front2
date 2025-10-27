@@ -6,7 +6,7 @@
   <title>Afreshtrip - Header</title>
   
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="../Css/email-success.css"/>
+  <link rel="stylesheet" href="../Css/count-2.css"/>
   
 </head>
 <body>
@@ -36,19 +36,7 @@
   <button class="icon-btn"><img src="../assets/login-4.png" alt="Support" /></button>
 </div>
 
-    <div class="language-dropdown">
-      <span class="lang-label">Choose Language</span>
-      
-        <div class="custom-select" id="language-select">
-          <i class="selected-option">
-            <img src="../assets/3.png" alt="English Icon" class="flag-icon">
-          </i>
-
-          <span class="selected-option">English</span>
-          <img src="../assets/4.png" alt="Dropdown Arrow" class="arrow-icon" />
-
-        
-      </div>
+</div>
     
   </header>
 
@@ -57,24 +45,72 @@
 
 <!-- Main Content -->
 <main class="main-content">
-  <div class="login-container">
-    <!-- Email Icon with Badge -->
-    <div class="email-icon-container">
-        <img src="../assets/xingxiang.png" alt="Email" class="email-icon" />
+  <div class="profile-container">
+    <div class="profile-card">
+
+      <!-- Top Navigation -->
+      <div class="profile-nav">
+        <button class="profile-nav-btn profile-nav-btn-active">My Profile</button>
+        <button class="profile-nav-btn">Subscription</button>
+        <button class="profile-nav-btn">My trips</button>
+        <button class="profile-nav-btn">Notification</button>
+        <button class="profile-nav-btn">Logout</button>
+      </div>
+
+      <!-- Avatar and Profile Information -->
+      <div class="profile-details">
         
-  
-      <!-- Success Message -->
-      <h2 class="success-title">Account created successfully</h2>
-      <h1 class="main-message">Check your inbox!</h1>
-      <p class="instruction-text">
-        Open your email to activate your account, login in.<br />
-        An email has been sent to the address you provided.
-      </p>
+        <!-- Avatar -->
+        <div class="profile-pic">
+          <div class="profile-pic-container">
+            <img src="../assets/count-1.png" alt="Profile" />
+          </div>
+        </div>
+
+        <!-- My Trips -->
+<div class="my-trips">
+  <h2>My trips</h2>
+  <table class="trips-table">
+      <thead>
+          <tr>
+              <th>Date</th>
+              <th>City</th>
+              <th>Stops</th>
+          </tr>
+      </thead>
+      <tbody>
+          <tr>
+              <td>2020-9-10</td>
+              <td>Paris</td>
+              <td>5 stops</td>
+          </tr>
+          <tr>
+              <td>2021-10-10</td>
+              <td>London</td>
+              <td>6 stops</td>
+          </tr>
+          <tr>
+              <td>name</td>
+              <td>type</td>
+              <td>type</td>
+          </tr>
+          <tr>
+              <td>name</td>
+              <td>type</td>
+              <td>type</td>
+          </tr>
+      </tbody>
+  </table>
+</div>
 
 
-    </div>
-  </div>
-</main>
+
+      </div> 
+
+    </div> 
+  </div> 
+</main> 
+
 
 
 

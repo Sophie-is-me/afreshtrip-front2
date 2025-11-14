@@ -1,73 +1,58 @@
+// src/components/SubscriptionCard.tsx
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
-interface Feature {
-  name: string;
-  included: boolean;
-  description?: string;
-}
+import type { SubscriptionPlan } from '../types/subscription';
 
 interface SubscriptionCardProps {
-  plan: string;
-  price: string;
-  period: string;
-  features: Feature[];
+  plan: SubscriptionPlan;
   isSelected?: boolean;
-  isPopular?: boolean;
-  isBestValue?: boolean;
-  isDisabled?: boolean;
   isLoading?: boolean;
   onClick?: () => void;
-  buttonText?: string;
   onButtonClick?: () => void;
   className?: string;
   highlightColor?: string;
-  badgeText?: string;
-  originalPrice?: string;
-  discount?: number;
   currency?: string;
   showComparison?: boolean;
+  onCompareClick?: () => void;
 }
 
 const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
   plan,
-  price,
-  period,
-  features,
   isSelected = false,
-  isPopular = false,
-  isBestValue = false,
-  isDisabled = false,
   isLoading = false,
   onClick,
-  buttonText,
   onButtonClick,
   className = '',
   highlightColor = 'teal',
-  badgeText,
-  originalPrice,
-  discount,
   currency = '$',
   showComparison = true,
+  onCompareClick,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const { t } = useTranslation();
 
   const handleCardClick = () => {
-    if (!isDisabled && !isLoading && onClick) {
+    if (!plan.isDisabled && !isLoading && onClick) {
       onClick();
     }
   };
 
   const handleButtonClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!isDisabled && !isLoading && onButtonClick) {
+    if (!plan.isDisabled && !isLoading && onButtonClick) {
       onButtonClick();
     }
   };
 
+  const handleCompareClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onCompareClick) {
+      onCompareClick();
+    }
+  };
+
   const getButtonVariant = () => {
-    if (isDisabled) return 'disabled';
+    if (plan.isDisabled) return 'disabled';
     if (isLoading) return 'loading';
     if (isSelected) return 'selected';
     return 'default';
@@ -91,7 +76,7 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
   const getCardClass = () => {
     const baseClass = `p-6 rounded-xl cursor-pointer transition-all duration-300 relative overflow-hidden ${className}`;
     
-    if (isDisabled) {
+    if (plan.isDisabled) {
       return `${baseClass} border border-gray-200 bg-gray-50 opacity-60`;
     }
     
@@ -107,10 +92,10 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
   };
 
   const renderBadge = () => {
-    if (!badgeText && !isPopular && !isBestValue) return null;
+    if (!plan.badgeText && !plan.isPopular && !plan.isBestValue) return null;
     
-    const badgeTextToRender = badgeText || (isBestValue ? t('subscriptionCard.bestValue') : t('subscriptionCard.popular'));
-    const badgeColor = isBestValue ? 'purple' : 'red';
+    const badgeTextToRender = plan.badgeText || (plan.isBestValue ? t('subscriptionCard.bestValue') : t('subscriptionCard.popular'));
+    const badgeColor = plan.isBestValue ? 'purple' : 'red';
     
     return (
       <div className={`absolute top-0 right-0 bg-${badgeColor}-500 text-white text-xs font-bold px-3 py-1 rounded-bl-lg rounded-tr-xl`}>
@@ -120,11 +105,11 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
   };
 
   const renderPrice = () => {
-    if (!originalPrice || !discount) {
+    if (!plan.originalPrice || !plan.discount) {
       return (
         <div className="flex items-baseline">
-          <span className="text-4xl font-bold text-gray-900">{currency}{price}</span>
-          <span className="ml-2 text-gray-600">{period}</span>
+          <span className="text-4xl font-bold text-gray-900">{currency}{plan.price}</span>
+          <span className="ml-2 text-gray-600">{plan.period}</span>
         </div>
       );
     }
@@ -133,13 +118,13 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
       <div className="flex items-baseline">
         <div className="flex flex-col">
           <div className="flex items-baseline">
-            <span className="text-4xl font-bold text-gray-900">{currency}{price}</span>
-            <span className="ml-2 text-gray-600">{period}</span>
+            <span className="text-4xl font-bold text-gray-900">{currency}{plan.price}</span>
+            <span className="ml-2 text-gray-600">{plan.period}</span>
           </div>
           <div className="flex items-center mt-1">
-            <span className="text-lg text-gray-500 line-through mr-2">{currency}{originalPrice}</span>
+            <span className="text-lg text-gray-500 line-through mr-2">{currency}{plan.originalPrice}</span>
             <span className="bg-red-100 text-red-800 text-xs font-semibold px-2 py-1 rounded">
-              {discount}% {t('subscriptionCard.off')}
+              {plan.discount}% {t('subscriptionCard.off')}
             </span>
           </div>
         </div>
@@ -150,8 +135,8 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
   const renderFeatures = () => {
     return (
       <ul className="space-y-3 mb-6">
-        {features.map((feature, index) => (
-          <li key={index} className="flex items-start">
+        {plan.features.map((feature) => (
+          <li key={feature.id} className="flex items-start">
             <span className={`shrink-0 w-5 h-5 rounded-full flex items-center justify-center mr-3 ${
               feature.included ? 'bg-green-100' : 'bg-gray-100'
             }`}>
@@ -178,13 +163,13 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
   };
 
   const renderButton = () => {
-    const buttonLabel = buttonText || (isSelected ? t('subscriptionCard.currentPlan') : t('subscriptionCard.selectPlan'));
+    const buttonLabel = isSelected ? t('subscriptionCard.currentPlan') : t('subscriptionCard.selectPlan');
     
     return (
       <button
         className={getButtonClass()}
         onClick={handleButtonClick}
-        disabled={isDisabled || isLoading}
+        disabled={plan.isDisabled || isLoading}
         aria-label={buttonLabel}
       >
         {isLoading ? (
@@ -209,14 +194,14 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       role="button"
-      tabIndex={isDisabled ? -1 : 0}
+      tabIndex={plan.isDisabled ? -1 : 0}
       onKeyDown={(e) => e.key === 'Enter' && handleCardClick()}
-      aria-label={`${plan} subscription plan, ${currency}${price} per ${period}`}
+      aria-label={`${plan.name} subscription plan, ${currency}${plan.price} per ${plan.period}`}
     >
       {renderBadge()}
       
       <div className="mb-4">
-        <h3 className="text-xl font-semibold text-gray-900 mb-2">{plan}</h3>
+        <h3 className="text-xl font-semibold text-gray-900 mb-2">{plan.name}</h3>
         {renderPrice()}
       </div>
       
@@ -224,14 +209,11 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
       
       {renderButton()}
       
-      {showComparison && !isDisabled && (
+      {showComparison && !plan.isDisabled && (
         <div className="mt-4 text-center">
           <button
             className={`text-sm text-${highlightColor}-600 hover:text-${highlightColor}-700 font-medium focus:outline-none`}
-            onClick={(e) => {
-              e.stopPropagation();
-              // Handle comparison view
-            }}
+            onClick={handleCompareClick}
           >
             {t('subscriptionCard.comparePlans')}
           </button>

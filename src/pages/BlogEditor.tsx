@@ -5,6 +5,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useBlog } from '../contexts/BlogContext';
 import PhotoLibrary from '../components/PhotoLibrary';
 import { useDebounce } from '../hooks/useDebounce';
+import FeatureGate from '../components/FeatureGate';
+import { FeatureId } from '../types/features';
 import DOMPurify from 'dompurify';
 
 interface BlogFormData {
@@ -321,8 +323,9 @@ const BlogEditor: React.FC = () => {
   ];
   
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto py-8 px-4">
+    <FeatureGate feature={FeatureId.BLOG_PUBLISHING}>
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-4xl mx-auto py-8 px-4">
         {/* Header */}
         <div className="mb-6 flex justify-between items-center">
           <div>
@@ -696,6 +699,7 @@ const BlogEditor: React.FC = () => {
         onInsert={insertImage}
       />
     </div>
+    </FeatureGate>
   );
 };
 

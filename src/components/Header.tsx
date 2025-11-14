@@ -70,20 +70,20 @@ const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="bg-teal-800 text-white sticky top-0 z-50 shadow-lg">
+    <header className="bg-gradient-to-r from-teal-700 to-teal-800 text-white sticky top-0 z-50 shadow-lg">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center py-4">
+        <div className="flex justify-between items-center py-3 md:py-4">
            {/* Left side: Logo and Language */}
-           <div className="flex items-center gap-4">
+           <div className="flex items-center gap-2 md:gap-4">
              <Link to="/" className="flex items-center gap-2">
-               <img src="/assets/tubiao.png" alt="Afreshtrip Logo" className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 border-white" />
-               <span className="text-xl sm:text-2xl font-bold">Afreshtrip</span>
+               <img src="/assets/tubiao.png" alt="Afreshtrip Logo" className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-full border-2 border-white shadow-md" />
+               <span className="text-lg sm:text-xl md:text-2xl font-bold">Afreshtrip</span>
              </Link>
 
-             {/* Language Dropdown - Always Visible */}
-             <div className="relative" ref={dropdownRef}>
+             {/* Language Dropdown - Hidden on mobile */}
+             <div className="relative hidden sm:block" ref={dropdownRef}>
                <button
-                 className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-teal-700 transition-colors"
+                 className="flex items-center gap-2 px-2 md:px-3 py-1.5 md:py-2 rounded-lg hover:bg-teal-700/50 smooth-transition"
                  onClick={toggleDropdown}
                  aria-expanded={isDropdownOpen}
                  aria-haspopup="true"

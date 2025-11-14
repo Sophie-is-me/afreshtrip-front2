@@ -1,75 +1,47 @@
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+// src/pages/Subscription.tsx
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
-import ProfileNav from '../components/ProfileNav';
 import Breadcrumb from '../components/Breadcrumb';
 import SubscriptionCard from '../components/SubscriptionCard';
-import { useTranslation } from 'react-i18next';
+import { useSubscription } from '../hooks/useSubscription';
+import LoadingSpinner from '../components/LoadingSpinner';
+import ErrorMessage from '../components/ErrorMessage';
 
 const Subscription: React.FC = () => {
   const { t } = useTranslation();
-  const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('subscription');
-  const [selectedPlan, setSelectedPlan] = useState('week');
+  const {
+    selectedPlanId,
+    userSubscription,
+    plans,
+    isLoading,
+    isUpdating,
+    error,
+    success,
+    handlePlanSelect,
+    handlePlanUpdate,
+  } = useSubscription();
 
-  const handleTabChange = (tab: string) => {
-    setActiveTab(tab);
-    if (tab === 'profile') navigate('/profile');
-    else if (tab === 'trips') navigate('/trips');
-    else if (tab === 'notifications') navigate('/notifications');
+  const handleComparePlans = () => {
+    // Handle comparison view
+    console.log('Compare plans clicked');
   };
 
-  const subscriptions = [
-    {
-      plan: 'Week',
-      price: '19',
-      period: 'Per week',
-      id: 'week',
-      features: [
-        { name: 'Basic trip planning', included: true },
-        { name: 'Limited destinations', included: true },
-        { name: 'Email support', included: true },
-        { name: 'Mobile app access', included: false },
-      ]
-    },
-    {
-      plan: 'Month',
-      price: '39',
-      period: 'Per month',
-      id: 'month',
-      features: [
-        { name: 'Advanced trip planning', included: true },
-        { name: 'Unlimited destinations', included: true },
-        { name: 'Priority email support', included: true },
-        { name: 'Mobile app access', included: true },
-      ]
-    },
-    {
-      plan: 'Season',
-      price: '89',
-      period: 'Per month',
-      id: 'season',
-      features: [
-        { name: 'Premium trip planning', included: true },
-        { name: 'VIP destinations access', included: true },
-        { name: '24/7 phone support', included: true },
-        { name: 'Mobile app access', included: true },
-      ]
-    },
-    {
-      plan: 'Year',
-      price: '199',
-      period: 'Per month',
-      id: 'year',
-      features: [
-        { name: 'Ultimate trip planning', included: true },
-        { name: 'Exclusive destinations', included: true },
-        { name: 'Dedicated concierge', included: true },
-        { name: 'Mobile app access', included: true },
-      ]
-    },
-  ];
+  if (error) {
+    return (
+      <div className="min-h-screen bg-white">
+        <Header showIconButtons showNavLinks={false} />
+        <main className="px-8 py-8">
+          <div className="max-w-6xl mx-auto">
+            <ErrorMessage error={error} />
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -82,6 +54,7 @@ const Subscription: React.FC = () => {
             </svg>
             <span>{t('blog.back')}</span>
           </Link>
+          
           <Breadcrumb
             items={[
               { label: t('profileNav.profile'), href: '/profile' },
@@ -89,30 +62,42 @@ const Subscription: React.FC = () => {
             ]}
             className="mb-6"
           />
-          <div className="bg-white rounded-lg shadow-md p-8 mb-8">
-            <ProfileNav activeTab={activeTab} onTabChange={handleTabChange} />
-          </div>
+
+          {success && (
+            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-center">
+                <svg className="w-5 h-5 text-green-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                <span className="text-green-800 font-medium">{success}</span>
+              </div>
+            </div>
+          )}
 
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-gray-900 mb-4">{t('subscription.title')}</h1>
             <p className="text-lg text-gray-600">{t('subscription.subtitle')}</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {subscriptions.map((sub) => (
-              <SubscriptionCard
-                key={sub.id}
-                plan={sub.plan}
-                price={sub.price}
-                period={sub.period}
-                features={sub.features}
-                isSelected={selectedPlan === sub.id}
-                onClick={() => setSelectedPlan(sub.id)}
-                buttonText={sub.id === 'week' ? t('subscription.currentPlan') : t('subscription.update')}
-                onButtonClick={() => console.log(`Update to ${sub.plan}`)}
-              />
-            ))}
-          </div>
+          {isLoading && plans.length === 0 ? (
+            <div className="flex justify-center py-12">
+              <LoadingSpinner size="lg" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {plans.map((plan) => (
+                <SubscriptionCard
+                  key={plan.id}
+                  plan={plan}
+                  isSelected={userSubscription?.planId === plan.id}
+                  isLoading={isUpdating && selectedPlanId === plan.id}
+                  onClick={() => handlePlanSelect(plan.id)}
+                  onButtonClick={() => handlePlanUpdate(plan.id)}
+                  onCompareClick={handleComparePlans}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </main>
       <Footer />

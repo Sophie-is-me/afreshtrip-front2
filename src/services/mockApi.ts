@@ -22,12 +22,87 @@ import type {
 import { FeatureId, FEATURE_PLAN_MAPPING, getUpgradePlan } from '../types/features';
 import type { UserSubscription } from '../types/subscription';
 import { mockUserSubscription } from '../types/subscription';
-import type { TripSettings, Trip, Place, Weather, Route } from '../types/trip';
+import type { TripSettings, Trip, Place, Weather, Route, ClothingSuggestion } from '../types/trip';
 
 // Simulate network delay
 const simulateDelay = (ms: number = 500) =>
   new Promise(resolve => setTimeout(resolve, ms));
 
+// Generate clothing suggestions based on weather condition and temperature
+const generateClothingSuggestions = (condition: string, temperature: number): ClothingSuggestion[] => {
+  const lowerCondition = condition.toLowerCase();
+  const suggestions: ClothingSuggestion[] = [];
+
+  // Base suggestions based on temperature
+  if (temperature >= 25) {
+    suggestions.push({
+      name: 'T-shirt',
+      icon: '<svg fill="currentColor" viewBox="0 0 24 24"><path d="M21.75 8L20 9.75V19.75C20 20.1642 19.6642 20.5 19.25 20.5H4.75C4.33579 20.5 4 20.1642 4 19.75V9.75L2.25 8L7 3.25C7 3.25 7 5.5 9.25 5.5H14.75C17 5.5 17 3.25 17 3.25L21.75 8Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>'
+    });
+    suggestions.push({
+      name: 'Shorts',
+      icon: '<svg fill="currentColor" viewBox="0 0 24 24"><path d="M5 10V20C5 20.5523 5.44772 21 6 21H8C8.55228 21 9 20.5523 9 20V16H15V20C15 20.5523 15.4477 21 16 21H18C18.5523 21 19 20.5523 19 20V10H5Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M3 10H21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    });
+    suggestions.push({
+      name: 'Sunglasses',
+      icon: '<svg fill="currentColor" viewBox="0 0 24 24"><path d="M2 9H3.5C4.5 6 6.5 4 9.5 4C11.5 4 13 5 13.5 6C14 5 15.5 4 17.5 4C20.5 4 22.5 6 23.5 9H22C21.5 7 20.5 5 18.5 5C16.5 5 15.5 6.5 15.5 9H13.5C13.5 6.5 12.5 5 10.5 5C8.5 5 7.5 7 7 9H2Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M3 9C3 9 3 13 7 13C11 13 11 9 11 9M13 9C13 9 13 13 17 13C21 13 21 9 21 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>'
+    });
+  } else if (temperature >= 15) {
+    suggestions.push({
+      name: 'Light jacket',
+      icon: '<svg fill="currentColor" viewBox="0 0 24 24"><path d="M3 10L6 3H18L21 10V20C21 20.5523 20.5523 21 20 21H4C3.44772 21 3 20.5523 3 20V10Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M3 10H21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 10V21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 10V21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 3V6H14V3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    });
+    suggestions.push({
+      name: 'Jeans',
+      icon: '<svg fill="currentColor" viewBox="0 0 24 24"><path d="M5 4V20C5 20.5523 5.44772 21 6 21H8C8.55228 21 9 20.5523 9 20V13H15V20C15 20.5523 15.4477 21 16 21H18C18.5523 21 19 20.5523 19 20V4H5Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M3 4H21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 4V7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 4V6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 4V6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    });
+    suggestions.push({
+      name: 'Sneakers',
+      icon: '<svg fill="currentColor" viewBox="0 0 24 24"><path d="M2 18V13C2 12.4477 2.44772 12 3 12H21C21.5523 12 22 12.4477 22 13V18C22 18.5523 21.5523 19 21 19H3C2.44772 19 2 18.5523 2 18Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M5 12V8C5 7.44772 5.44772 7 6 7H11L14 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M17 12L19 8H21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 15H7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 15H11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 15H15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    });
+  } else {
+    suggestions.push({
+      name: 'Winter coat',
+      icon: '<svg fill="currentColor" viewBox="0 0 24 24"><path d="M3 11L6 3H18L21 11V20C21 20.5523 20.5523 21 20 21H4C3.44772 21 3 20.5523 3 20V11Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M3 11H21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 11V21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 11V21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 3V7H14V3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 7V11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    });
+    suggestions.push({
+      name: 'Sweater',
+      icon: '<svg fill="currentColor" viewBox="0 0 24 24"><path d="M3 9L6 3H18L21 9V20C21 20.5523 20.5523 21 20 21H4C3.44772 21 3 20.5523 3 20V9Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M3 9H21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 3V6H14V3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 12L8 18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 12L16 18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 12V18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    });
+    suggestions.push({
+      name: 'Boots',
+      icon: '<svg fill="currentColor" viewBox="0 0 24 24"><path d="M4 9V19C4 20.1046 4.89543 21 6 21H18C19.1046 21 20 20.1046 20 19V9C20 7.89543 19.1046 7 18 7H6C4.89543 7 4 7.89543 4 9Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M8 7V4C8 3.44772 8.44772 3 9 3H15C15.5523 3 16 3.44772 16 4V7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 12H17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    });
+  }
+
+  // Additional suggestions based on condition
+  if (lowerCondition.includes('rain') || lowerCondition.includes('shower')) {
+    suggestions.push({
+      name: 'Umbrella',
+      icon: '<svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12H22C22 6.48 17.52 2 12 2Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M12 12V20" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 20H16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    });
+    suggestions.push({
+      name: 'Raincoat',
+      icon: '<svg fill="currentColor" viewBox="0 0 24 24"><path d="M3 10L6 3H18L21 10V20C21 20.5523 20.5523 21 20 21H4C3.44772 21 3 20.5523 3 20V10Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M3 10H21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 10V21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 10V21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 3V6H14V3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 10V15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    });
+  } else if (lowerCondition.includes('snow')) {
+    suggestions.push({
+      name: 'Gloves',
+      icon: '<svg fill="currentColor" viewBox="0 0 24 24"><path d="M7 12V7C7 5.89543 7.89543 5 9 5H15C16.1046 5 17 5.89543 17 7V12C17 13.1046 16.1046 14 15 14H9C7.89543 14 7 13.1046 7 12Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M9 5V3C9 2.44772 9.44772 2 10 2H14C14.5523 2 15 2.44772 15 3V5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 8H5C4.44772 8 4 8.44772 4 9V11C4 11.5523 4.44772 12 5 12H7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M17 8H19C19.5523 8 20 8.44772 20 9V11C20 11.5523 19.5523 12 19 12H17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 14V18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 14V18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    });
+    suggestions.push({
+      name: 'Scarf',
+      icon: '<svg fill="currentColor" viewBox="0 0 24 24"><path d="M19 7C19 4.79086 17.2091 3 15 3H9C6.79086 3 5 4.79086 5 7V17C5 19.2091 6.79086 21 9 21H15C17.2091 21 19 19.2091 19 17V7Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M5 7H19" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 12H19" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 17H19" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 3V21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    });
+  } else if (lowerCondition.includes('wind')) {
+    suggestions.push({
+      name: 'Windbreaker',
+      icon: '<svg fill="currentColor" viewBox="0 0 24 24"><path d="M3 10L6 3H18L21 10V20C21 20.5523 20.5523 21 20 21H4C3.44772 21 3 20.5523 3 20V10Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M3 10H21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 10V21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 10V21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 3V6H14V3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 14H18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    });
+  }
+
+  return suggestions.slice(0, 4); // Limit to 4 suggestions
+};
 // Mock user database (in real backend, this would be in database)
 const mockUserSubscriptions = new Map<string, UserSubscription>();
 
@@ -377,6 +452,7 @@ export class MockApiClient {
         { date: new Date().toISOString().split('T')[0], temp: 18, condition: 'Partly cloudy' },
         { date: new Date(Date.now() + 86400000).toISOString().split('T')[0], temp: 20, condition: 'Sunny' },
       ],
+      clothing: generateClothingSuggestions('Partly cloudy', 18),
     };
     return {
       id: 'trip_' + Date.now(),
@@ -397,18 +473,50 @@ export class MockApiClient {
     ];
   }
 
-  async getWeather(location: string): Promise<Weather> {
+  async getWeather(location: string, time?: string): Promise<Weather> {
     await simulateDelay();
+    let temperature = 22;
+    let condition = 'Sunny';
+    let humidity = 60;
+
+    // Generate time-specific weather data if time is provided
+    if (time) {
+      const timeDate = new Date(time);
+      const hour = timeDate.getHours();
+
+      // Adjust temperature and condition based on time of day
+      if (hour >= 6 && hour < 12) {
+        temperature = 20; // Morning
+        condition = 'Partly cloudy';
+        humidity = 65;
+      } else if (hour >= 12 && hour < 18) {
+        temperature = 25; // Afternoon
+        condition = 'Sunny';
+        humidity = 55;
+      } else if (hour >= 18 && hour < 22) {
+        temperature = 18; // Evening
+        condition = 'Clear';
+        humidity = 70;
+      } else {
+        temperature = 15; // Night
+        condition = 'Clear';
+        humidity = 75;
+      }
+    }
+
     return {
       location,
-      temperature: 22,
-      condition: 'Sunny',
-      humidity: 60,
+      temperature,
+      condition,
+      humidity,
       forecast: [
-        { date: new Date().toISOString().split('T')[0], temp: 22, condition: 'Sunny' },
-        { date: new Date(Date.now() + 86400000).toISOString().split('T')[0], temp: 24, condition: 'Clear' },
-        { date: new Date(Date.now() + 2 * 86400000).toISOString().split('T')[0], temp: 20, condition: 'Cloudy' },
+        { date: new Date().toISOString().split('T')[0], temp: temperature, condition },
+        { date: new Date(Date.now() + 86400000).toISOString().split('T')[0], temp: temperature + 2, condition: 'Clear' },
+        { date: new Date(Date.now() + 2 * 86400000).toISOString().split('T')[0], temp: temperature - 2, condition: 'Cloudy' },
+        { date: new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0], temp: temperature + 1, condition: 'Partly cloudy' },
+        { date: new Date(Date.now() + 4 * 86400000).toISOString().split('T')[0], temp: temperature - 1, condition: 'Rainy' },
       ],
+      clothing: generateClothingSuggestions(condition, temperature),
     };
   }
 

@@ -1,9 +1,7 @@
 // src/components/trip/TripMap.tsx
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import { useTripStore } from '../../stores/tripStore';
-import RouteInfoWidget from './RouteInfoWidget';
-import TripSummary from './TripSummary';
-import MapControls from './MapControls';
+// import MapControls from './MapControls';
 import 'leaflet/dist/leaflet.css';
 
 // Fix for default markers in react-leaflet
@@ -24,8 +22,8 @@ const TripMap: React.FC = () => {
 
   if (!currentTrip) {
     return (
-      <div className="h-full w-full bg-gray-100 rounded-2xl flex items-center justify-center relative overflow-hidden">
-        <MapContainer center={defaultCenter} zoom={defaultZoom} className="h-full z-10 w-full rounded-2xl">
+      <div className="h-full w-full bg-gray-100 flex items-center justify-center relative overflow-hidden">
+        <MapContainer center={defaultCenter} zoom={defaultZoom} className="h-full z-10 w-full ">
           <TileLayer
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -36,7 +34,7 @@ const TripMap: React.FC = () => {
             <p className="text-gray-700 font-medium">Generate a trip to see the map</p>
           </div>
         </div>
-        <MapControls />
+        {/* <MapControls /> */}
       </div>
     );
   }
@@ -85,17 +83,7 @@ const TripMap: React.FC = () => {
       </MapContainer>
 
       {/* Map Controls */}
-      <MapControls />
-
-      {/* Route Info Overlay - Show on all platforms */}
-      <div className="absolute bottom-4 left-4 z-40 hidden md:block">
-        <RouteInfoWidget />
-      </div>
-
-      {/* Trip Summary Overlay - Only show on desktop in right side */}
-      <div className="absolute bottom-4 right-4 z-40 hidden xl:block">
-        <TripSummary />
-      </div>
+      {/* <MapControls /> */}
     </div>
   );
 };

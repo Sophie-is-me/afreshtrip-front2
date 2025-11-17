@@ -22,12 +22,18 @@ export interface WeatherDay {
   condition: string;
 }
 
+export interface ClothingSuggestion {
+  name: string;
+  icon: string; // SVG string for the clothing icon
+}
+
 export interface Weather {
   location: string;
   temperature: number;
   condition: string;
   humidity: number;
   forecast: WeatherDay[];
+  clothing: ClothingSuggestion[];
 }
 
 export interface Route {

@@ -1,15 +1,86 @@
 import { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import TripSettingsPanel from './TripSettingsPanel';
 import TripMap from './TripMap';
 import WeatherSummary from './WeatherSummary';
-import WeatherDialog from './WeatherDialog';
-import BottomSheet from '../BottomSheet';
-import FloatingActionButton from '../FloatingActionButton';
-import { Bars3Icon } from '@heroicons/react/24/outline';
+import { mockApiClient } from '../../services/mockApi';
+import type { TripSettings, Trip } from '../../types/trip';
 
 const TripPlanner = () => {
-  const [showBottomSheet, setShowBottomSheet] = useState(false);
-  const [showWeatherDialog, setShowWeatherDialog] = useState(false);
+  // --- STATE MANAGEMENT ---
+  const [transport, setTransport] = useState<'car' | 'bike'>('car');
+  const [tripType, setTripType] = useState<'one' | 'return'>('return');
+  const [departureCity, setDepartureCity] = useState('Copenhagen');
+  const [destinationCity, setDestinationCity] = useState('Copenhagen');
+  const [useCurrentLocation, setUseCurrentLocation] = useState(false);
+  const [stations, setStations] = useState(3);
+  const [duration, setDuration] = useState(1);
+  const [interests, setInterests] = useState<string[]>(['Outdoors & Sport']);
+
+  // Trip data state
+  const [currentTrip, setCurrentTrip] = useState<Trip | null>(null);
+  const [generatedStops, setGeneratedStops] = useState<string[]>([]);
+  const [selectedStop, setSelectedStop] = useState<string | null>(null);
+  const [tripDetails, setTripDetails] = useState<{ time: string; distance: string; co2: string } | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const generateTripMutation = useMutation({
+    mutationFn: (tripSettings: TripSettings) => mockApiClient.generateTrip(tripSettings),
+    onSuccess: (trip: Trip) => {
+      // Use the actual places from the generated trip
+      const stops = trip.places.map(place => place.name);
+
+      setGeneratedStops(stops);
+
+      // Use actual trip route data
+      const distance = trip.route.distance;
+      const duration = trip.route.duration;
+      const timeHours = Math.floor(duration / 60);
+      const timeMinutes = duration % 60;
+
+      setTripDetails({
+          time: timeHours > 0 ? `${timeHours}h ${timeMinutes}min` : `${timeMinutes}min`,
+          distance: `${distance} km`,
+          co2: `${Math.round(distance * 0.12)}g`
+      });
+
+      // Set the generated trip
+      setCurrentTrip(trip);
+      setIsGenerating(false);
+    },
+    onError: (error: Error) => {
+      console.error('Trip generation failed:', error);
+      setIsGenerating(false);
+    },
+  });
+
+  const handleToggleInterest = (interest: string) => {
+    setInterests(prev =>
+      prev.includes(interest) ? prev.filter(i => i !== interest) : [...prev, interest]
+    );
+  };
+
+  const handleGenerateTrip = () => {
+    setIsGenerating(true);
+    setGeneratedStops([]); // Clear previous results
+    setTripDetails(null);
+    setSelectedStop(null);
+
+    const settings: TripSettings = {
+      destination: destinationCity,
+      duration,
+      budget: 1000, // Mock value
+      travelers: 1, // Mock value
+      preferences: interests,
+      vehicle: transport,
+    };
+    generateTripMutation.mutate(settings);
+  };
+
+  const handleStartNavigation = () => {
+    // TODO: Implement navigation start logic
+    console.log('Starting navigation...');
+  };
 
   return (
     <div className="w-full flex flex-col bg-linear-to-br from-slate-50 via-blue-50 to-teal-50 relative overflow-hidden">
@@ -21,58 +92,43 @@ const TripPlanner = () => {
       <div className="hidden md:flex md:gap-4 md:ps-8 md:pb-4 md:min-h-[calc(100vh-64px)] relative z-10">
         {/* Left Panel - Trip Planning Components */}
         <div className="flex-[0_0_40%] flex flex-col gap-6 bg-transparent scrollbar-thin">
-          <TripSettingsPanel />
+          <TripSettingsPanel
+            transport={transport}
+            setTransport={setTransport}
+            tripType={tripType}
+            setTripType={setTripType}
+            departureCity={departureCity}
+            setDepartureCity={setDepartureCity}
+            destinationCity={destinationCity}
+            setDestinationCity={setDestinationCity}
+            useCurrentLocation={useCurrentLocation}
+            setUseCurrentLocation={setUseCurrentLocation}
+            stations={stations}
+            setStations={setStations}
+            duration={duration}
+            setDuration={setDuration}
+            interests={interests}
+            onToggleInterest={handleToggleInterest}
+            onGenerateTrip={handleGenerateTrip}
+            generatedStops={generatedStops}
+            selectedStop={selectedStop}
+            setSelectedStop={setSelectedStop}
+            tripDetails={tripDetails}
+            isGenerating={isGenerating}
+            onStartNavigation={handleStartNavigation}
+          />
         </div>
 
         {/* Center Panel - Map with Weather Overlay */}
         <div className="flex-1 relative md:sticky md:top-0 md:h-[calc(100vh-64px)] overflow-hidden shadow-2xl border-4 border-white/50">
-          <TripMap />
-          
+          <TripMap trip={currentTrip} />
+
           {/* Weather Widget Overlay - Top Right */}
           <div className="absolute top-4 right-4 z-20 w-80">
-            <WeatherSummary onClick={() => setShowWeatherDialog(true)} />
+            <WeatherSummary onClick={() => {}} />
           </div>
         </div>
       </div>
-
-      {/* Mobile: Map + bottom sheet */}
-      <div className="md:hidden h-full relative">
-        {/* Map */}
-        <div className="h-full relative">
-          <TripMap />
-          
-          {/* Weather Widget Overlay - Top Right */}
-          <div className="absolute top-4 right-4 z-20 w-72">
-            <WeatherSummary onClick={() => setShowWeatherDialog(true)} />
-          </div>
-        </div>
-
-        {/* Bottom Sheet for Mobile */}
-        <BottomSheet
-          isOpen={showBottomSheet}
-          onClose={() => setShowBottomSheet(false)}
-          title="Plan Your Trip"
-        >
-          <div className="space-y-6">
-            <TripSettingsPanel />
-          </div>
-        </BottomSheet>
-
-        {/* Mobile FAB */}
-        <FloatingActionButton
-          onClick={() => setShowBottomSheet(!showBottomSheet)}
-          icon={<Bars3Icon className="h-6 w-6" />}
-          label="Open trip planner"
-          position="bottom-right"
-          variant="primary"
-        />
-      </div>
-
-      {/* Weather Dialog */}
-      <WeatherDialog
-        isOpen={showWeatherDialog}
-        onClose={() => setShowWeatherDialog(false)}
-      />
     </div>
   );
 };

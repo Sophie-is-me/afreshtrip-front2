@@ -1,22 +1,41 @@
 import React, { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { MapPinIcon } from '@heroicons/react/24/outline';
 import { FaCar, FaBicycle } from 'react-icons/fa';
-import { useTripStore } from '../../stores/tripStore';
-import { mockApiClient } from '../../services/mockApi';
-import type { TripSettings, Trip } from '../../types/trip';
 import TripGenerationCard from './TripGenerationCard';
 import { motion } from 'framer-motion';
 
 // --- Helper Components for better structure ---
 
+interface TripCustomizationProps {
+  transport: 'car' | 'bike';
+  setTransport: (transport: 'car' | 'bike') => void;
+  tripType: 'one' | 'return';
+  setTripType: (tripType: 'one' | 'return') => void;
+  t: (key: string) => string;
+}
+
+interface RoutePlannerProps {
+  departureCity: string;
+  setDepartureCity: (city: string) => void;
+  destinationCity: string;
+  setDestinationCity: (city: string) => void;
+  useCurrentLocation: boolean;
+  setUseCurrentLocation: (use: boolean) => void;
+  stations: number;
+  setStations: (stations: number) => void;
+  duration: number;
+  setDuration: (duration: number) => void;
+  t: (key: string) => string;
+}
+
 // Custom Radio Button for Trip Type and Transport (matching design)
-const DesignRadio = ({ id, name, value, checked, onChange, children, icon }: { 
-  id: string, 
-  name: string, 
-  value: string, 
-  checked: boolean, 
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void, 
+const DesignRadio = ({ id, name, value, checked, onChange, children, icon }: {
+  id: string,
+  name: string,
+  value: string,
+  checked: boolean,
+  onChange: () => void,
   children: React.ReactNode,
   icon?: React.ReactNode
 }) => (
@@ -27,7 +46,7 @@ const DesignRadio = ({ id, name, value, checked, onChange, children, icon }: {
       name={name}
       value={value}
       checked={checked}
-      onChange={onChange}
+      onChange={() => onChange()}
       className="hidden"
     />
     <label
@@ -48,18 +67,18 @@ const DesignRadio = ({ id, name, value, checked, onChange, children, icon }: {
 );
 
 // Custom Checkbox for Interests (matching design)
-const DesignCheckbox = ({ id, label, checked, onChange }: { 
-  id: string, 
-  label: string, 
-  checked: boolean, 
-  onChange: (checked: boolean) => void 
+const DesignCheckbox = ({ id, label, checked, onChange }: {
+  id: string,
+  label: string,
+  checked: boolean,
+  onChange: () => void
 }) => (
   <div className="flex items-center">
     <input
       type="checkbox"
       id={id}
       checked={checked}
-      onChange={(e) => onChange(e.target.checked)}
+      onChange={() => onChange()}
       className="hidden"
     />
     <label
@@ -145,18 +164,18 @@ const DesignButton = ({
 };
 
 // Input field component matching the design
-const DesignInput = ({ 
-  value, 
-  onChange, 
-  placeholder, 
-  type = 'text', 
+const DesignInput = ({
+  value,
+  onChange,
+  placeholder,
+  type = 'text',
   disabled = false,
   className = ''
-}: { 
-  value: string | number, 
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void, 
-  placeholder?: string, 
-  type?: string, 
+}: {
+  value: string,
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void,
+  placeholder?: string,
+  type?: string,
   disabled?: boolean,
   className?: string
 }) => (
@@ -170,24 +189,200 @@ const DesignInput = ({
   />
 );
 
-const TripSettingsPanel: React.FC = () => {
-  const { setTripSettings, setTrip, setLoading, setError } = useTripStore();
-
-  // --- STATE MANAGEMENT ---
-  const [transport, setTransport] = useState<'car' | 'bike'>('car');
-  const [tripType, setTripType] = useState<'one' | 'return'>('return');
-  const [departureCity, setDepartureCity] = useState('Copenhagen');
-  const [destinationCity, setDestinationCity] = useState('Copenhagen');
-  const [useCurrentLocation, setUseCurrentLocation] = useState(false);
-  const [stations, setStations] = useState(3);
-  const [duration, setDuration] = useState(1);
-  const [interests, setInterests] = useState<string[]>(['Outdoors & Sport']);
+const TripCustomization: React.FC<TripCustomizationProps> = ({ transport, setTransport, tripType, setTripType, t }) => (
+    <div className="mb-6 p-4 border border-gray-200">
+      {/* <h3 className="text-lg font-bold text-teal-900 mb-2">Customize Your Journey</h3>
+      <p className="text-sm text-gray-600 mb-4">
+        Select your preferred mode of transport and trip type to tailor the perfect journey.
+      </p> */}
+      <div className="flex flex-col sm:flex-row gap-6">
+        {/* --- Transportation Section --- */}
+        <div className="flex-1">
+          <label className="block text-xs text-gray-500 mb-2 font-semibold">{t('trips.transportation')}</label>
+          <div className="flex space-x-4 bg-gray-50 p-3">
+            <DesignRadio
+              id="car"
+              name="transport"
+              value="car"
+              checked={transport === 'car'}
+              onChange={() => setTransport('car')}
+              icon={<FaCar />}
+            >
+              {t('trips.carTrip')}
+            </DesignRadio>
+            <DesignRadio
+              id="bike"
+              name="transport"
+              value="bike"
+              checked={transport === 'bike'}
+              onChange={() => setTransport('bike')}
+              icon={<FaBicycle />}
+            >
+              {t('trips.bikeTrip')}
+            </DesignRadio>
+          </div>
+        </div>
   
-  // State for generated trip data
-  const [generatedStops, setGeneratedStops] = useState<string[]>([]);
-  const [selectedStop, setSelectedStop] = useState<string | null>(null);
-  const [tripDetails, setTripDetails] = useState<{ time: string; distance: string; co2: string } | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
+        {/* --- Trip Type Section --- */}
+        <div className="flex-1">
+          <label className="block text-xs text-gray-500 mb-2 font-semibold">{t('trips.tripType')}</label>
+          <div className="flex space-x-4 bg-gray-50 p-3">
+            <DesignRadio
+              id="one-way"
+              name="tripType"
+              value="one"
+              checked={tripType === 'one'}
+              onChange={() => setTripType('one')}
+            >
+              {t('trips.oneWay')}
+            </DesignRadio>
+            <DesignRadio
+              id="return"
+              name="tripType"
+              value="return"
+              checked={tripType === 'return'}
+              onChange={() => setTripType('return')}
+            >
+              {t('trips.returnWay')}
+            </DesignRadio>
+          </div>
+        </div>
+      </div>
+    </div>
+);
+
+const RoutePlanner: React.FC<RoutePlannerProps> = ({
+    departureCity,
+    setDepartureCity,
+    destinationCity,
+    setDestinationCity,
+    useCurrentLocation,
+    setUseCurrentLocation,
+    stations,
+    setStations,
+    duration,
+    setDuration,
+    t,
+  }) => (
+    <div className="mb-6 p-4 border border-gray-200">
+      {/* <h3 className="text-lg font-bold text-teal-900 mb-2">Define Your Route</h3>
+      <p className="text-sm text-gray-600 mb-4">
+        Tell us where you're starting, where you're going, and for how long.
+      </p> */}
+      
+      {/* --- Cities --- */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+        <div>
+          <label className="block text-xs text-gray-500 mb-1 font-semibold">{t('trips.departureCity')}</label>
+          <div className="flex items-center">
+            <DesignInput
+              value={departureCity}
+              onChange={(e) => setDepartureCity(e.target.value)}
+              disabled={useCurrentLocation}
+            />
+            <button
+              type="button"
+              onClick={() => setUseCurrentLocation(!useCurrentLocation)}
+              className={`ml-2 p-2 rounded-lg transition-colors ${
+                useCurrentLocation ? 'bg-teal-100 text-teal-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+              aria-label="Use current location"
+            >
+              <MapPinIcon className="w-5 h-5" />
+            </button>
+          </div>
+          {useCurrentLocation && (
+            <p className="text-xs text-teal-600 mt-1">{t('trips.usingCurrentLocation')}</p>
+          )}
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1 font-semibold">{t('trips.destinationCity')}</label>
+          <DesignInput
+            value={destinationCity}
+            onChange={(e) => setDestinationCity(e.target.value)}
+          />
+        </div>
+      </div>
+  
+      {/* --- Stops and Duration --- */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-gray-50 p-3">
+          <label className="block text-xs text-gray-500 mb-1 font-semibold">{t('trips.stations')}</label>
+          <DesignInput
+            type="number"
+            value={stations.toString()}
+            onChange={(e) => setStations(parseInt(e.target.value, 10))}
+            className="bg-transparent"
+          />
+        </div>
+        <div className="bg-gray-50 p-3">
+          <label className="block text-xs text-gray-500 mb-1 font-semibold">{t('trips.duration')}</label>
+          <div className="flex items-baseline">
+            <DesignInput
+              type="number"
+              value={duration.toString()}
+              onChange={(e) => setDuration(parseInt(e.target.value, 10))}
+              className="bg-transparent"
+            />
+            <span className="ml-2 text-gray-600">{t('trips.days')}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+);
+
+interface TripSettingsPanelProps {
+  transport: 'car' | 'bike';
+  setTransport: (transport: 'car' | 'bike') => void;
+  tripType: 'one' | 'return';
+  setTripType: (tripType: 'one' | 'return') => void;
+  departureCity: string;
+  setDepartureCity: (city: string) => void;
+  destinationCity: string;
+  setDestinationCity: (city: string) => void;
+  useCurrentLocation: boolean;
+  setUseCurrentLocation: (use: boolean) => void;
+  stations: number;
+  setStations: (stations: number) => void;
+  duration: number;
+  setDuration: (duration: number) => void;
+  interests: string[];
+  onToggleInterest: (interest: string) => void;
+  onGenerateTrip: () => void;
+  generatedStops: string[];
+  selectedStop: string | null;
+  setSelectedStop: (stop: string) => void;
+  tripDetails: { time: string; distance: string; co2: string } | null;
+  isGenerating: boolean;
+  onStartNavigation: () => void;
+}
+
+const TripSettingsPanel: React.FC<TripSettingsPanelProps> = ({
+  transport,
+  setTransport,
+  tripType,
+  setTripType,
+  departureCity,
+  setDepartureCity,
+  destinationCity,
+  setDestinationCity,
+  useCurrentLocation,
+  setUseCurrentLocation,
+  stations,
+  setStations,
+  duration,
+  setDuration,
+  interests,
+  onToggleInterest,
+  onGenerateTrip,
+  generatedStops,
+  selectedStop,
+  setSelectedStop,
+  tripDetails,
+  isGenerating,
+  onStartNavigation,
+}) => {
+  const { t } = useTranslation();
 
   const interestOptions = ['Outdoors & Sport', 'Culture & Museum', 'Fjords & Mountains'];
 
@@ -214,195 +409,49 @@ const TripSettingsPanel: React.FC = () => {
     }
   ];
 
-  const mockSuggestedStops = {
-    'Outdoors & Sport': ['Dyrehaven', 'Amager Strandpark', 'Superkilen Park', 'Kastellet'],
-    'Culture & Museum': ['Amalienborg Palace', 'Charlottenlund Palace', 'The Open Air Museum', 'Ny Carlsberg Glyptotek'],
-    'Fjords & Mountains': ['Roskilde Fjord', 'Vejle Fjord', 'Møns Klint', 'Himmelbjerget'],
-  };
-
-  const generateTripMutation = useMutation({
-    mutationFn: (tripSettings: TripSettings) => mockApiClient.generateTrip(tripSettings),
-    onSuccess: (trip: Trip) => {
-      // Simulate backend response
-      const stops = interests.flatMap(interest => mockSuggestedStops[interest as keyof typeof mockSuggestedStops] || []).slice(0, stations);
-      const uniqueStops = [...new Set(stops)]; // Ensure no duplicates
-      
-      setGeneratedStops(uniqueStops);
-      
-      // Simulate trip details based on generated stops
-      const simulatedDistance = uniqueStops.length * 25 + Math.floor(Math.random() * 20);
-      const simulatedTimeHours = Math.floor(simulatedDistance / 40);
-      const simulatedTimeMinutes = Math.floor((simulatedDistance % 40) * 1.5);
-
-      setTripDetails({
-          time: `${simulatedTimeHours}h ${simulatedTimeMinutes}min`,
-          distance: `${simulatedDistance} km`,
-          co2: `${Math.round(simulatedDistance * 0.12)}g`
-      });
-
-      // Update global store
-      setTrip(trip);
-      setTripSettings(trip.settings);
-      setLoading(false);
-      setIsGenerating(false);
-    },
-    onError: (error: Error) => {
-      setError(error.message);
-      setLoading(false);
-      setIsGenerating(false);
-    },
-  });
-
-  const handleToggleInterest = (interest: string) => {
-    setInterests(prev =>
-      prev.includes(interest) ? prev.filter(i => i !== interest) : [...prev, interest]
-    );
-  };
-
-  const handleGenerateTrip = () => {
-    setIsGenerating(true);
-    setError(null);
-    setGeneratedStops([]); // Clear previous results
-    setTripDetails(null);
-
-    const settings: TripSettings = {
-        destination: destinationCity,
-        duration,
-        budget: 1000, // Mock value
-        travelers: 1, // Mock value
-        preferences: interests,
-        vehicle: transport,
-    };
-    generateTripMutation.mutate(settings);
-  };
-
 
 
   return (
     <div className="h-full flex flex-col p-6 bg-transparent">
-      {/* --- Transportation Section --- */}
-      <div className="mb-6">
-        <h3 className="text-lg font-bold text-teal-900 mb-4">Transportation</h3>
-        <div className="flex space-x-4">
-          <DesignRadio
-            id="car"
-            name="transport"
-            value="car"
-            checked={transport === 'car'}
-            onChange={() => setTransport('car')}
-            icon={<FaCar />}
-          >
-            Car Trip
-          </DesignRadio>
-          <DesignRadio
-            id="bike"
-            name="transport"
-            value="bike"
-            checked={transport === 'bike'}
-            onChange={() => setTransport('bike')}
-            icon={<FaBicycle />}
-          >
-            Bike Trip
-          </DesignRadio>
-        </div>
-      </div>
+      <h2 className="text-xl font-bold text-teal-900 mb-6 text-center">{t('trips.planYourTrip')}</h2>
       
-      {/* --- Trip Type Section --- */}
-      <div className="mb-6">
-        <h3 className="text-lg font-bold text-teal-900 mb-4">Trip Type</h3>
-        <div className="flex space-x-4">
-          <DesignRadio
-            id="one-way"
-            name="tripType"
-            value="one"
-            checked={tripType === 'one'}
-            onChange={() => setTripType('one')}
-          >
-            One way
-          </DesignRadio>
-          <DesignRadio
-            id="return"
-            name="tripType"
-            value="return"
-            checked={tripType === 'return'}
-            onChange={() => setTripType('return')}
-          >
-            Return way
-          </DesignRadio>
-        </div>
-      </div>
+      <TripCustomization
+        transport={transport}
+        setTransport={setTransport}
+        tripType={tripType}
+        setTripType={setTripType}
+        t={t}
+      />
       
-      {/* --- Route Section --- */}
-      <div className="mb-6">
-        <h3 className="text-lg font-bold text-teal-900 mb-4">Route</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Departure city</label>
-            <div className="flex items-center">
-              <DesignInput
-                value={departureCity}
-                onChange={(e) => setDepartureCity(e.target.value)}
-                disabled={useCurrentLocation}
-              />
-              <button
-                type="button"
-                onClick={() => setUseCurrentLocation(!useCurrentLocation)}
-                className={`ml-2 p-2 rounded-lg transition-colors ${
-                  useCurrentLocation ? 'bg-teal-100 text-teal-600' : 'bg-gray-100 text-gray-600'
-                }`}
-              >
-                <MapPinIcon className="w-5 h-5" />
-              </button>
-            </div>
-            {useCurrentLocation && (
-              <p className="text-xs text-teal-600 mt-1">Using your current location</p>
-            )}
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Destination City</label>
-            <DesignInput
-              value={destinationCity}
-              onChange={(e) => setDestinationCity(e.target.value)}
-            />
-          </div>
-        </div>
-        
-        <div className="grid grid-cols-2 gap-4 mt-4">
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Stations</label>
-            <DesignInput
-              type="number"
-              value={stations}
-              onChange={(e) => setStations(parseInt(e.target.value, 10))}
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Duration</label>
-            <div className="flex items-baseline">
-              <DesignInput
-                type="number"
-                value={duration}
-                onChange={(e) => setDuration(parseInt(e.target.value, 10))}
-              />
-              <span className="ml-2 text-gray-600">days</span>
-            </div>
-          </div>
-        </div>
-      </div>
+      <RoutePlanner
+        departureCity={departureCity}
+        setDepartureCity={setDepartureCity}
+        destinationCity={destinationCity}
+        setDestinationCity={setDestinationCity}
+        useCurrentLocation={useCurrentLocation}
+        setUseCurrentLocation={setUseCurrentLocation}
+        stations={stations}
+        setStations={setStations}
+        duration={duration}
+        setDuration={setDuration}
+        t={t}
+    />
       
       {/* --- Interests Section --- */}
-      <div className="mb-6">
-        <h3 className="text-lg font-bold text-teal-900 mb-4">Interests</h3>
-        <div className="space-y-2 space-x-4 flex justify-around flex-row">
-          {interestOptions.map(interest => (
-            <DesignCheckbox
-              key={interest}
-              id={interest}
-              label={interest}
-              checked={interests.includes(interest)}
-              onChange={() => handleToggleInterest(interest)}
-            />
-          ))}
+      <div className="mb-6 p-4 border border-gray-200">
+        <label className="block text-xs text-gray-500 mb-2 font-semibold">{t('trips.interests')}</label>
+        <div className="bg-gray-50 p-3">
+          <div className="flex space-x-4">
+            {interestOptions.map(interest => (
+              <DesignCheckbox
+                key={interest}
+                id={interest}
+                label={interest}
+                checked={interests.includes(interest)}
+                onChange={() => onToggleInterest(interest)}
+              />
+            ))}
+          </div>
         </div>
       </div>
 
@@ -410,12 +459,12 @@ const TripSettingsPanel: React.FC = () => {
       <div className="mb-6">
         {!isGenerating && generatedStops.length === 0 && (
           <DesignButton
-            onClick={handleGenerateTrip}
+            onClick={onGenerateTrip}
             disabled={!destinationCity}
             variant="primary"
             className="w-[50%] mx-auto"
           >
-            Generate Trip
+            {t('trips.generateTrip')}
           </DesignButton>
         )}
       </div>
@@ -423,7 +472,7 @@ const TripSettingsPanel: React.FC = () => {
       {/* --- Testimonials Section --- */}
       {generatedStops.length === 0 && !isGenerating && (
         <div className="mb-6">
-          <h3 className="text-lg font-bold text-teal-900 mb-4">Testimonials</h3>
+          <h3 className="text-lg font-bold text-teal-900 mb-4">{t('trips.testimonials')}</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {testimonials.map((testimonial, index) => (
               <div key={index} className="bg-gray-50 border border-gray-200 p-4">
@@ -447,8 +496,8 @@ const TripSettingsPanel: React.FC = () => {
             setSelectedStop={setSelectedStop}
             tripDetails={tripDetails}
             isGenerating={isGenerating}
-            onGenerateTrip={handleGenerateTrip}
-            onStartNavigation={() => {}}
+            onGenerateTrip={onGenerateTrip}
+            onStartNavigation={onStartNavigation}
           />
         )}
       </div>

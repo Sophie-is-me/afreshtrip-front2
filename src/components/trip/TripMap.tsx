@@ -1,6 +1,7 @@
-// src/components/trip/TripMap.tsx
+import React from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
-import { useTripStore } from '../../stores/tripStore';
+import { useTranslation } from 'react-i18next';
+import type { Trip } from '../../types/trip';
 // import MapControls from './MapControls';
 import 'leaflet/dist/leaflet.css';
 
@@ -13,14 +14,18 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-const TripMap: React.FC = () => {
-  const { currentTrip } = useTripStore();
+interface TripMapProps {
+  trip: Trip | null;
+}
+
+const TripMap: React.FC<TripMapProps> = ({ trip }) => {
+  const { t } = useTranslation();
 
   // Default center if no trip
   const defaultCenter: [number, number] = [48.8566, 2.3522]; // Paris
   const defaultZoom = 10;
 
-  if (!currentTrip) {
+  if (!trip) {
     return (
       <div className="h-full w-full bg-gray-100 flex items-center justify-center relative overflow-hidden">
         <MapContainer center={defaultCenter} zoom={defaultZoom} className="h-full z-10 w-full ">
@@ -30,16 +35,15 @@ const TripMap: React.FC = () => {
           />
         </MapContainer>
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-1000">
-          <div className="glass-effect p-6 rounded-2xl shadow-xl pointer-events-auto">
-            <p className="text-gray-700 font-medium">Generate a trip to see the map</p>
+          <div className="glass-effect p-6 boder-gray-400 border-2 shadow-xl pointer-events-auto">
+            <p className="text-gray-700 font-medium">{t('trips.generateTripToSeeMap')}</p>
           </div>
         </div>
-        {/* <MapControls /> */}
       </div>
     );
   }
 
-  const { places, route } = currentTrip;
+  const { places, route } = trip;
 
   // Calculate center from places or route
   const center: [number, number] = places.length > 0
@@ -81,9 +85,6 @@ const TripMap: React.FC = () => {
           </Marker>
         ))}
       </MapContainer>
-
-      {/* Map Controls */}
-      {/* <MapControls /> */}
     </div>
   );
 };

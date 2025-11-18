@@ -14,6 +14,7 @@ export interface Place {
   lng: number;
   description: string;
   category: string; // e.g., 'attraction', 'restaurant'
+  image?: string; // URL to touristic image
 }
 
 export interface WeatherDay {

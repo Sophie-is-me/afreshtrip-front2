@@ -1,5 +1,6 @@
 // src/components/trip/WeatherSummary.tsx
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { CloudIcon, SunIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { useTripStore } from '../../stores/tripStore';
@@ -13,6 +14,7 @@ interface WeatherSummaryProps {
 }
 
 const WeatherSummary: React.FC<WeatherSummaryProps> = ({ onClick, location: propLocation, time: propTime }) => {
+  const { t } = useTranslation();
   const { currentTrip } = useTripStore();
   const location = propLocation || currentTrip?.weather?.location || 'Paris';
   const time = propTime;
@@ -48,7 +50,7 @@ const WeatherSummary: React.FC<WeatherSummaryProps> = ({ onClick, location: prop
   return (
     <div
       onClick={onClick}
-      className="bg-white rounded-2xl p-4 w-full max-w-sm mx-auto shadow-lg cursor-pointer hover:shadow-xl transition-shadow"
+      className="bg-white border-gray-400 border-2 p-4 w-full max-w-sm mx-auto shadow-lg cursor-pointer hover:shadow-xl transition-shadow"
     >
       {isLoading ? (
         <div className="flex items-center justify-center py-8">
@@ -56,7 +58,7 @@ const WeatherSummary: React.FC<WeatherSummaryProps> = ({ onClick, location: prop
         </div>
       ) : error ? (
         <div className="bg-red-100 border border-red-300 rounded-lg p-4 text-center">
-          <p className="text-red-700 text-sm font-medium">Failed to load weather data</p>
+          <p className="text-red-700 text-sm font-medium">{t('trips.failedToLoadWeather')}</p>
         </div>
       ) : weather ? (
         <>
@@ -81,7 +83,7 @@ const WeatherSummary: React.FC<WeatherSummaryProps> = ({ onClick, location: prop
 
           {/* 3-days forecast */}
           <div className="mb-4">
-            <h3 className="text-base font-semibold text-gray-700 mb-2">3-days forecast</h3>
+            <h3 className="text-base font-semibold text-gray-700 mb-2">{t('trips.threeDaysForecast')}</h3>
             <div className="space-y-1">
               {weather.forecast.slice(0, 3).map((day, index) => (
                 <div key={index} className="flex items-center justify-between">
@@ -94,7 +96,7 @@ const WeatherSummary: React.FC<WeatherSummaryProps> = ({ onClick, location: prop
 
           {/* Clothes Suggestion */}
           <div>
-            <h3 className="text-base font-semibold text-gray-700 mb-2">Clothes</h3>
+            <h3 className="text-base font-semibold text-gray-700 mb-2">{t('trips.clothes')}</h3>
             <div className="flex justify-around items-center space-x-3 text-gray-500">
               {weather.clothing.map((item, index) => (
                 <div key={index} className="flex flex-col items-center">
@@ -106,7 +108,7 @@ const WeatherSummary: React.FC<WeatherSummaryProps> = ({ onClick, location: prop
           </div>
         </>
       ) : (
-        <p className="text-gray-500 text-sm text-center">No weather data available</p>
+        <p className="text-gray-500 text-sm text-center">{t('trips.noWeatherData')}</p>
       )}
     </div>
   );

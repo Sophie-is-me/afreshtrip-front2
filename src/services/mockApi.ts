@@ -433,27 +433,108 @@ export class MockApiClient {
 
   // Trip-related mock services
   async generateTrip(settings: TripSettings): Promise<Trip> {
-    await simulateDelay();
-    const mockPlaces: Place[] = [
-      { id: '1', name: 'Eiffel Tower', lat: 48.8584, lng: 2.2945, description: 'Iconic tower in Paris', category: 'attraction' },
-      { id: '2', name: 'Louvre Museum', lat: 48.8606, lng: 2.3376, description: 'World-famous art museum', category: 'museum' },
-    ];
-    const mockRoute: Route = {
-      waypoints: [{ lat: 48.8584, lng: 2.2945 }, { lat: 48.8606, lng: 2.3376 }],
-      distance: 5.2,
-      duration: 25,
+    await simulateDelay(1500); // Simulate longer processing for trip generation
+
+    // Base coordinates for Copenhagen (can be made dynamic based on destination)
+    const baseLat = 55.6761;
+    const baseLng = 12.5683;
+
+    // Generate places based on interests and destination
+    const allPossiblePlaces: Record<string, Array<{name: string, description: string, category: 'park' | 'beach' | 'attraction' | 'museum' | 'nature', image: string}>> = {
+      'Outdoors & Sport': [
+        { name: 'Dyrehaven', description: 'Beautiful forest and park area', category: 'park' as const, image: '/assets/dyrehaven.jpg' },
+        { name: 'Amager Strandpark', description: 'Urban beach and recreational area', category: 'beach' as const, image: '/assets/amager-strandpark.jpg' },
+        { name: 'Superkilen Park', description: 'Unique multicultural park', category: 'park' as const, image: '/assets/superkilen.jpg' },
+        { name: 'Kastellet', description: 'Historic fort and park', category: 'attraction' as const, image: '/assets/kastellet.jpg' },
+        { name: 'Fælledparken', description: 'Large urban park', category: 'park' as const, image: '/assets/faelledparken.jpg' },
+      ],
+      'Culture & Museum': [
+        { name: 'Amalienborg Palace', description: 'Royal residence and museum', category: 'museum' as const, image: '/assets/amalienborg.jpg' },
+        { name: 'Charlottenlund Palace', description: 'Historic palace with gardens', category: 'museum' as const, image: '/assets/charlottenlund.jpg' },
+        { name: 'The Open Air Museum', description: 'Living history museum', category: 'museum' as const, image: '/assets/open-air-museum.jpg' },
+        { name: 'Ny Carlsberg Glyptotek', description: 'Art museum with sculpture garden', category: 'museum' as const, image: '/assets/ny-carlsberg.jpg' },
+        { name: 'Christiansborg Palace', description: 'Parliament and royal palace', category: 'museum' as const, image: '/assets/christiansborg.jpg' },
+      ],
+      'Fjords & Mountains': [
+        { name: 'Roskilde Fjord', description: 'Beautiful fjord area', category: 'nature' as const, image: '/assets/roskilde-fjord.jpg' },
+        { name: 'Vejle Fjord', description: 'Scenic fjord landscape', category: 'nature' as const, image: '/assets/vejle-fjord.jpg' },
+        { name: 'Møns Klint', description: 'Chalk cliffs and nature', category: 'nature' as const, image: '/assets/mons-klint.jpg' },
+        { name: 'Møns Klint', description: 'Chalk cliffs and nature', category: 'nature' as const, image: '/assets/mons-klint.jpg' },
+        { name: 'Himmelbjerget', description: 'Highest natural point in Denmark', category: 'nature' as const, image: '/assets/himmelbjerget.jpg' },
+        { name: 'Gribskov', description: 'Ancient forest area', category: 'nature' as const, image: '/assets/gribskov.jpg' },
+      ],
     };
+
+    // Collect places based on selected interests
+    let selectedPlaces: Array<{name: string, description: string, category: 'park' | 'beach' | 'attraction' | 'museum' | 'nature', image: string}> = [];
+    settings.preferences.forEach(interest => {
+      const places = allPossiblePlaces[interest as keyof typeof allPossiblePlaces] || [];
+      selectedPlaces = selectedPlaces.concat(places);
+    });
+
+    // If no interests selected, use a default mix
+    if (selectedPlaces.length === 0) {
+      selectedPlaces = [
+        ...allPossiblePlaces['Outdoors & Sport'].slice(0, 2),
+        ...allPossiblePlaces['Culture & Museum'].slice(0, 2),
+        ...allPossiblePlaces['Fjords & Mountains'].slice(0, 1),
+      ];
+    }
+
+    // Limit to stations count and shuffle
+    const shuffledPlaces = selectedPlaces.sort(() => 0.5 - Math.random());
+    const finalPlaces = shuffledPlaces.slice(0, settings.preferences.length > 0 ? Math.min(settings.preferences.length * 2, settings.preferences.length === 1 ? 4 : 6) : 4);
+
+    // Generate coordinates around Copenhagen with some variation
+    const mockPlaces: Place[] = finalPlaces.map((place, index) => {
+      const latOffset = (Math.random() - 0.5) * 0.1; // ±0.05 degrees
+      const lngOffset = (Math.random() - 0.5) * 0.1;
+      return {
+        id: `place_${index + 1}`,
+        name: place.name,
+        lat: baseLat + latOffset,
+        lng: baseLng + lngOffset,
+        description: place.description,
+        category: place.category,
+        image: place.image,
+      };
+    });
+
+    // Create route waypoints in order of places
+    const waypoints = mockPlaces.map(place => ({ lat: place.lat, lng: place.lng }));
+
+    // Calculate total distance (simplified)
+    let totalDistance = 0;
+    for (let i = 1; i < waypoints.length; i++) {
+      const prev = waypoints[i - 1];
+      const curr = waypoints[i];
+      const distance = Math.sqrt((curr.lat - prev.lat) ** 2 + (curr.lng - prev.lng) ** 2) * 111; // rough km
+      totalDistance += distance;
+    }
+
+    const mockRoute: Route = {
+      waypoints,
+      distance: Math.round(totalDistance * 10) / 10,
+      duration: Math.round(totalDistance * 3), // assume 20 km/h average speed
+    };
+
     const mockWeather: Weather = {
       location: settings.destination,
-      temperature: 18,
-      condition: 'Partly cloudy',
-      humidity: 55,
-      forecast: [
-        { date: new Date().toISOString().split('T')[0], temp: 18, condition: 'Partly cloudy' },
-        { date: new Date(Date.now() + 86400000).toISOString().split('T')[0], temp: 20, condition: 'Sunny' },
-      ],
-      clothing: generateClothingSuggestions('Partly cloudy', 18),
+      temperature: 15 + Math.floor(Math.random() * 10), // 15-25°C
+      condition: ['Sunny', 'Partly cloudy', 'Cloudy', 'Light rain'][Math.floor(Math.random() * 4)],
+      humidity: 50 + Math.floor(Math.random() * 30), // 50-80%
+      forecast: Array.from({ length: 5 }, (_, i) => {
+        const date = new Date();
+        date.setDate(date.getDate() + i);
+        return {
+          date: date.toISOString().split('T')[0],
+          temp: 15 + Math.floor(Math.random() * 10),
+          condition: ['Sunny', 'Partly cloudy', 'Cloudy'][Math.floor(Math.random() * 3)],
+        };
+      }),
+      clothing: generateClothingSuggestions('Partly cloudy', 20),
     };
+
     return {
       id: 'trip_' + Date.now(),
       settings,

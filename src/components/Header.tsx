@@ -116,6 +116,12 @@ const Header: React.FC<HeaderProps> = ({
                    >
                      <span>🇪🇸</span> {t('header.spanish')}
                    </button>
+                   <button
+                     className={`flex items-center gap-3 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 ${i18n.language === 'zh' ? 'bg-gray-100' : ''}`}
+                     onClick={() => changeLanguage('zh')}
+                   >
+                     <span>🇨🇳</span> {t('header.chinese')}
+                   </button>
                  </div>
                )}
              </div>

@@ -189,6 +189,21 @@ const Blog: React.FC = () => {
     window.location.reload();
   };
 
+  // Translate category
+  const translateCategory = (category: string) => {
+    switch (category) {
+      case 'Travel': return t('blog.travel');
+      case 'Food': return t('blog.food');
+      case 'Culture': return t('blog.culture');
+      case 'Adventure': return t('blog.adventure');
+      case 'Nature': return t('blog.nature');
+      case 'City Guide': return t('blog.cityGuide');
+      case 'Tips & Tricks': return t('blog.tipsTricks');
+      case 'Photography': return t('blog.photography');
+      default: return category;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header showNavLinks={false} />
@@ -244,7 +259,7 @@ const Blog: React.FC = () => {
                     : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
               >
-                {category}
+                {translateCategory(category)}
               </button>
             ))}
           </div>

@@ -14,7 +14,7 @@ interface WeatherSummaryProps {
 }
 
 const WeatherSummary: React.FC<WeatherSummaryProps> = ({ onClick, location: propLocation, time: propTime }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { currentTrip } = useTripStore();
   const location = propLocation || currentTrip?.weather?.location || 'Paris';
   const time = propTime;
@@ -46,6 +46,15 @@ const WeatherSummary: React.FC<WeatherSummaryProps> = ({ onClick, location: prop
     return <CloudIcon className="h-6 w-6 text-gray-600" />;
   };
 
+  const getLocale = () => {
+    switch (i18n.language) {
+      case 'fr': return 'fr-FR';
+      case 'es': return 'es-ES';
+      case 'zh': return 'zh-CN';
+      default: return 'en-US';
+    }
+  };
+
 
   return (
     <div
@@ -68,7 +77,7 @@ const WeatherSummary: React.FC<WeatherSummaryProps> = ({ onClick, location: prop
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
             <h2 className="text-lg font-semibold text-gray-800">
-              {new Date(weather.forecast[0].date).toLocaleDateString('en-US', { weekday: 'short', day: '2-digit', month: 'long' })}
+              {new Date(weather.forecast[0].date).toLocaleDateString(getLocale(), { weekday: 'short', day: '2-digit', month: 'long' })}
             </h2>
           </div>
 

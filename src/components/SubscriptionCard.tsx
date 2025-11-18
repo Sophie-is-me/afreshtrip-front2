@@ -92,11 +92,11 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
   };
 
   const renderBadge = () => {
-    if (!plan.badgeText && !plan.isPopular && !plan.isBestValue) return null;
-    
-    const badgeTextToRender = plan.badgeText || (plan.isBestValue ? t('subscriptionCard.bestValue') : t('subscriptionCard.popular'));
+    if (!plan.badgeTextKey && !plan.isPopular && !plan.isBestValue) return null;
+
+    const badgeTextToRender = plan.badgeTextKey ? t(plan.badgeTextKey) : (plan.isBestValue ? t('subscriptionCard.bestValue') : t('subscriptionCard.popular'));
     const badgeColor = plan.isBestValue ? 'purple' : 'red';
-    
+
     return (
       <div className={`absolute top-0 right-0 bg-${badgeColor}-500 text-white text-xs font-bold px-3 py-1 rounded-bl-lg rounded-tr-xl`}>
         {badgeTextToRender}
@@ -109,7 +109,7 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
       return (
         <div className="flex items-baseline">
           <span className="text-4xl font-bold text-gray-900">{currency}{plan.price}</span>
-          <span className="ml-2 text-gray-600">{plan.period}</span>
+          <span className="ml-2 text-gray-600">{t(plan.periodKey)}</span>
         </div>
       );
     }
@@ -119,7 +119,7 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
         <div className="flex flex-col">
           <div className="flex items-baseline">
             <span className="text-4xl font-bold text-gray-900">{currency}{plan.price}</span>
-            <span className="ml-2 text-gray-600">{plan.period}</span>
+            <span className="ml-2 text-gray-600">{t(plan.periodKey)}</span>
           </div>
           <div className="flex items-center mt-1">
             <span className="text-lg text-gray-500 line-through mr-2">{currency}{plan.originalPrice}</span>
@@ -151,7 +151,7 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
               )}
             </span>
             <span className={`text-sm ${feature.included ? 'text-gray-700' : 'text-gray-400'}`}>
-              {feature.name}
+              {t(feature.nameKey)}
               {feature.description && (
                 <span className="block text-xs text-gray-500 mt-1">{feature.description}</span>
               )}
@@ -196,12 +196,12 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
       role="button"
       tabIndex={plan.isDisabled ? -1 : 0}
       onKeyDown={(e) => e.key === 'Enter' && handleCardClick()}
-      aria-label={`${plan.name} subscription plan, ${currency}${plan.price} per ${plan.period}`}
+      aria-label={`${t(plan.nameKey)} subscription plan, ${currency}${plan.price} per ${t(plan.periodKey)}`}
     >
       {renderBadge()}
       
       <div className="mb-4">
-        <h3 className="text-xl font-semibold text-gray-900 mb-2">{plan.name}</h3>
+        <h3 className="text-xl font-semibold text-gray-900 mb-2">{t(plan.nameKey)}</h3>
         {renderPrice()}
       </div>
       

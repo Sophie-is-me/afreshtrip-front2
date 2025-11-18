@@ -3,9 +3,18 @@ import { useTranslation } from 'react-i18next';
 import type { Comment } from '../types/blog';
 
 const CommentSection: React.FC<{ comments: Comment[]; onAddComment: (comment: string) => void; onLikeComment: (commentId: string) => void }> = ({ comments, onAddComment, onLikeComment }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [newComment, setNewComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const getLocale = () => {
+    switch (i18n.language) {
+      case 'fr': return 'fr-FR';
+      case 'es': return 'es-ES';
+      case 'zh': return 'zh-CN';
+      default: return 'en-US';
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,7 +63,7 @@ const CommentSection: React.FC<{ comments: Comment[]; onAddComment: (comment: st
               <div className="flex-1">
                 <div className="flex items-center mb-2">
                   <h4 className="font-medium text-gray-900">{comment.author.name}</h4>
-                  <span className="ml-auto text-sm text-gray-500">{new Date(comment.date).toLocaleDateString()}</span>
+                  <span className="ml-auto text-sm text-gray-500">{new Date(comment.date).toLocaleDateString(getLocale())}</span>
                 </div>
                 <p className="text-gray-700 mb-3">{comment.content}</p>
                 <div className="flex items-center gap-4">
@@ -85,7 +94,7 @@ const CommentSection: React.FC<{ comments: Comment[]; onAddComment: (comment: st
                         <div className="flex-1">
                           <div className="flex items-center mb-1">
                             <h5 className="font-medium text-sm text-gray-900">{reply.author.name}</h5>
-                            <span className="ml-auto text-xs text-gray-500">{new Date(reply.date).toLocaleDateString()}</span>
+                            <span className="ml-auto text-xs text-gray-500">{new Date(reply.date).toLocaleDateString(getLocale())}</span>
                           </div>
                           <p className="text-sm text-gray-700">{reply.content}</p>
                         </div>

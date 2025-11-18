@@ -46,7 +46,7 @@ const GalleryCard: React.FC<GalleryCardProps> = ({
   const [likesCount, setLikesCount] = useState(likes);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const handleLike = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -88,12 +88,21 @@ const GalleryCard: React.FC<GalleryCardProps> = ({
     }
   };
 
+  const getLocale = () => {
+    switch (i18n.language) {
+      case 'fr': return 'fr-FR';
+      case 'es': return 'es-ES';
+      case 'zh': return 'zh-CN';
+      default: return 'en-US';
+    }
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric' 
+    return date.toLocaleDateString(getLocale(), {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
     });
   };
 
@@ -104,6 +113,20 @@ const GalleryCard: React.FC<GalleryCardProps> = ({
       return (num / 1000).toFixed(1) + 'K';
     }
     return num.toString();
+  };
+
+  const translateCategory = (category: string) => {
+    switch (category) {
+      case 'Travel': return t('blog.travel');
+      case 'Food': return t('blog.food');
+      case 'Culture': return t('blog.culture');
+      case 'Adventure': return t('blog.adventure');
+      case 'Nature': return t('blog.nature');
+      case 'City Guide': return t('blog.cityGuide');
+      case 'Tips & Tricks': return t('blog.tipsTricks');
+      case 'Photography': return t('blog.photography');
+      default: return category;
+    }
   };
 
   if (loading) {
@@ -161,7 +184,7 @@ const GalleryCard: React.FC<GalleryCardProps> = ({
           />
         )}
         <div className="absolute top-0 left-0 bg-teal-600 text-white px-3 py-1 rounded-br-lg text-sm font-medium">
-          {category}
+          {translateCategory(category)}
         </div>
       </div>
 

@@ -99,5 +99,13 @@
   "authorBioDefault": "No hay biografía disponible.",
   "relatedPosts": "Publicaciones relacionadas",
   "readMore": "Leer más",
-  "close": "Cerrar"
+  "close": "Cerrar",
+  "travel": "Viaje",
+  "food": "Comida",
+  "culture": "Cultura",
+  "adventure": "Aventura",
+  "nature": "Naturaleza",
+  "cityGuide": "Guía de ciudad",
+  "tipsTricks": "Consejos y trucos",
+  "photography": "Fotografía"
 }

@@ -312,14 +312,14 @@ const BlogEditor: React.FC = () => {
   
   // Categories
   const categories = [
-    'Travel',
-    'Food',
-    'Culture',
-    'Adventure',
-    'Nature',
-    'City Guide',
-    'Tips & Tricks',
-    'Photography'
+    t('blog.travel'),
+    t('blog.food'),
+    t('blog.culture'),
+    t('blog.adventure'),
+    t('blog.nature'),
+    t('blog.cityGuide'),
+    t('blog.tipsTricks'),
+    t('blog.photography')
   ];
   
   return (

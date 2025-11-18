@@ -9,7 +9,16 @@ interface BlogPostMetaProps {
 }
 
 const BlogPostMeta: React.FC<BlogPostMetaProps> = ({ post, readingTime, isLiked }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+
+  const getLocale = () => {
+    switch (i18n.language) {
+      case 'fr': return 'fr-FR';
+      case 'es': return 'es-ES';
+      case 'zh': return 'zh-CN';
+      default: return 'en-US';
+    }
+  };
 
   return (
     <div className="mb-8">
@@ -24,7 +33,7 @@ const BlogPostMeta: React.FC<BlogPostMetaProps> = ({ post, readingTime, isLiked 
           />
           <div>
             <p className="font-medium text-gray-900">{post.author.name}</p>
-            <p>{new Date(post.date).toLocaleDateString()}</p>
+            <p>{new Date(post.date).toLocaleDateString(getLocale())}</p>
           </div>
         </div>
 

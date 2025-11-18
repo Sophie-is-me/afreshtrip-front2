@@ -47,5 +47,7 @@
   "totalDistance": "Total distance",
   "co2Emissions": "CO2 emissions",
   "ecoFriendlyRouteSelected": "Eco-friendly route selected",
-  "startNavigation": "Start Navigation"
+  "startNavigation": "Start Navigation",
+  "travelers": "Travelers",
+  "travelTime": "Travel Time"
 }

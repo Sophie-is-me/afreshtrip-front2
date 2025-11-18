@@ -1,5 +1,5 @@
-import React from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
+import React, { useEffect } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import { useTranslation } from 'react-i18next';
 import type { Trip } from '../../types/trip';
 // import MapControls from './MapControls';
@@ -17,6 +17,26 @@ L.Icon.Default.mergeOptions({
 interface TripMapProps {
   trip: Trip | null;
 }
+
+const MapUpdater: React.FC<{ trip: Trip | null }> = ({ trip }) => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (trip) {
+      const allPoints: [number, number][] = [
+        ...trip.places.map(p => [p.lat, p.lng] as [number, number]),
+        ...trip.route.waypoints.map(wp => [wp.lat, wp.lng] as [number, number])
+      ];
+
+      if (allPoints.length > 0) {
+        const bounds = L.latLngBounds(allPoints);
+        map.fitBounds(bounds, { padding: [20, 20], animate: true, duration: 500 });
+      }
+    }
+  }, [trip, map]);
+
+  return null;
+};
 
 const TripMap: React.FC<TripMapProps> = ({ trip }) => {
   const { t } = useTranslation();
@@ -45,41 +65,53 @@ const TripMap: React.FC<TripMapProps> = ({ trip }) => {
 
   const { places, route } = trip;
 
-  // Calculate center from places or route
-  const center: [number, number] = places.length > 0
-    ? [places[0].lat, places[0].lng]
-    : route.waypoints.length > 0
-    ? [route.waypoints[0].lat, route.waypoints[0].lng]
-    : defaultCenter;
-
   const routePositions: [number, number][] = route.waypoints.map(wp => [wp.lat, wp.lng]);
 
+  // Debug logging
+  console.log('TripMap - Route positions:', routePositions);
+  console.log('TripMap - Places:', places);
+
   return (
-    <div className="h-full w-full bg-gray-100 rounded-2xl relative overflow-hidden">
-      <MapContainer center={center} zoom={13} className="h-full w-full rounded-2xl">
+    <div className="h-full w-full bg-gray-100 relative overflow-hidden">
+      <MapContainer center={defaultCenter} zoom={defaultZoom} className="h-full w-full">
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         />
+
+        <MapUpdater trip={trip} />
 
         {/* Route Polyline */}
         {routePositions.length > 1 && (
           <Polyline
             positions={routePositions}
             color="#0d9488"
-            weight={5}
-            opacity={0.8}
+            weight={6}
+            opacity={0.9}
+            dashArray="10, 10"
           />
         )}
 
         {/* Place Markers */}
-        {places.map((place) => (
+        {places.map((place, index) => (
           <Marker key={place.id} position={[place.lat, place.lng]}>
             <Popup className="zIndex={40}">
-              <div>
-                <h3 className="font-semibold">{place.name}</h3>
-                <p className="text-sm text-gray-600">{place.description}</p>
-                <p className="text-xs text-gray-500 capitalize">{place.category}</p>
+              <div className="max-w-xs">
+                {place.image && (
+                  <img
+                    src={place.image}
+                    alt={place.name}
+                    className="w-full h-32 object-cover rounded mb-2"
+                  />
+                )}
+                <h3 className="font-semibold text-lg mb-1">{place.name}</h3>
+                <p className="text-sm text-gray-600 mb-2">{place.description}</p>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs bg-teal-100 text-teal-800 px-2 py-1 rounded capitalize">
+                    {place.category}
+                  </span>
+                  <span className="text-xs text-gray-500">Stop {index + 1}</span>
+                </div>
               </div>
             </Popup>
           </Marker>

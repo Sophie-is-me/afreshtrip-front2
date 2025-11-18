@@ -1,10 +1,21 @@
 // src/components/trip/TripSummary.tsx
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChartBarIcon, UsersIcon, CalendarIcon, CurrencyDollarIcon } from '@heroicons/react/24/outline';
 import { useTripStore } from '../../stores/tripStore';
 
 const TripSummary: React.FC = () => {
+  const { t, i18n } = useTranslation();
   const { currentTrip } = useTripStore();
+
+  const getLocale = () => {
+    switch (i18n.language) {
+      case 'fr': return 'fr-FR';
+      case 'es': return 'es-ES';
+      case 'zh': return 'zh-CN';
+      default: return 'en-US';
+    }
+  };
 
   if (!currentTrip) {
     return (
@@ -45,7 +56,7 @@ const TripSummary: React.FC = () => {
             <div className="w-9 h-9 bg-green-500 rounded-xl flex items-center justify-center mr-3 shadow-md">
               <UsersIcon className="h-5 w-5 text-white" />
             </div>
-            <span className="text-sm text-gray-700 font-semibold">Travelers</span>
+            <span className="text-sm text-gray-700 font-semibold">{t('trips.travelers')}</span>
           </div>
           <span className="text-base font-bold text-green-700">{settings.travelers} {settings.travelers === 1 ? 'person' : 'people'}</span>
         </div>
@@ -91,7 +102,7 @@ const TripSummary: React.FC = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <span className="font-medium">
-              Created on {new Date(createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+              Created on {new Date(createdAt).toLocaleDateString(getLocale(), { month: 'long', day: 'numeric', year: 'numeric' })}
             </span>
           </div>
         </div>

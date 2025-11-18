@@ -15,7 +15,7 @@ const TripPlanner = () => {
   const [useCurrentLocation, setUseCurrentLocation] = useState(false);
   const [stations, setStations] = useState(3);
   const [duration, setDuration] = useState(1);
-  const [interests, setInterests] = useState<string[]>(['Outdoors & Sport']);
+  const [interests, setInterests] = useState<string[]>(['outdoorsSport']);
 
   // Trip data state
   const [currentTrip, setCurrentTrip] = useState<Trip | null>(null);

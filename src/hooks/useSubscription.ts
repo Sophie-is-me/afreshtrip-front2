@@ -35,14 +35,14 @@ export const useSubscription = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [errorKey, setErrorKey] = useState<string | null>(null);
+  const [successKey, setSuccessKey] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchSubscriptionData = async () => {
       try {
         setIsLoading(true);
-        setError(null);
+        setErrorKey(null);
 
         // Load plans (this would come from API in production)
         setPlans(subscriptionPlansData.plans);
@@ -64,7 +64,7 @@ export const useSubscription = () => {
           setSelectedPlanId(null);
         }
       } catch (err) {
-        setError('Failed to load subscription data. Please try again.');
+        setErrorKey('subscription.error.loadFailed');
         console.error('Error fetching subscription data:', err);
       } finally {
         setIsLoading(false);
@@ -81,33 +81,33 @@ export const useSubscription = () => {
 
   const handlePlanUpdate = useCallback(async (planId: string) => {
     if (!user) {
-      setError('You must be logged in to update your subscription');
+      setErrorKey('subscription.error.loginRequired');
       return;
     }
 
     // Validation: Check if selecting the same plan
     if (userSubscription?.planId === planId) {
-      setError('You are already subscribed to this plan');
+      setErrorKey('subscription.error.alreadySubscribed');
       return;
     }
 
     // Validation: Check if plan exists
     const selectedPlan = plans.find(p => p.id === planId);
     if (!selectedPlan) {
-      setError('Selected plan not found');
+      setErrorKey('subscription.error.planNotFound');
       return;
     }
 
     // Validation: Check if plan is disabled
     if (selectedPlan.isDisabled) {
-      setError('This plan is currently not available');
+      setErrorKey('subscription.error.planDisabled');
       return;
     }
 
     try {
       setIsUpdating(true);
-      setError(null);
-      setSuccess(null);
+      setErrorKey(null);
+      setSuccessKey(null);
 
       // Use mock API client for subscription update
       const request: UpdateSubscriptionRequest = {
@@ -120,12 +120,12 @@ export const useSubscription = () => {
       if (response.success && response.data?.subscription) {
         setUserSubscription(response.data.subscription);
         setSelectedPlanId(planId);
-        setSuccess('Subscription updated successfully!');
+        setSuccessKey('subscription.success.updateSuccess');
       } else {
-        setError(response.error?.message || 'Failed to update subscription');
+        setErrorKey(response.error?.message || 'subscription.error.updateFailed');
       }
     } catch (err) {
-      setError('Failed to update subscription. Please try again.');
+      setErrorKey('subscription.error.updateFailed');
       console.error('Error updating subscription:', err);
     } finally {
       setIsUpdating(false);
@@ -134,19 +134,19 @@ export const useSubscription = () => {
 
   const handleCancelSubscription = useCallback(async (reason?: string) => {
     if (!user) {
-      setError('You must be logged in to cancel your subscription');
+      setErrorKey('subscription.error.cancelLoginRequired');
       return;
     }
 
     if (!userSubscription) {
-      setError('No active subscription found');
+      setErrorKey('subscription.error.noSubscription');
       return;
     }
 
     try {
       setIsCancelling(true);
-      setError(null);
-      setSuccess(null);
+      setErrorKey(null);
+      setSuccessKey(null);
 
       // Use mock API client for subscription cancellation
       const response = await mockApiClient.cancelSubscription(user.uid, reason);
@@ -154,12 +154,12 @@ export const useSubscription = () => {
       if (response.success) {
         // Update local state to reflect cancellation
         setUserSubscription(prev => prev ? { ...prev, autoRenew: false } : null);
-        setSuccess('Subscription cancelled successfully. Your access will continue until the end of the current billing period.');
+        setSuccessKey('subscription.success.cancelSuccess');
       } else {
-        setError(response.error?.message || 'Failed to cancel subscription');
+        setErrorKey(response.error?.message || 'subscription.error.cancelFailed');
       }
     } catch (err) {
-      setError('Failed to cancel subscription. Please try again.');
+      setErrorKey('subscription.error.cancelFailed');
       console.error('Error cancelling subscription:', err);
     } finally {
       setIsCancelling(false);
@@ -173,8 +173,8 @@ export const useSubscription = () => {
     isLoading,
     isUpdating,
     isCancelling,
-    error,
-    success,
+    errorKey,
+    successKey,
     handlePlanSelect,
     handlePlanUpdate,
     handleCancelSubscription,

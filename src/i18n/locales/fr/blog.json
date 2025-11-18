@@ -99,5 +99,13 @@
   "authorBioDefault": "Aucune bio disponible.",
   "relatedPosts": "Articles connexes",
   "readMore": "Lire la suite",
-  "close": "Fermer"
+  "close": "Fermer",
+  "travel": "Voyage",
+  "food": "Nourriture",
+  "culture": "Culture",
+  "adventure": "Aventure",
+  "nature": "Nature",
+  "cityGuide": "Guide de ville",
+  "tipsTricks": "Conseils et astuces",
+  "photography": "Photographie"
 }

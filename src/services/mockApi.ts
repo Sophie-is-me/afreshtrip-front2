@@ -441,21 +441,21 @@ export class MockApiClient {
 
     // Generate places based on interests and destination
     const allPossiblePlaces: Record<string, Array<{name: string, description: string, category: 'park' | 'beach' | 'attraction' | 'museum' | 'nature', image: string}>> = {
-      'Outdoors & Sport': [
+      'outdoorsSport': [
         { name: 'Dyrehaven', description: 'Beautiful forest and park area', category: 'park' as const, image: '/assets/dyrehaven.jpg' },
         { name: 'Amager Strandpark', description: 'Urban beach and recreational area', category: 'beach' as const, image: '/assets/amager-strandpark.jpg' },
         { name: 'Superkilen Park', description: 'Unique multicultural park', category: 'park' as const, image: '/assets/superkilen.jpg' },
         { name: 'Kastellet', description: 'Historic fort and park', category: 'attraction' as const, image: '/assets/kastellet.jpg' },
         { name: 'Fælledparken', description: 'Large urban park', category: 'park' as const, image: '/assets/faelledparken.jpg' },
       ],
-      'Culture & Museum': [
+      'cultureMuseum': [
         { name: 'Amalienborg Palace', description: 'Royal residence and museum', category: 'museum' as const, image: '/assets/amalienborg.jpg' },
         { name: 'Charlottenlund Palace', description: 'Historic palace with gardens', category: 'museum' as const, image: '/assets/charlottenlund.jpg' },
         { name: 'The Open Air Museum', description: 'Living history museum', category: 'museum' as const, image: '/assets/open-air-museum.jpg' },
         { name: 'Ny Carlsberg Glyptotek', description: 'Art museum with sculpture garden', category: 'museum' as const, image: '/assets/ny-carlsberg.jpg' },
         { name: 'Christiansborg Palace', description: 'Parliament and royal palace', category: 'museum' as const, image: '/assets/christiansborg.jpg' },
       ],
-      'Fjords & Mountains': [
+      'fjordsMountains': [
         { name: 'Roskilde Fjord', description: 'Beautiful fjord area', category: 'nature' as const, image: '/assets/roskilde-fjord.jpg' },
         { name: 'Vejle Fjord', description: 'Scenic fjord landscape', category: 'nature' as const, image: '/assets/vejle-fjord.jpg' },
         { name: 'Møns Klint', description: 'Chalk cliffs and nature', category: 'nature' as const, image: '/assets/mons-klint.jpg' },
@@ -475,9 +475,9 @@ export class MockApiClient {
     // If no interests selected, use a default mix
     if (selectedPlaces.length === 0) {
       selectedPlaces = [
-        ...allPossiblePlaces['Outdoors & Sport'].slice(0, 2),
-        ...allPossiblePlaces['Culture & Museum'].slice(0, 2),
-        ...allPossiblePlaces['Fjords & Mountains'].slice(0, 1),
+        ...allPossiblePlaces['outdoorsSport'].slice(0, 2),
+        ...allPossiblePlaces['cultureMuseum'].slice(0, 2),
+        ...allPossiblePlaces['fjordsMountains'].slice(0, 1),
       ];
     }
 

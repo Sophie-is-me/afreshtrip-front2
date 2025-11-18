@@ -1,4 +1,62 @@
 {
   "title": "Elige tu plan",
-  "subtitle": "Selecciona el plan de suscripción perfecto para tus necesidades de viaje"
+  "subtitle": "Selecciona el plan de suscripción perfecto para tus necesidades de viaje",
+  "error": {
+    "loadFailed": "Error al cargar los datos de suscripción. Por favor, inténtalo de nuevo.",
+    "loginRequired": "Debes iniciar sesión para actualizar tu suscripción",
+    "alreadySubscribed": "Ya estás suscrito a este plan",
+    "planNotFound": "Plan seleccionado no encontrado",
+    "planDisabled": "Este plan no está disponible actualmente",
+    "updateFailed": "Error al actualizar la suscripción. Por favor, inténtalo de nuevo.",
+    "cancelLoginRequired": "Debes iniciar sesión para cancelar tu suscripción",
+    "noSubscription": "No se encontró suscripción activa",
+    "cancelFailed": "Error al cancelar la suscripción. Por favor, inténtalo de nuevo."
+  },
+  "success": {
+    "updateSuccess": "¡Suscripción actualizada exitosamente!",
+    "cancelSuccess": "Suscripción cancelada exitosamente. Tu acceso continuará hasta el final del período de facturación actual."
+  },
+  "card": {
+    "bestValue": "Mejor valor",
+    "popular": "Popular",
+    "off": "de descuento",
+    "currentPlan": "Plan actual",
+    "selectPlan": "Seleccionar plan",
+    "processing": "Procesando...",
+    "comparePlans": "Comparar planes"
+  },
+  "plans": {
+    "week": {
+      "name": "Semana",
+      "period": "Por semana"
+    },
+    "month": {
+      "name": "Mes",
+      "period": "Por mes"
+    },
+    "season": {
+      "name": "Temporada",
+      "period": "Por mes"
+    },
+    "year": {
+      "name": "Año",
+      "period": "Por mes",
+      "badgeText": "Más popular"
+    }
+  },
+  "features": {
+    "basicTripPlanning": "Planificación de viaje básica",
+    "limitedDestinations": "Destinos limitados",
+    "emailSupport": "Soporte por email",
+    "mobileAppAccess": "Acceso a la aplicación móvil",
+    "advancedTripPlanning": "Planificación de viaje avanzada",
+    "unlimitedDestinations": "Destinos ilimitados",
+    "priorityEmailSupport": "Soporte por email prioritario",
+    "premiumTripPlanning": "Planificación de viaje premium",
+    "vipDestinations": "Acceso a destinos VIP",
+    "phoneSupport": "Soporte telefónico 24/7",
+    "ultimateTripPlanning": "Planificación de viaje definitiva",
+    "exclusiveDestinations": "Destinos exclusivos",
+    "dedicatedConcierge": "Conserje dedicado"
+  }
 }

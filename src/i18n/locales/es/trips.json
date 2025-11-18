@@ -47,5 +47,7 @@
   "totalDistance": "Distancia total",
   "co2Emissions": "Emisiones de CO2",
   "ecoFriendlyRouteSelected": "Ruta ecológica seleccionada",
-  "startNavigation": "Iniciar navegación"
+  "startNavigation": "Iniciar navegación",
+  "travelers": "Viajeros",
+  "travelTime": "Tiempo de viaje"
 }

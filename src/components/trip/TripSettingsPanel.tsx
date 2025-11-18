@@ -384,7 +384,7 @@ const TripSettingsPanel: React.FC<TripSettingsPanelProps> = ({
 }) => {
   const { t } = useTranslation();
 
-  const interestOptions = ['Outdoors & Sport', 'Culture & Museum', 'Fjords & Mountains'];
+  const interestOptions = ['outdoorsSport', 'cultureMuseum', 'fjordsMountains'];
 
   const testimonials = [
     {
@@ -446,7 +446,7 @@ const TripSettingsPanel: React.FC<TripSettingsPanelProps> = ({
               <DesignCheckbox
                 key={interest}
                 id={interest}
-                label={interest}
+                label={t(`trips.${interest}`)}
                 checked={interests.includes(interest)}
                 onChange={() => onToggleInterest(interest)}
               />

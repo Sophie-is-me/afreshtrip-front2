@@ -1,0 +1,18 @@
+{
+  "editProfile": "编辑个人资料信息",
+  "username": "用户名",
+  "email": "邮箱",
+  "mobile": "手机号码",
+  "dob": "出生日期",
+  "password": "密码",
+  "confirmPassword": "确认密码",
+  "gender": "性别",
+  "male": "男",
+  "female": "女",
+  "update": "更新",
+  "usernamePlaceholder": "您的用户名",
+  "mobilePlaceholder": "您的手机号码",
+  "passwordPlaceholder": "您的密码",
+  "confirmPasswordPlaceholder": "确认您的密码",
+  "contentComingSoon": "{{tab}} 的内容将在此处实现。"
+}

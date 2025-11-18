@@ -21,10 +21,19 @@ const PublishSuccess: React.FC<PublishSuccessProps> = ({
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [showConfetti, setShowConfetti] = useState(true);
   const [copiedLink, setCopiedLink] = useState(false);
   // const [shareOpen, setShareOpen] = useState(false);
+
+  const getLocale = () => {
+    switch (i18n.language) {
+      case 'fr': return 'fr-FR';
+      case 'es': return 'es-ES';
+      case 'zh': return 'zh-CN';
+      default: return 'en-US';
+    }
+  };
   
   // Get post data from location state
   const postData = (location.state as { 
@@ -182,7 +191,7 @@ const PublishSuccess: React.FC<PublishSuccessProps> = ({
                   />
                   <div>
                     <p className="font-medium text-gray-900">{user?.displayName || user?.email || 'Anonymous'}</p>
-                    <p className="text-sm text-gray-500">{new Date().toLocaleDateString()}</p>
+                    <p className="text-sm text-gray-500">{new Date().toLocaleDateString(getLocale())}</p>
                   </div>
                 </div>
                 

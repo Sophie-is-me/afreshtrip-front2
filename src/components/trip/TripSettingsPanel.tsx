@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { MapPinIcon } from '@heroicons/react/24/outline';
+import { MapPinIcon, PlayIcon } from '@heroicons/react/24/outline';
 import { FaCar, FaBicycle } from 'react-icons/fa';
 import TripGenerationCard from './TripGenerationCard';
+import { useTripStore } from '../../stores/tripStore';
 import { motion } from 'framer-motion';
 
 // --- Helper Components for better structure ---
@@ -51,7 +52,7 @@ const DesignRadio = ({ id, name, value, checked, onChange, children, icon }: {
     />
     <label
       htmlFor={id}
-      className={`flex items-center cursor-pointer transition-all duration-300 ${
+      className={`flex items-center cursor-pointer transition-all duration-300 text-xs md:text-sm ${
         checked ? 'text-teal-600' : 'text-gray-600'
       }`}
     >
@@ -83,7 +84,7 @@ const DesignCheckbox = ({ id, label, checked, onChange }: {
     />
     <label
       htmlFor={id}
-      className={`flex items-center cursor-pointer transition-all duration-300 ${
+      className={`flex items-center cursor-pointer transition-all duration-300 text-xs md:text-sm ${
         checked ? 'text-teal-600' : 'text-gray-600'
       }`}
     >
@@ -185,7 +186,7 @@ const DesignInput = ({
     onChange={onChange}
     placeholder={placeholder}
     disabled={disabled}
-    className={`w-full p-2 border-b-2 border-gray-200 focus:outline-none focus:border-teal-500 transition ${className}`}
+    className={`w-full p-2 md:p-3 border-b-2 border-gray-200 focus:outline-none focus:border-teal-500 transition ${className}`}
   />
 );
 
@@ -195,10 +196,10 @@ const TripCustomization: React.FC<TripCustomizationProps> = ({ transport, setTra
       <p className="text-sm text-gray-600 mb-4">
         Select your preferred mode of transport and trip type to tailor the perfect journey.
       </p> */}
-      <div className="flex flex-col sm:flex-row gap-6">
+      <div className="flex flex-col sm:flex-row gap-4 md:gap-6">
         {/* --- Transportation Section --- */}
         <div className="flex-1">
-          <label className="block text-xs text-gray-500 mb-2 font-semibold">{t('trips.transportation')}</label>
+          <label className="block text-xs md:text-sm text-gray-500 mb-2 font-semibold">{t('trips.transportation')}</label>
           <div className="flex space-x-4 bg-gray-50 p-3">
             <DesignRadio
               id="car"
@@ -225,7 +226,7 @@ const TripCustomization: React.FC<TripCustomizationProps> = ({ transport, setTra
   
         {/* --- Trip Type Section --- */}
         <div className="flex-1">
-          <label className="block text-xs text-gray-500 mb-2 font-semibold">{t('trips.tripType')}</label>
+          <label className="block text-xs md:text-sm text-gray-500 mb-2 font-semibold">{t('trips.tripType')}</label>
           <div className="flex space-x-4 bg-gray-50 p-3">
             <DesignRadio
               id="one-way"
@@ -271,9 +272,9 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       </p> */}
       
       {/* --- Cities --- */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-4">
         <div>
-          <label className="block text-xs text-gray-500 mb-1 font-semibold">{t('trips.departureCity')}</label>
+          <label className="block text-xs md:text-sm text-gray-500 mb-1 font-semibold">{t('trips.departureCity')}</label>
           <div className="flex items-center">
             <DesignInput
               value={departureCity}
@@ -296,7 +297,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           )}
         </div>
         <div>
-          <label className="block text-xs text-gray-500 mb-1 font-semibold">{t('trips.destinationCity')}</label>
+          <label className="block text-xs md:text-sm text-gray-500 mb-1 font-semibold">{t('trips.destinationCity')}</label>
           <DesignInput
             value={destinationCity}
             onChange={(e) => setDestinationCity(e.target.value)}
@@ -305,9 +306,9 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       </div>
   
       {/* --- Stops and Duration --- */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
         <div className="bg-gray-50 p-3">
-          <label className="block text-xs text-gray-500 mb-1 font-semibold">{t('trips.stations')}</label>
+          <label className="block text-xs md:text-sm text-gray-500 mb-1 font-semibold">{t('trips.stations')}</label>
           <DesignInput
             type="number"
             value={stations.toString()}
@@ -316,7 +317,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           />
         </div>
         <div className="bg-gray-50 p-3">
-          <label className="block text-xs text-gray-500 mb-1 font-semibold">{t('trips.duration')}</label>
+          <label className="block text-xs md:text-sm text-gray-500 mb-1 font-semibold">{t('trips.duration')}</label>
           <div className="flex items-baseline">
             <DesignInput
               type="number"
@@ -349,11 +350,6 @@ interface TripSettingsPanelProps {
   interests: string[];
   onToggleInterest: (interest: string) => void;
   onGenerateTrip: () => void;
-  generatedStops: string[];
-  selectedStop: string | null;
-  setSelectedStop: (stop: string) => void;
-  tripDetails: { time: string; distance: string; co2: string } | null;
-  isGenerating: boolean;
   onStartNavigation: () => void;
 }
 
@@ -375,14 +371,10 @@ const TripSettingsPanel: React.FC<TripSettingsPanelProps> = ({
   interests,
   onToggleInterest,
   onGenerateTrip,
-  generatedStops,
-  selectedStop,
-  setSelectedStop,
-  tripDetails,
-  isGenerating,
   onStartNavigation,
 }) => {
   const { t } = useTranslation();
+  const { generatedStops, isGenerating } = useTripStore();
 
   const interestOptions = ['outdoorsSport', 'cultureMuseum', 'fjordsMountains'];
 
@@ -412,7 +404,7 @@ const TripSettingsPanel: React.FC<TripSettingsPanelProps> = ({
 
 
   return (
-    <div className="h-full flex flex-col p-6 bg-transparent">
+    <div className="h-full flex flex-col py-6 bg-transparent">
       <h2 className="text-xl font-bold text-teal-900 mb-6 text-center">{t('trips.planYourTrip')}</h2>
       
       <TripCustomization
@@ -439,9 +431,9 @@ const TripSettingsPanel: React.FC<TripSettingsPanelProps> = ({
       
       {/* --- Interests Section --- */}
       <div className="mb-6 p-4 border border-gray-200">
-        <label className="block text-xs text-gray-500 mb-2 font-semibold">{t('trips.interests')}</label>
+        <label className="block text-xs md:text-sm text-gray-500 mb-2 font-semibold">{t('trips.interests')}</label>
         <div className="bg-gray-50 p-3">
-          <div className="flex space-x-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {interestOptions.map(interest => (
               <DesignCheckbox
                 key={interest}
@@ -464,7 +456,10 @@ const TripSettingsPanel: React.FC<TripSettingsPanelProps> = ({
             variant="primary"
             className="w-[50%] mx-auto"
           >
-            {t('trips.generateTrip')}
+            <div className="flex items-center">
+              <PlayIcon className="w-5 h-5 mr-2" />
+              {t('trips.generateTrip')}
+            </div>
           </DesignButton>
         )}
       </div>
@@ -491,11 +486,6 @@ const TripSettingsPanel: React.FC<TripSettingsPanelProps> = ({
       <div className="grow overflow-y-auto">
         {(isGenerating || generatedStops.length > 0) && (
           <TripGenerationCard
-            generatedStops={generatedStops}
-            selectedStop={selectedStop}
-            setSelectedStop={setSelectedStop}
-            tripDetails={tripDetails}
-            isGenerating={isGenerating}
             onGenerateTrip={onGenerateTrip}
             onStartNavigation={onStartNavigation}
           />

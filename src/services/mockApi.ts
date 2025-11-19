@@ -439,29 +439,35 @@ export class MockApiClient {
     const baseLat = 55.6761;
     const baseLng = 12.5683;
 
+    // Generate random image URLs using Lorem Picsum
+    const generateRandomImage = (width: number = 400, height: number = 300, seed?: string) => {
+      const baseUrl = 'https://picsum.photos';
+      const seedParam = seed ? `?random=${seed}` : '';
+      return `${baseUrl}/${width}/${height}${seedParam}`;
+    };
+
     // Generate places based on interests and destination
     const allPossiblePlaces: Record<string, Array<{name: string, description: string, category: 'park' | 'beach' | 'attraction' | 'museum' | 'nature', image: string}>> = {
       'outdoorsSport': [
-        { name: 'Dyrehaven', description: 'Beautiful forest and park area', category: 'park' as const, image: '/assets/dyrehaven.jpg' },
-        { name: 'Amager Strandpark', description: 'Urban beach and recreational area', category: 'beach' as const, image: '/assets/amager-strandpark.jpg' },
-        { name: 'Superkilen Park', description: 'Unique multicultural park', category: 'park' as const, image: '/assets/superkilen.jpg' },
-        { name: 'Kastellet', description: 'Historic fort and park', category: 'attraction' as const, image: '/assets/kastellet.jpg' },
-        { name: 'Fælledparken', description: 'Large urban park', category: 'park' as const, image: '/assets/faelledparken.jpg' },
+        { name: 'Dyrehaven', description: 'Beautiful forest and park area perfect for outdoor activities', category: 'park' as const, image: generateRandomImage(400, 300, 'forest1') },
+        { name: 'Amager Strandpark', description: 'Urban beach and recreational area with sports facilities', category: 'beach' as const, image: generateRandomImage(400, 300, 'beach1') },
+        { name: 'Superkilen Park', description: 'Unique multicultural park with recreational spaces', category: 'park' as const, image: generateRandomImage(400, 300, 'park1') },
+        { name: 'Kastellet', description: 'Historic fort and park with walking paths', category: 'attraction' as const, image: generateRandomImage(400, 300, 'fort1') },
+        { name: 'Fælledparken', description: 'Large urban park for sports and relaxation', category: 'park' as const, image: generateRandomImage(400, 300, 'park2') },
       ],
       'cultureMuseum': [
-        { name: 'Amalienborg Palace', description: 'Royal residence and museum', category: 'museum' as const, image: '/assets/amalienborg.jpg' },
-        { name: 'Charlottenlund Palace', description: 'Historic palace with gardens', category: 'museum' as const, image: '/assets/charlottenlund.jpg' },
-        { name: 'The Open Air Museum', description: 'Living history museum', category: 'museum' as const, image: '/assets/open-air-museum.jpg' },
-        { name: 'Ny Carlsberg Glyptotek', description: 'Art museum with sculpture garden', category: 'museum' as const, image: '/assets/ny-carlsberg.jpg' },
-        { name: 'Christiansborg Palace', description: 'Parliament and royal palace', category: 'museum' as const, image: '/assets/christiansborg.jpg' },
+        { name: 'Amalienborg Palace', description: 'Royal residence and museum showcasing Danish history', category: 'museum' as const, image: generateRandomImage(400, 300, 'palace1') },
+        { name: 'Charlottenlund Palace', description: 'Historic palace with beautiful gardens and art collections', category: 'museum' as const, image: generateRandomImage(400, 300, 'palace2') },
+        { name: 'The Open Air Museum', description: 'Living history museum with traditional Danish buildings', category: 'museum' as const, image: generateRandomImage(400, 300, 'museum1') },
+        { name: 'Ny Carlsberg Glyptotek', description: 'Art museum with sculpture garden and international collections', category: 'museum' as const, image: generateRandomImage(400, 300, 'museum2') },
+        { name: 'Christiansborg Palace', description: 'Parliament and royal palace with guided tours', category: 'museum' as const, image: generateRandomImage(400, 300, 'palace3') },
       ],
       'fjordsMountains': [
-        { name: 'Roskilde Fjord', description: 'Beautiful fjord area', category: 'nature' as const, image: '/assets/roskilde-fjord.jpg' },
-        { name: 'Vejle Fjord', description: 'Scenic fjord landscape', category: 'nature' as const, image: '/assets/vejle-fjord.jpg' },
-        { name: 'Møns Klint', description: 'Chalk cliffs and nature', category: 'nature' as const, image: '/assets/mons-klint.jpg' },
-        { name: 'Møns Klint', description: 'Chalk cliffs and nature', category: 'nature' as const, image: '/assets/mons-klint.jpg' },
-        { name: 'Himmelbjerget', description: 'Highest natural point in Denmark', category: 'nature' as const, image: '/assets/himmelbjerget.jpg' },
-        { name: 'Gribskov', description: 'Ancient forest area', category: 'nature' as const, image: '/assets/gribskov.jpg' },
+        { name: 'Roskilde Fjord', description: 'Beautiful fjord area with scenic views and water activities', category: 'nature' as const, image: generateRandomImage(400, 300, 'fjord1') },
+        { name: 'Vejle Fjord', description: 'Scenic fjord landscape perfect for nature walks', category: 'nature' as const, image: generateRandomImage(400, 300, 'fjord2') },
+        { name: 'Møns Klint', description: 'Dramatic chalk cliffs and pristine nature reserves', category: 'nature' as const, image: generateRandomImage(400, 300, 'cliffs1') },
+        { name: 'Himmelbjerget', description: 'Highest natural point in Denmark with panoramic views', category: 'nature' as const, image: generateRandomImage(400, 300, 'mountain1') },
+        { name: 'Gribskov', description: 'Ancient forest area with hiking trails and wildlife', category: 'nature' as const, image: generateRandomImage(400, 300, 'forest2') },
       ],
     };
 

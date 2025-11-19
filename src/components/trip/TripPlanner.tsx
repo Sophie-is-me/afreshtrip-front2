@@ -4,6 +4,7 @@ import TripSettingsPanel from './TripSettingsPanel';
 import TripMap from './TripMap';
 import WeatherSummary from './WeatherSummary';
 import { mockApiClient } from '../../services/mockApi';
+import { useTripStore } from '../../stores/tripStore';
 import type { TripSettings, Trip } from '../../types/trip';
 
 const TripPlanner = () => {
@@ -17,12 +18,15 @@ const TripPlanner = () => {
   const [duration, setDuration] = useState(1);
   const [interests, setInterests] = useState<string[]>(['outdoorsSport']);
 
-  // Trip data state
-  const [currentTrip, setCurrentTrip] = useState<Trip | null>(null);
-  const [generatedStops, setGeneratedStops] = useState<string[]>([]);
-  const [selectedStop, setSelectedStop] = useState<string | null>(null);
-  const [tripDetails, setTripDetails] = useState<{ time: string; distance: string; co2: string } | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
+  // Use Zustand store for trip data
+  const {
+    currentTrip,
+    setTrip,
+    setGeneratedStops,
+    setTripDetails,
+    setIsGenerating,
+    resetGenerationState
+  } = useTripStore();
 
   const generateTripMutation = useMutation({
     mutationFn: (tripSettings: TripSettings) => mockApiClient.generateTrip(tripSettings),
@@ -31,6 +35,7 @@ const TripPlanner = () => {
       const stops = trip.places.map(place => place.name);
 
       setGeneratedStops(stops);
+      setTrip(trip);
 
       // Use actual trip route data
       const distance = trip.route.distance;
@@ -44,8 +49,6 @@ const TripPlanner = () => {
           co2: `${Math.round(distance * 0.12)}g`
       });
 
-      // Set the generated trip
-      setCurrentTrip(trip);
       setIsGenerating(false);
     },
     onError: (error: Error) => {
@@ -62,9 +65,7 @@ const TripPlanner = () => {
 
   const handleGenerateTrip = () => {
     setIsGenerating(true);
-    setGeneratedStops([]); // Clear previous results
-    setTripDetails(null);
-    setSelectedStop(null);
+    resetGenerationState();
 
     const settings: TripSettings = {
       destination: destinationCity,
@@ -83,7 +84,7 @@ const TripPlanner = () => {
   };
 
   return (
-    <div className="w-full flex flex-col bg-linear-to-br from-slate-50 via-blue-50 to-teal-50 relative overflow-hidden">
+    <div className="w-full flex flex-col bg-linear-to-br from-slate-50 via-blue-50 to-teal-50 relative">
       {/* Decorative background elements */}
       <div className="absolute top-0 left-0 w-96 h-96 bg-teal-400/10 rounded-full blur-3xl animate-pulse" />
       <div className="absolute bottom-0 right-0 w-96 h-96 bg-blue-400/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
@@ -91,7 +92,7 @@ const TripPlanner = () => {
       {/* Desktop: Two-panel layout */}
       <div className="hidden md:flex md:gap-4 md:ps-8 md:pb-4 md:min-h-[calc(100vh-64px)] relative z-10">
         {/* Left Panel - Trip Planning Components */}
-        <div className="flex-[0_0_40%] flex flex-col gap-6 bg-transparent scrollbar-thin">
+        <div className="flex-[0_0_35%] flex flex-col gap-6 bg-transparent scrollbar-thin">
           <TripSettingsPanel
             transport={transport}
             setTransport={setTransport}
@@ -110,17 +111,12 @@ const TripPlanner = () => {
             interests={interests}
             onToggleInterest={handleToggleInterest}
             onGenerateTrip={handleGenerateTrip}
-            generatedStops={generatedStops}
-            selectedStop={selectedStop}
-            setSelectedStop={setSelectedStop}
-            tripDetails={tripDetails}
-            isGenerating={isGenerating}
             onStartNavigation={handleStartNavigation}
           />
         </div>
 
         {/* Center Panel - Map with Weather Overlay */}
-        <div className="flex-1 relative md:sticky md:top-0 md:h-[calc(100vh-64px)] overflow-hidden shadow-2xl border-4 border-white/50">
+        <div className="flex-1 sticky top-20 md:h-[calc(100vh-64px)] shadow-2xs border-4 border-white/50">
           <TripMap trip={currentTrip} />
 
           {/* Weather Widget Overlay - Top Right */}

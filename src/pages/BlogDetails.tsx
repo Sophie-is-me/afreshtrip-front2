@@ -52,34 +52,17 @@ const BlogDetails: React.FC = () => {
       try {
         setLoading(true);
         setError(null);
-        
+
         const foundPost = blogPosts.find(p => p.id === id);
         if (foundPost) {
           setPost(foundPost);
           setIsLiked(foundPost.isLiked || false);
           setIsSaved(foundPost.isSaved || false);
-          
+
           // Get related posts
           const related = getRelatedPosts(foundPost.id, foundPost.category);
           setRelatedPosts(related);
-          
-          // Extract headings for table of contents
-          if (contentRef.current) {
-            const headingElements = contentRef.current.querySelectorAll('h2, h3, h4');
-            const extractedHeadings = Array.from(headingElements).map((heading, index) => ({
-              id: `heading-${index}`,
-              text: heading.textContent || '',
-              level: parseInt(heading.tagName.substring(1))
-            }));
-            setHeadings(extractedHeadings);
-            setShowTableOfContents(extractedHeadings.length > 0);
-            
-            // Add IDs to headings
-            headingElements.forEach((heading, index) => {
-              heading.id = `heading-${index}`;
-            });
-          }
-          
+
           // Fetch comments (mock data for now)
           setComments([
             {
@@ -131,6 +114,25 @@ const BlogDetails: React.FC = () => {
 
     fetchPost();
   }, [blogPosts, id, t, getRelatedPosts]);
+
+  // Extract headings for table of contents after content is rendered
+  useEffect(() => {
+    if (post && contentRef.current) {
+      const headingElements = contentRef.current.querySelectorAll('h2, h3, h4');
+      const extractedHeadings = Array.from(headingElements).map((heading, index) => ({
+        id: `heading-${index}`,
+        text: heading.textContent || '',
+        level: parseInt(heading.tagName.substring(1))
+      }));
+      setHeadings(extractedHeadings);
+      setShowTableOfContents(extractedHeadings.length > 0);
+
+      // Add IDs to headings
+      headingElements.forEach((heading, index) => {
+        heading.id = `heading-${index}`;
+      });
+    }
+  }, [post]);
 
   // Show/hide back to top button
   useEffect(() => {
@@ -262,15 +264,15 @@ const BlogDetails: React.FC = () => {
           )}
 
           {/* Content and Table of Contents */}
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 mt-8">
-            <div className="lg:col-span-3">
+          <div className={`grid gap-8 mt-8 ${showTableOfContents ? 'grid-cols-1 lg:grid-cols-4' : 'grid-cols-1'}`}>
+            <div className={showTableOfContents ? 'lg:col-span-3' : ''}>
               <div
                 ref={contentRef}
                 className="prose prose-lg max-w-none mb-8"
                 dangerouslySetInnerHTML={{ __html: post.content }}
               />
             </div>
-            
+
             {showTableOfContents && (
               <div className="lg:col-span-1">
                 <TableOfContents headings={headings} />

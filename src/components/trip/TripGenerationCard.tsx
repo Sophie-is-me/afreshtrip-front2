@@ -1,17 +1,17 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  MapPinIcon, 
+import { useTripStore } from '../../stores/tripStore';
+import {
+  MapPinIcon,
   FlagIcon,
   ClockIcon,
   MapIcon,
   FireIcon,
   ArrowPathIcon,
-  SparklesIcon,
-  CheckCircleIcon
+  SparklesIcon
 } from '@heroicons/react/24/outline';
-import { 
+import {
   PlayIcon as PlaySolidIcon,
   MapPinIcon as MapPinSolidIcon,
   FlagIcon as FlagSolidIcon
@@ -21,14 +21,12 @@ import {
 const TripStation = ({
   name,
   isActive,
-  onClick,
   index,
   isLast,
   isCompleted,
 }: {
   name: string;
   isActive: boolean;
-  onClick: () => void;
   index: number;
   isLast: boolean;
   isCompleted: boolean;
@@ -48,10 +46,7 @@ const TripStation = ({
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.3, delay: index * 0.1 }}
-      className="relative flex items-start mb-6 cursor-pointer"
-      onClick={onClick}
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
+      className="relative flex items-start mb-6"
     >
       <div className={`relative z-10 w-12 h-12 rounded-full flex items-center justify-center text-white shadow-md transition-all duration-300 ${
         isActive ? 'bg-teal-500 shadow-lg' : isCompleted ? 'bg-teal-300' : 'bg-white border-2 border-gray-300'
@@ -68,34 +63,27 @@ const TripStation = ({
           isActive ? 'text-teal-700' : isCompleted ? 'text-gray-700' : 'text-gray-500'
         }`}>{name}</span>
       </div>
-      {isCompleted && (
-        <div className="absolute left-10 top-10">
-          <CheckCircleIcon className="w-5 h-5 text-teal-500" />
-        </div>
-      )}
     </motion.div>
   );
 };
 
 const TripGenerationCard = ({
-  generatedStops,
-  selectedStop,
-  setSelectedStop,
-  tripDetails,
-  isGenerating,
   onGenerateTrip,
   onStartNavigation,
 }: {
-  generatedStops: string[];
-  selectedStop: string | null;
-  setSelectedStop: (stop: string) => void;
-  tripDetails: { time: string; distance: string; co2: string } | null;
-  isGenerating: boolean;
   onGenerateTrip: () => void;
   onStartNavigation: () => void;
 }) => {
   const { t } = useTranslation();
-  const [visibleStops, setVisibleStops] = useState<string[]>([]);
+  const {
+    generatedStops,
+    visibleStops,
+    selectedStop,
+    tripDetails,
+    isGenerating,
+    addVisibleStop
+  } = useTripStore();
+
   const [isFullyRevealed, setIsFullyRevealed] = useState(false);
 
   // Animate stops appearing one by one
@@ -103,8 +91,7 @@ const TripGenerationCard = ({
     if (generatedStops.length > 0 && !isFullyRevealed) {
       const timer = setTimeout(() => {
         if (visibleStops.length < generatedStops.length) {
-          setVisibleStops(generatedStops.slice(0, visibleStops.length + 1));
-          setSelectedStop(generatedStops[visibleStops.length]);
+          addVisibleStop(generatedStops[visibleStops.length]);
         } else {
           setIsFullyRevealed(true);
         }
@@ -112,12 +99,11 @@ const TripGenerationCard = ({
 
       return () => clearTimeout(timer);
     }
-  }, [generatedStops, visibleStops, isFullyRevealed, setSelectedStop]);
+  }, [generatedStops, visibleStops, isFullyRevealed, addVisibleStop]);
 
   // Reset when new trip generation starts
   useEffect(() => {
     if (isGenerating) {
-      setVisibleStops([]);
       setIsFullyRevealed(false);
     }
   }, [isGenerating]);
@@ -177,7 +163,6 @@ const TripGenerationCard = ({
                       key={stop}
                       name={stop}
                       isActive={selectedStop === stop}
-                      onClick={() => setSelectedStop(stop)}
                       index={index}
                       isLast={index === generatedStops.length - 1}
                       isCompleted={isStopCompleted(index)}

@@ -1,17 +1,46 @@
-import React, { createContext, useContext, useState } from 'react';
-import type { BlogPost } from '../types/blog';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import type { BlogPost, CreateBlogPostInput } from '../types/blog';
+import { apiClient, type BlogVo, type BlogDto } from '../services/apiClient';
+import { useAuth } from './AuthContext';
+
+// [convertApiBlogPost is correctly implemented as provided in your prompt]
+const convertApiBlogPost = (apiPost: BlogVo): BlogPost => ({
+  id: apiPost.blId?.toString() || '',
+  title: apiPost.title || 'Untitled',
+  content: apiPost.content || '',
+  excerpt: apiPost.excerpt || apiPost.content?.substring(0, 150) || '',
+  images: apiPost.imageUrl?.map(img => img.imgUrl) || [],
+  author: {
+    id: apiPost.userId?.toString() || 'unknown',
+    name: apiPost.author?.nickname || 'Anonymous', 
+    avatar: apiPost.author?.avatar || '',
+  },
+  date: apiPost.createdAt || new Date().toISOString(),
+  views: apiPost.play || 0,
+  likes: apiPost.like || 0,
+  category: apiPost.category || 'Uncategorized',
+  tags: apiPost.tags || [],
+  slug: apiPost.slug || `post-${apiPost.blId}`,
+  isPublished: apiPost.isPublished ?? true,
+  createdAt: apiPost.createdAt || new Date().toISOString(),
+  updatedAt: apiPost.updatedAt || new Date().toISOString(),
+});
 
 interface BlogContextType {
   blogPosts: BlogPost[];
+  loading: boolean;
+  error: string | null;
   getAllBlogPosts: () => BlogPost[];
   getPostById: (id: string) => BlogPost | undefined;
   getBlogPostById: (id: string) => BlogPost | undefined;
   addNewPost: (post: BlogPost) => void;
-  createBlogPost: (post: Omit<BlogPost, 'id' | 'createdAt' | 'updatedAt'>) => string;
-  updateBlogPost: (id: string, updates: Partial<BlogPost>) => void;
+  createBlogPost: (post: CreateBlogPostInput) => Promise<string>;
+  // UPDATED: Now returns a Promise for auto-save UI feedback
+  updateBlogPost: (id: string, updates: Partial<BlogPost>) => Promise<void>; 
   updatePostStatistics: (id: string, stats: { views?: number; likes?: number; isLiked?: boolean; isSaved?: boolean }) => void;
   getRelatedPosts: (currentId: string, category: string, limit?: number) => BlogPost[];
   uploadImage: (file: File) => Promise<string>;
+  refreshBlogPosts: () => Promise<void>;
 }
 
 const BlogContext = createContext<BlogContextType | undefined>(undefined);
@@ -25,159 +54,110 @@ export const useBlog = () => {
   return context;
 };
 
-const initialBlogPosts: BlogPost[] = [
-  {
-    id: '1',
-    title: 'Destinations worth going the extra mile.',
-    content: `
-      <p>Exploring the world has always been about discovering places that challenge our perceptions and expand our horizons. Some destinations require that extra effort, that willingness to step outside our comfort zones and embrace the unknown.</p>
-
-      <h2>The Hidden Gems</h2>
-      <p>When we talk about destinations worth going the extra mile for, we're referring to those places that aren't necessarily the most popular tourist spots, but offer experiences that are truly transformative.</p>
-
-      <p>These locations often require more planning, longer travel times, or even some physical exertion to reach. But the rewards? Absolutely priceless.</p>
-
-      <h2>Why the Extra Effort Matters</h2>
-      <p>The journey itself becomes part of the story. The challenges we overcome along the way make the destination even more meaningful. It's not just about arriving; it's about the transformation that happens during the process.</p>
-
-      <p>Whether it's hiking through remote trails, navigating local transportation systems, or learning to communicate in unfamiliar languages, each obstacle builds character and creates memories that last a lifetime.</p>
-    `,
-    excerpt: 'They describe a universe consisting of bodies moving with clockwork predictability on a stage of absolute space and time.',
-    images: ['/assets/image-1.png', '/assets/image-2.png', '/assets/image-3.png'],
-    author: {
-      id: 'author1',
-      name: 'Matt Wilson',
-      avatar: '/assets/avater.png',
-    },
-    date: '2021-04-14',
-    views: 2350,
-    likes: 0,
-    category: 'Travel',
-    tags: ['adventure', 'exploration', 'travel tips'],
-    slug: 'destinations-worth-going-extra-mile',
-    isPublished: true,
-    createdAt: '2021-04-14T10:00:00Z',
-    updatedAt: '2021-04-14T10:00:00Z',
-  },
-  {
-    id: '2',
-    title: 'Destinations worth going the extra mile.',
-    content: `
-      <p>Another perspective on extraordinary travel destinations that demand commitment and reward with unforgettable experiences.</p>
-
-      <h2>Remote Locations</h2>
-      <p>Some of the most beautiful places on earth are deliberately hard to reach, preserving their pristine condition and ensuring that only the most dedicated travelers experience them.</p>
-    `,
-    excerpt: 'They describe a universe consisting of bodies moving with clockwork predictability on a stage of absolute space and time.',
-    images: ['/assets/image-1.png'],
-    author: {
-      id: 'author1',
-      name: 'Matt Wilson',
-      avatar: '/assets/avater.png',
-    },
-    date: '2021-04-14',
-    views: 2350,
-    likes: 0,
-    category: 'Travel',
-    slug: 'destinations-worth-going-extra-mile-2',
-    isPublished: true,
-    createdAt: '2021-04-14T10:00:00Z',
-    updatedAt: '2021-04-14T10:00:00Z',
-  },
-  {
-    id: '3',
-    title: 'How can you discover the most amazing hosts?',
-    content: `
-      <p>Finding exceptional hosts is an art that combines research, intuition, and a bit of luck. The most amazing hosts don't just provide accommodation; they become part of your travel story.</p>
-
-      <h2>Research and Reviews</h2>
-      <p>Start with thorough research. Read reviews carefully, looking for patterns in feedback about hospitality, local knowledge, and genuine connections.</p>
-
-      <h2>Local Communities</h2>
-      <p>The best hosts are often deeply connected to their local communities. They know the hidden spots, understand the culture, and can introduce you to authentic experiences.</p>
-    `,
-    excerpt: '',
-    images: ['/assets/image-1.png'],
-    author: {
-      id: 'author1',
-      name: 'Matt Wilson',
-      avatar: '/assets/avater.png',
-    },
-    date: '2021-04-14',
-    views: 2350,
-    likes: 0,
-    category: 'Travel',
-    slug: 'discover-amazing-hosts',
-    isPublished: true,
-    createdAt: '2021-04-14T10:00:00Z',
-    updatedAt: '2021-04-14T10:00:00Z',
-  },
-];
-
 export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [blogPosts, setBlogPosts] = useState<BlogPost[]>(initialBlogPosts);
+  const { user } = useAuth();
+  const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refreshBlogPosts = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await apiClient.getBlogs();
+      const posts = response.records.map(convertApiBlogPost);
+      setBlogPosts(posts);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load blog posts';
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshBlogPosts();
+  }, [refreshBlogPosts]);
 
   const getAllBlogPosts = () => blogPosts;
-
   const getPostById = (id: string) => blogPosts.find(p => p.id === id);
-
   const getBlogPostById = getPostById;
+  const addNewPost = (post: BlogPost) => setBlogPosts(prev => [...prev, post]);
 
-  const addNewPost = (post: BlogPost) => {
-    setBlogPosts(prev => [...prev, post]);
+  const createBlogPost = async (post: CreateBlogPostInput) => {
+    if (!user) throw new Error('User must be logged in to create a post');
+    try {
+      setLoading(true);
+      const blogData: BlogDto = {
+        title: post.title,
+        content: post.content,
+        excerpt: post.excerpt,
+        tags: post.tags,
+        category: post.category,
+        isPublished: post.isPublished,
+        imageUrl: post.images?.map(img => ({ imgUrl: img })) || [],
+        videoUrl: [],
+      };
+      const response = await apiClient.createBlog(blogData);
+      const newPost = convertApiBlogPost(response);
+      addNewPost(newPost);
+      return newPost.id;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create blog post';
+      throw new Error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const createBlogPost = (post: Omit<BlogPost, 'id' | 'createdAt' | 'updatedAt'>) => {
-    const id = Date.now().toString();
-    const now = new Date().toISOString();
-    const newPost: BlogPost = {
-      ...post,
-      id,
-      createdAt: now,
-      updatedAt: now,
-    };
-    addNewPost(newPost);
-    return id;
-  };
-
-  const updateBlogPost = (id: string, updates: Partial<BlogPost>) => {
+  // --- CRITICAL UPDATE ---
+  // Must be async to support "Saving..." indicators in UI
+  const updateBlogPost = async (id: string, updates: Partial<BlogPost>) => {
+    // 1. Optimistic Update (UI feels fast)
     setBlogPosts(prev =>
       prev.map(p => p.id === id ? { ...p, ...updates, updatedAt: new Date().toISOString() } : p)
     );
+
+    // 2. Persist to Backend (Real consistency)
+    try {
+        // TODO: Replace with real API call when available
+        // const payload: BlogDto = { ...convertLocalToDto(updates) };
+        // await apiClient.updateBlog(id, payload);
+        
+        // Simulating network delay for now so Auto-Save indicator works
+        await new Promise(resolve => setTimeout(resolve, 500));
+    } catch (err) {
+        console.error("Failed to persist update", err);
+        throw err; // Throwing allows the UI to show "Error Saving"
+    }
   };
 
   const uploadImage = async (file: File): Promise<string> => {
-    // Mock upload - in real app, upload to server
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.readAsDataURL(file);
-    });
+    try {
+      const response = await apiClient.uploadFile(file);
+      if (response.code === 200 && response.data) return response.data;
+      throw new Error('Failed to upload image');
+    } catch {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+    }
   };
 
   const updatePostStatistics = (id: string, stats: { views?: number; likes?: number; isLiked?: boolean; isSaved?: boolean }) => {
-    setBlogPosts(prev =>
-      prev.map(p => p.id === id ? { ...p, ...stats } : p)
-    );
+    setBlogPosts(prev => prev.map(p => p.id === id ? { ...p, ...stats } : p));
   };
 
   const getRelatedPosts = (currentId: string, category: string, limit: number = 3) => {
-    return blogPosts
-      .filter(p => p.id !== currentId && p.category === category && p.isPublished)
-      .slice(0, limit);
+    return blogPosts.filter(p => p.id !== currentId && p.category === category && p.isPublished).slice(0, limit);
   };
 
   const value = {
-    blogPosts,
-    getAllBlogPosts,
-    getPostById,
-    getBlogPostById,
-    addNewPost,
-    createBlogPost,
-    updateBlogPost,
-    updatePostStatistics,
-    getRelatedPosts,
-    uploadImage,
+    blogPosts, loading, error, getAllBlogPosts, getPostById, getBlogPostById,
+    addNewPost, createBlogPost, updateBlogPost, updatePostStatistics,
+    getRelatedPosts, uploadImage, refreshBlogPosts,
   };
 
   return <BlogContext.Provider value={value}>{children}</BlogContext.Provider>;

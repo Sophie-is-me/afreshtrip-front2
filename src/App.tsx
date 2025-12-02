@@ -24,44 +24,42 @@ import Accessibility from './pages/Accessibility';
 import Dashboard from './pages/Dashboard';
 import NotFound from './pages/NotFound';
 
+function App() {
+  return (
+    <AuthProvider>
+      <Router>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/blog" element={<BlogProvider><Blog /></BlogProvider>} />
+          <Route path="/blog/:id" element={<BlogProvider><BlogDetails /></BlogProvider>} />
+          <Route path="/blog/publish-success" element={<BlogProvider><PublishSuccess /></BlogProvider>} />
+          <Route path="/blog/create" element={<BlogProvider><ProtectedRoute><BlogEditor /></ProtectedRoute></BlogProvider>} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/subscription" element={<Subscription />} />
+          <Route path="/trips" element={<Trips />} />
+          <Route path="/notifications" element={<Notifications />} />
+          <Route path="/support" element={<Support />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/destinations" element={<Destinations />} />
+          <Route path="/tours" element={<Tours />} />
+          <Route path="/faq" element={<FAQ />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/cookies" element={<Cookies />} />
+          <Route path="/accessibility" element={<Accessibility />} />
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Router>
+    </AuthProvider>
+  );
+};
+
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
   if (loading) return <div>Loading...</div>;
   return user ? children : <Navigate to="/login" />;
 };
-
-function App() {
-  return (
-    <AuthProvider>
-      <BlogProvider>
-        <Router>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/blog" element={<Blog />} />
-            <Route path="/blog/:id" element={<BlogDetails />} />
-            <Route path="/blog/publish-success" element={<PublishSuccess />} />
-            <Route path="/blog/create" element={<ProtectedRoute><BlogEditor /></ProtectedRoute>} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/subscription" element={<Subscription />} />
-            <Route path="/trips" element={<Trips />} />
-            <Route path="/notifications" element={<Notifications />} />
-            <Route path="/support" element={<Support />} />
-            <Route path="/about" element={<About />} />
-            <Route path="/destinations" element={<Destinations />} />
-            <Route path="/tours" element={<Tours />} />
-            <Route path="/faq" element={<FAQ />} />
-            <Route path="/privacy" element={<Privacy />} />
-            <Route path="/terms" element={<Terms />} />
-            <Route path="/cookies" element={<Cookies />} />
-            <Route path="/accessibility" element={<Accessibility />} />
-            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </Router>
-      </BlogProvider>
-    </AuthProvider>
-  );
-}
 
 export default App;

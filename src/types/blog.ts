@@ -29,6 +29,16 @@ export interface BlogPost {
   updatedAt: string; // Last update timestamp
 }
 
+export interface CreateBlogPostInput {
+  title: string;
+  content: string;
+  excerpt?: string;
+  category: string;
+  tags?: string[];
+  images: string[];
+  isPublished: boolean;
+}
+
 // Type for blog post listing (subset of fields for performance)
 export interface BlogPostSummary {
   id: string;

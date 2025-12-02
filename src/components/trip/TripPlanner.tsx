@@ -3,7 +3,7 @@ import { useMutation } from '@tanstack/react-query';
 import TripSettingsPanel from './TripSettingsPanel';
 import TripMap from './TripMap';
 import WeatherSummary from './WeatherSummary';
-import { mockApiClient } from '../../services/mockApi';
+import { tripService } from '../../services/tripService';
 import { useTripStore } from '../../stores/tripStore';
 import type { TripSettings, Trip } from '../../types/trip';
 
@@ -29,7 +29,7 @@ const TripPlanner = () => {
   } = useTripStore();
 
   const generateTripMutation = useMutation({
-    mutationFn: (tripSettings: TripSettings) => mockApiClient.generateTrip(tripSettings),
+    mutationFn: (tripSettings: TripSettings) => tripService.generateTrip(tripSettings),
     onSuccess: (trip: Trip) => {
       // Use the actual places from the generated trip
       const stops = trip.places.map(place => place.name);

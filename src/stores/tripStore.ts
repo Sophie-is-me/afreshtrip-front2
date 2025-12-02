@@ -28,7 +28,7 @@ interface TripState {
   resetGenerationState: () => void;
 }
 
-export const useTripStore = create<TripState>((set, get) => ({
+export const useTripStore = create<TripState>((set) => ({
   currentTrip: null,
   tripSettings: null,
   isLoading: false,

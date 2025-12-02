@@ -6,17 +6,13 @@ interface BottomSheetProps {
   onClose: () => void;
   children: ReactNode;
   title?: string;
-  snapPoints?: number[];
-  defaultSnap?: number;
 }
 
-const BottomSheet = ({ 
-  isOpen, 
-  onClose, 
-  children, 
-  title,
-  snapPoints = [0.3, 0.6, 0.9],
-  defaultSnap = 0.6
+const BottomSheet = ({
+  isOpen,
+  onClose,
+  children,
+  title
 }: BottomSheetProps) => {
   const sheetRef = useRef<HTMLDivElement>(null);
   const startY = useRef(0);

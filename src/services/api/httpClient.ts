@@ -7,7 +7,8 @@ import {
   TimeoutError,
   isApiError,
   createErrorFromResponse,
-  createErrorFromApiResponse
+  createErrorFromApiResponse,
+  SubscriptionRequiredError
 } from './errors';
 
 /**
@@ -61,6 +62,12 @@ export class HttpClient {
       'Content-Type': 'application/json',
     };
 
+    // If sending FormData, delete Content-Type.
+    // The browser will automatically set 'multipart/form-data; boundary=...'
+    if (restConfig.body instanceof FormData) {
+      delete requestHeaders['Content-Type'];
+    }
+
     // Merge additional headers
     if (headers) {
       Object.assign(requestHeaders, headers);
@@ -92,6 +99,12 @@ export class HttpClient {
       // Handle non-2xx responses
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+
+         // Intercept Subscription Check
+        if (response.status === 403 && errorData.message === 'SUBSCRIPTION_REQUIRED') {
+          throw new SubscriptionRequiredError();
+        }
+
         throw createErrorFromResponse(response, errorData);
       }
 
@@ -99,6 +112,10 @@ export class HttpClient {
 
       // Handle API-level errors (non-200 codes)
       if (data.code && data.code !== 200) {
+        // Double check for subscription error in successful HTTP response (if backend wraps 403 in 200)
+        if (data.code === 403 && data.message === 'SUBSCRIPTION_REQUIRED') {
+           throw new SubscriptionRequiredError();
+        }
         throw createErrorFromApiResponse(data);
       }
 

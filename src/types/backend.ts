@@ -64,7 +64,7 @@ export interface BackendFeatureService {
   getUpgradeSuggestions(
     userId: string,
     featureIds: FeatureId[]
-  ): Promise<Record<FeatureId, UpgradeSuggestion>>;
+  ): Promise<Partial<Record<FeatureId, UpgradeSuggestion>>>;
 }
 
 // ============================================================================
@@ -86,6 +86,7 @@ export interface FeatureAccessResult {
   requiredPlans: string[];
   expiresAt?: Date;
   isBeta?: boolean;
+  upgradeMessage?: string;
   upgradeSuggestion?: UpgradeSuggestion;
 }
 

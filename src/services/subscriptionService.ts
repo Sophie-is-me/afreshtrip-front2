@@ -1,71 +1,272 @@
-// src/services/subscriptionService.ts
-
 /**
- * SUBSCRIPTION SERVICE - Backend Integration for VIP/Subscription Management
+ * SUBSCRIPTION SERVICE - Business Logic Layer
  *
- * This service integrates with backend VIP APIs to manage user subscriptions,
- * payment processing, and feature access control.
+ * This service acts as a bridge between the UI and the lower-level API Client.
+ * It orchestrates the multi-step Alipay payment flow and handles status verification.
  */
 
 import { apiClient } from './apiClient';
-import { paymentService, type VipPaymentOptions } from './paymentService';
 import type { VipOrder as ApiVipOrder } from '../types/api';
+import type { SubscriptionPlan } from '../types/subscription';
 
 export type VipOrder = ApiVipOrder;
 
 export interface VipStatus {
   hasVip: boolean;
   endTime?: string;
-  vipType?: string;
+  vipType?: string; // e.g. "year", "month"
   daysRemaining?: number;
+  autoRenew?: boolean;
 }
 
 export class SubscriptionService {
+  
   /**
-   * Get user's VIP status
+   * Purchase VIP subscription with proper Alipay flow
+   * Flow: 
+   * 1. Create Order (Backend)
+   * 2. Initiate Payment (Backend -> Alipay)
+   * 3. Return Payment URL to Frontend
+   * 
+   * @param userId - User ID (used for logging/verification context)
+   * @param planId - 'week' | 'month' | 'year'
+   * @param paymentMethod - Currently only 'alipay' is supported
    */
-  async getVipStatus(): Promise<VipStatus> {
+  async purchaseVip(
+    _userId: string,
+    planId: string,
+    paymentMethod: 'alipay' | 'stripe' = 'alipay'
+  ): Promise<{
+    success: boolean;
+    paymentUrl?: string;
+    orderNo?: string;
+    error?: string;
+  }> {
     try {
-      const response = await apiClient.getSubscriptionStatus();
+      if (paymentMethod === 'alipay') {
+        // Step 1: Order Creation Phase
+        // Create VIP order and get order details (orderNo, amount)
+        const orderResult = await apiClient.createVipOrder(planId);
 
-      if (response.isSubscribed && response.endTime) {
-        const endTime = new Date(response.endTime);
-        const now = new Date();
-        const daysRemaining = Math.max(0, Math.ceil((endTime.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+        if (!orderResult.success) {
+          return {
+            success: false,
+            error: orderResult.errorMessage || 'Failed to create VIP order'
+          };
+        }
+
+        // Step 2: Payment Initiation Phase
+        // Get payment URL using the order details from Step 1
+        const paymentResult = await apiClient.initiateAlipayPaymentForOrder(
+          orderResult.orderNo,
+          orderResult.amount,
+          planId
+        );
+
+        if (!paymentResult.success || !paymentResult.paymentUrl) {
+          return {
+            success: false,
+            error: paymentResult.errorMessage || 'Failed to initiate Alipay payment'
+          };
+        }
+
+        // Return the payment URL so the UI can redirect the user
+        // Step 3: User Payment Phase will happen outside this service
+        return {
+          success: true,
+          paymentUrl: paymentResult.paymentUrl,
+          orderNo: orderResult.orderNo
+        };
+
+      } else if (paymentMethod === 'stripe') {
+        // For Stripe: Similar 2-step process
+        const orderResult = await apiClient.createVipOrder(planId);
+
+        if (!orderResult.success) {
+          return {
+            success: false,
+            error: orderResult.errorMessage || 'Failed to create Stripe order'
+          };
+        }
+
+        const stripeResult = await apiClient.createStripeOrder(planId);
+
+        if (!stripeResult.success) {
+          return {
+            success: false,
+            error: stripeResult.errorMessage || 'Failed to create Stripe order'
+          };
+        }
 
         return {
-          hasVip: endTime > now,
-          endTime: response.endTime,
-          vipType: response.vipType?.typeName,
-          daysRemaining,
+          success: true,
+          paymentUrl: stripeResult.paymentUrl || undefined,
+          orderNo: orderResult.orderNo
+        };
+
+      } else {
+        return {
+          success: false,
+          error: 'Unsupported payment method'
         };
       }
 
-      return {
-        hasVip: false,
-      };
     } catch (error) {
-      console.error('Failed to get VIP status:', error);
+      console.error('VIP purchase failed:', error);
       return {
-        hasVip: false,
+        success: false,
+        error: error instanceof Error ? error.message : 'Purchase failed'
       };
     }
   }
 
   /**
-   * Get user's VIP orders
+   * Step 4: Payment Verification Phase
+   * Poll for payment status after user completes payment
    */
-  async getVipOrders(params?: {
-    current?: number;
-    size?: number;
-  }): Promise<{
-    orders: VipOrder[];
-    total: number;
-    hasMore: boolean;
+  async verifyPayment(orderNo: string): Promise<{
+    success: boolean;
+    isPaid: boolean;
+    error?: string;
   }> {
     try {
-      const response = await apiClient.getVipOrders(params?.current, params?.size);
+      const statusResult = await apiClient.checkPaymentStatusForOrder(orderNo);
 
+      if (!statusResult.success) {
+        return {
+          success: false,
+          isPaid: false,
+          error: statusResult.errorMessage || 'Failed to check payment status'
+        };
+      }
+
+      return {
+        success: true,
+        isPaid: statusResult.isPaid
+      };
+
+    } catch (error) {
+      console.error('Payment verification failed:', error);
+      return {
+        success: false,
+        isPaid: false,
+        error: error instanceof Error ? error.message : 'Payment verification failed'
+      };
+    }
+  }
+
+  /**
+   * Check payment status
+   * Wrapper for the API client method
+   */
+  async checkPaymentStatus(orderNo: string): Promise<{
+    isPaid: boolean;
+    status: number;
+    error?: string;
+  }> {
+    try {
+      const result = await apiClient.checkPaymentStatus(orderNo);
+
+      if (!result.success) {
+        return {
+          isPaid: false,
+          status: -1,
+          error: 'Failed to check payment status'
+        };
+      }
+
+      return {
+        isPaid: result.isPaid,
+        status: result.status
+      };
+
+    } catch (error) {
+      return {
+        isPaid: false,
+        status: -1,
+        error: error instanceof Error ? error.message : 'Status check failed'
+      };
+    }
+  }
+
+  /**
+   * Handle payment completion (Polling Mechanism)
+   * Call this when user returns to the app, or periodically while waiting.
+   * It polls the backend multiple times to see if the Alipay webhook has processed.
+   */
+  async handlePaymentReturn(userId: string, orderNo: string): Promise<{
+    success: boolean;
+    subscription?: VipStatus;
+    error?: string;
+  }> {
+    const maxAttempts = 10;
+    const pollInterval = 2000; // 2 seconds
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const status = await this.checkPaymentStatus(orderNo);
+
+      // Status 1 = Paid (Verified by backend)
+      if (status.isPaid || status.status === 1) {
+        // Payment successful, refresh and return the new status
+        // We fetch the latest status from the Source of Truth endpoint
+        const subscription = await this.getVipStatus(userId);
+        return {
+          success: true,
+          subscription
+        };
+      }
+
+      // Status 2 = Cancelled
+      if (status.status === 2) {
+         return { success: false, error: 'Payment was cancelled' };
+      }
+
+      // If pending (0), wait before next poll
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+    }
+
+    return {
+      success: false,
+      error: 'Payment verification timeout. Please check your order history.'
+    };
+  }
+
+  /**
+   * Get user's VIP status
+   * Uses the Unified Source of Truth endpoint (/subscriptions/me)
+   */
+  async getVipStatus(userId: string): Promise<VipStatus> {
+    try {
+      const subscription = await apiClient.getSubscription(userId);
+
+      if (subscription && subscription.status === 'active') {
+        const now = new Date();
+        const endDate = subscription.endDate ? new Date(subscription.endDate) : new Date();
+        
+        // Visual calculation only
+        const daysRemaining = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+
+        return {
+          hasVip: true,
+          endTime: subscription.endDate?.toISOString(),
+          vipType: subscription.planId,
+          daysRemaining,
+          autoRenew: subscription.autoRenew
+        };
+      }
+      return { hasVip: false };
+    } catch (error) {
+      console.error('Failed to get VIP status:', error);
+      return { hasVip: false };
+    }
+  }
+
+  /**
+   * Get VIP orders history
+   */
+  async getVipOrders(params?: { current?: number; size?: number }) {
+    try {
+      const response = await apiClient.getVipOrders(params?.current, params?.size);
       return {
         orders: response.records,
         total: response.total,
@@ -73,119 +274,30 @@ export class SubscriptionService {
       };
     } catch (error) {
       console.error('Failed to get VIP orders:', error);
-      return {
-        orders: [],
-        total: 0,
-        hasMore: false,
-      };
+      return { orders: [], total: 0, hasMore: false };
     }
   }
 
   /**
-   * Cancel unpaid VIP order
+   * Cancel VIP order
    */
   async cancelVipOrder(orderNo: string): Promise<boolean> {
     try {
-      const response = await apiClient.deleteVipOrder(orderNo);
-      return response;
+      return await apiClient.cancelVipOrder(orderNo);
     } catch (error) {
       console.error('Failed to cancel VIP order:', error);
       return false;
     }
   }
-
+  
   /**
-   * Activate free VIP trial
+   * Calculate savings for subscription plans (UI Helper)
    */
-  async activateFreeTrial(): Promise<boolean> {
-    try {
-      const response = await apiClient.activateFreeVipTrial();
-      return response;
-    } catch (error) {
-      console.error('Failed to activate free trial:', error);
-      return false;
+  calculateSavings(plan: SubscriptionPlan): number {
+    if (plan.originalPrice && plan.price) {
+      return Math.round(((plan.originalPrice - plan.price) / plan.originalPrice) * 100);
     }
-  }
-
-  /**
-   * Purchase VIP subscription
-   */
-  async purchaseVip(
-    vipType: VipPaymentOptions['vipType'],
-    paymentMethod: 'alipay' | 'stripe' = 'alipay'
-  ): Promise<{
-    success: boolean;
-    paymentUrl?: string;
-    sessionId?: string;
-    error?: string;
-  }> {
-    try {
-      let result;
-
-      // Use the appropriate payment method based on the parameter
-      if (paymentMethod === 'alipay') {
-        result = await paymentService.createVipAliPayPayment({ vipType });
-      } else {
-        result = await paymentService.createVipStripePayment({ vipType });
-      }
-
-      return {
-        success: result.success,
-        paymentUrl: result.paymentUrl,
-        sessionId: result.sessionId,
-        error: result.errorMessage,
-      };
-    } catch (error) {
-      console.error('VIP purchase failed:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Purchase failed',
-      };
-    }
-  }
-
-  /**
-   * Check if user has active VIP
-   */
-  async hasActiveVip(): Promise<boolean> {
-    const status = await this.getVipStatus();
-    return status.hasVip;
-  }
-
-  /**
-   * Get VIP pricing information
-   */
-  getVipPricing() {
-    return paymentService.getVipPricing();
-  }
-
-  /**
-   * Calculate savings for subscription plans
-   */
-  calculateSavings(vipType: keyof ReturnType<typeof this.getVipPricing>) {
-    return paymentService.calculateSavings(vipType);
-  }
-
-  /**
-   * Get recommended VIP plan based on usage
-   */
-  getRecommendedPlan(userActivity?: {
-    tripsGenerated?: number;
-    blogsCreated?: number;
-    featuresUsed?: string[];
-  }): VipPaymentOptions['vipType'] {
-    // Simple recommendation logic based on activity
-    const { tripsGenerated = 0, blogsCreated = 0, featuresUsed = [] } = userActivity || {};
-
-    if (tripsGenerated > 20 || blogsCreated > 10 || featuresUsed.length > 5) {
-      return 'VIP_YEAR';
-    } else if (tripsGenerated > 10 || blogsCreated > 5 || featuresUsed.length > 3) {
-      return 'VIP_QUARTER';
-    } else if (tripsGenerated > 5 || blogsCreated > 2 || featuresUsed.length > 1) {
-      return 'VIP_MONTH';
-    } else {
-      return 'VIP_WEEK';
-    }
+    return 0;
   }
 }
 

@@ -1,6 +1,15 @@
 {
   "title": "选择您的计划",
   "subtitle": "为您的旅行需求选择完美的订阅计划",
+  "selectPaymentMethod": "选择支付方式",
+  "selectedPlan": "已选计划",
+  "recommended": "推荐",
+  "international": "国际",
+  "processingPayment": "处理支付",
+  "alipay": "支付宝",
+  "alipayDescription": "使用支付宝安全支付",
+  "stripe": "Stripe",
+  "stripeDescription": "使用信用卡/借记卡支付",
   "error": {
     "loadFailed": "加载订阅数据失败。请重试。",
     "loginRequired": "您必须登录才能更新订阅",

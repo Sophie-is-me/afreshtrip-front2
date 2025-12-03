@@ -54,7 +54,6 @@ export class BlogService extends HttpClient {
     return response.data;
   }
 
-
   /**
    * Delete blog post
    */
@@ -78,6 +77,35 @@ export class BlogService extends HttpClient {
       data: boolean;
       timestamp?: number;
     }>(`/api/v1/blogs/${blId}/like`);
+    return response.data;
+  }
+  
+  /**
+   * Full update of existing blog post (Replaces all fields)
+   * Endpoint: PUT /api/v1/blogs/{id}
+   */
+  async updateBlog(blId: number, blogData: BlogDto): Promise<boolean> {
+    const response = await this.put<{
+      code: number;
+      message: string;
+      data: boolean;
+      timestamp?: number;
+    }>(`/api/v1/blogs/${blId}`, blogData);
+    return response.data;
+  }
+
+  /**
+   * Partial update of existing blog post
+   * Only updates fields provided in the `updates` object.
+   * Endpoint: PATCH /api/v1/blogs/{id}
+   */
+  async patchBlog(blId: number, updates: Partial<BlogDto>): Promise<boolean> {
+    const response = await this.patch<{
+      code: number;
+      message: string;
+      data: boolean;
+      timestamp?: number;
+    }>(`/api/v1/blogs/${blId}`, updates);
     return response.data;
   }
 
@@ -113,5 +141,4 @@ export class BlogService extends HttpClient {
     }>(`/api/v1/blogs/${blId}/comments?${params}`, {});
     return response.data > 0;
   }
-
 }

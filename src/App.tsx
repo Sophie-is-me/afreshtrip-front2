@@ -23,6 +23,7 @@ import Cookies from './pages/Cookies';
 import Accessibility from './pages/Accessibility';
 import Dashboard from './pages/Dashboard';
 import NotFound from './pages/NotFound';
+import PaymentResult from './pages/PaymentResult';
 
 function App() {
   return (
@@ -49,6 +50,7 @@ function App() {
           <Route path="/cookies" element={<Cookies />} />
           <Route path="/accessibility" element={<Accessibility />} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/payment/result" element={<PaymentResult />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Router>

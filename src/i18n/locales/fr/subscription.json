@@ -1,6 +1,15 @@
 {
   "title": "Choisissez votre plan",
   "subtitle": "Sélectionnez le plan d'abonnement parfait pour vos besoins de voyage",
+  "selectPaymentMethod": "Sélectionner le mode de paiement",
+  "selectedPlan": "Plan sélectionné",
+  "recommended": "Recommandé",
+  "international": "International",
+  "processingPayment": "Traitement du paiement",
+  "alipay": "Alipay",
+  "alipayDescription": "Payez en toute sécurité avec Alipay",
+  "stripe": "Stripe",
+  "stripeDescription": "Payez avec carte de crédit/débit",
   "error": {
     "loadFailed": "Échec du chargement des données d'abonnement. Veuillez réessayer.",
     "loginRequired": "Vous devez être connecté pour mettre à jour votre abonnement",

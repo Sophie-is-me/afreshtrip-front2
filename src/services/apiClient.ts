@@ -1,26 +1,20 @@
 // src/services/apiClient.ts
 
-/**
- * REAL API CLIENT - Production Backend Integration
- *
- * This service handles all communication with the Afreshtrip backend API.
- * It manages Firebase authentication tokens and provides typed API methods.
- * 
- * Refactored architecture: Uses composition pattern with separate service modules
- * for better maintainability and separation of concerns.
- */
-
 import { AuthService } from './api/authService';
 import { UserService } from './api/userService';
 import { BlogService } from './api/blogService';
 import { PaymentService } from './api/paymentService';
+import { StorageService } from './api/storageService';
+import { SubscriptionService } from './api/subscriptionService';
+import { FeatureService } from './api/featureService';
+
+// Import Types
 import type {
   LocationInfo,
   WeatherInfo,
   WeatherForecast,
   CollectedAddress,
   NationInfo,
-  ApiResponse,
   ResultIPageCollectAddress,
   User,
   UserDto,
@@ -29,50 +23,54 @@ import type {
   BlogDto,
   VipOrder,
   VipType,
-  IPageUsers
+  IPageUsers,
+  PaymentResponse,
+  AliPayDto,
+  PaymentStatusResponse
 } from '../types/api';
+
+import type { FeatureId } from '../types/features';
+import type { SubscriptionUpdateResult, FeatureAccessResult, UpgradeSuggestion } from '../types/backend';
+import type { UserSubscription } from '../types/subscription';
+import type { SubscriptionPlanResponse } from '../types/api';
 import { HttpClient } from './api/httpClient';
 
 /**
- * Base URL from backend documentation - Local Docker backend
+ * Base URL from backend documentation
  * the backend docs is accessible at /v3/api-docs
  */
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+const API_BASE_URL = import.meta.env.DEV ? 'http://localhost:8080' : 'https://afreshtrip-backend-550030138351.europe-west1.run.app';
 
 /**
  * Main API Client that composes all service modules
- * 
- * This client provides a unified interface to all API endpoints while
- * maintaining separation of concerns through composition.
  */
 export class ApiClient {
   private readonly auth: AuthService;
   private readonly user: UserService;
   private readonly blog: BlogService;
   private readonly payment: PaymentService;
+  private readonly storage: StorageService;
+  private readonly subscription: SubscriptionService;
+  private readonly feature: FeatureService;
 
   constructor(baseUrl: string = API_BASE_URL) {
-    // Initialize service modules with shared base URL
     this.auth = new AuthService(baseUrl);
     this.user = new UserService(baseUrl);
     this.blog = new BlogService(baseUrl);
     this.payment = new PaymentService(baseUrl);
+    this.storage = new StorageService(baseUrl);
+    this.subscription = new SubscriptionService(baseUrl);
+    this.feature = new FeatureService(baseUrl);
   }
 
   // ============================================================================
-  // AUTHENTICATION & HEALTH CHECKS (Delegated to AuthService)
+  // AUTHENTICATION & HEALTH CHECKS
   // ============================================================================
 
-  /**
-   * Check authentication service health
-   */
   getAuthHealth(): Promise<string> {
     return this.auth.getAuthHealth();
   }
 
-  /**
-   * Get detailed auth status
-   */
   getAuthStatus(): Promise<{
     firebaseEnabled: boolean;
     status: string;
@@ -81,67 +79,42 @@ export class ApiClient {
     return this.auth.getAuthStatus();
   }
 
-  /**
-   * Check if user is authenticated
-   */
   isAuthenticated(): Promise<boolean> {
     return this.auth.isAuthenticated();
   }
 
   // ============================================================================
-  // USER MANAGEMENT (Delegated to UserService)
+  // USER MANAGEMENT
   // ============================================================================
 
-  /**
-   * Get current user info
-   */
   getUserInfo(): Promise<User> {
     return this.user.getUserInfo();
   }
 
-  /**
-   * Update user profile
-   */
   updateUserProfile(userData: UserDto): Promise<boolean> {
     return this.user.updateUserProfile(userData);
   }
 
-  /**
-    * Get user by email
-    */
   getUserByEmail(userEmail: string): Promise<User> {
     return this.user.getUserByEmail(userEmail);
   }
 
-  /**
-   * Get all users with pagination
-   */
   getUsers(page?: number, size?: number): Promise<IPageUsers> {
     return this.user.getUsers(page || 0, size || 20);
   }
 
-  /**
-   * Search users
-   */
   searchUsers(keyword: string): Promise<User[]> {
     return this.user.searchUsers(keyword);
   }
 
-  /**
-    * Update user status
-    */
   updateUserStatus(userEmail: string, isActive: boolean): Promise<boolean> {
     return this.user.updateUserStatus(userEmail, isActive);
   }
 
-
   // ============================================================================
-  // BLOG MANAGEMENT (Delegated to BlogService)
+  // BLOG MANAGEMENT
   // ============================================================================
 
-  /**
-   * Get all blogs with pagination
-   */
   getBlogs(page?: number, size?: number): Promise<{
     records: BlogVo[];
     total: number;
@@ -152,38 +125,30 @@ export class ApiClient {
     return this.blog.getBlogs(page, size);
   }
 
-  /**
-   * Get blog by ID
-   */
   getBlogById(blId: number): Promise<BlogCommentVo> {
     return this.blog.getBlogById(blId);
   }
 
-  /**
-   * Create new blog post
-   */
   createBlog(blogData: BlogDto): Promise<BlogVo> {
     return this.blog.createBlog(blogData);
   }
 
+  updateBlog(blId: number, blogData: BlogDto): Promise<boolean> {
+    return this.blog.updateBlog(blId, blogData);
+  }
 
-  /**
-   * Delete blog post
-   */
+  patchBlog(blId: number, updates: Partial<BlogDto>): Promise<boolean> {
+    return this.blog.patchBlog(blId, updates);
+  }
+
   deleteBlog(blId: number): Promise<boolean> {
     return this.blog.deleteBlog(blId);
   }
 
-  /**
-   * Like/unlike blog post
-   */
   toggleBlogLike(blId: number): Promise<boolean> {
     return this.blog.toggleBlogLike(blId);
   }
 
-  /**
-    * Get user's blogs
-    */
   getUserBlogs(page?: number, size?: number): Promise<{
     records: BlogVo[];
     total: number;
@@ -194,65 +159,81 @@ export class ApiClient {
     return this.blog.getUserBlogs(page, size);
   }
 
-  /**
-   * Add comment to blog
-   */
   addComment(blId: number, content: string, replyToCommentId?: number): Promise<boolean> {
     return this.blog.addComment(blId, content, replyToCommentId);
   }
 
-
   // ============================================================================
-  // PAYMENT SYSTEMS (Delegated to PaymentService)
+  // PAYMENT SYSTEMS (UPDATED FLOW)
   // ============================================================================
 
   /**
-   * Generate AliPay payment URL
+   * Step 1: Create VIP Order
+   * @param planId - 'week' | 'month' | 'year'
+   * @returns Promise with order details (orderNo, amount)
    */
-  generateAliPayUrl(params: {
+  createVipOrder(planId: string): Promise<{
+    success: boolean;
     orderNo: string;
     amount: number;
-    subject: string;
-  }): Promise<ApiResponse<{
-    success: boolean;
-    paymentUrl: string;
-    orderNo: string;
     errorMessage?: string;
-    errorCode?: string;
-  }>> {
-    return this.payment.generateAliPayUrl(params);
+  }> {
+    return this.payment.createVipOrder(planId);
   }
 
   /**
-   * Initiate AliPay payment
+   * Step 2: Initiate Alipay Payment with Order Details
+   * @param orderNo - Order number from Step 1
+   * @param amount - Payment amount from Step 1
+   * @param planId - Plan identifier
+   * @returns Promise with payment URL
    */
-  initiateAliPayPayment(paymentData: {
-    subject: string;
-    out_trade_no: string;
-    total_amount: number;
-    body?: string;
-    product_code?: string;
-  }): Promise<ApiResponse<{
+  initiateAlipayPaymentForOrder(orderNo: string, amount: number, planId: string): Promise<PaymentResponse> {
+    return this.payment.initiateAlipayPaymentForOrder(orderNo, amount, planId);
+  }
+
+  /**
+   * Step 4: Check Payment Status (for polling)
+   * @param orderNo - Order number to check
+   * @returns Promise with payment status
+   */
+  checkPaymentStatusForOrder(orderNo: string): Promise<{
     success: boolean;
-    paymentUrl: string;
-    orderNo: string;
+    isPaid: boolean;
+    status: number;
     errorMessage?: string;
-    errorCode?: string;
-  }>> {
+  }> {
+    return this.payment.checkPaymentStatusForOrder(orderNo);
+  }
+
+  /**
+   * Step 2: Initiate Alipay Payment
+   * @param paymentData - Data returned from createVipOrder
+   */
+  initiateAliPayPayment(paymentData: AliPayDto): Promise<PaymentResponse> {
     return this.payment.initiateAliPayPayment(paymentData);
   }
 
+  /**
+   * Step 3: Check Payment Status
+   * @param orderNo - The order number to verify
+   */
+  checkPaymentStatus(orderNo: string): Promise<PaymentStatusResponse> {
+    return this.payment.checkPaymentStatus(orderNo);
+  }
 
   /**
-   * Get VIP types
+   * Step 4: Create Stripe Order (for Stripe payments)
+   * @param planId - 'week' | 'month' | 'year'
    */
+  createStripeOrder(planId: string): Promise<PaymentResponse> {
+    return this.payment.createStripeOrder(planId);
+  }
+
   getVipTypes(): Promise<VipType[]> {
     return this.payment.getVipTypes();
   }
 
-  /**
-   * Get VIP order history
-   */
   getVipOrders(page?: number, size?: number): Promise<{
     records: VipOrder[];
     total: number;
@@ -263,23 +244,10 @@ export class ApiClient {
     return this.payment.getVipOrders(page, size);
   }
 
-  /**
-    * Create VIP order
-    */
-  createVipOrder(vipTypeId: number): Promise<VipOrder> {
-    return this.payment.createVipOrder(vipTypeId);
-  }
-
-  /**
-   * Cancel VIP order
-   */
   cancelVipOrder(orderNo: string): Promise<boolean> {
     return this.payment.cancelVipOrder(orderNo);
   }
 
-  /**
-   * Check subscription status
-   */
   getSubscriptionStatus(): Promise<{
     isSubscribed: boolean;
     vipType?: VipType;
@@ -290,12 +258,61 @@ export class ApiClient {
   }
 
   // ============================================================================
+  // STORAGE & MEDIA SERVICES
+  // ============================================================================
+
+  uploadFile(file: File): Promise<string> {
+    return this.storage.uploadFile(file);
+  }
+
+  getUserMedia(page: number = 1, size: number = 20): Promise<{
+    images: string[];
+    total: number;
+    hasMore: boolean;
+  }> {
+    return this.storage.getUserMedia(page, size);
+  }
+
+  // ============================================================================
+  // SUBSCRIPTION SERVICES
+  // ============================================================================
+
+  getSubscription(userId: string): Promise<UserSubscription | null> {
+    return this.subscription.getUserSubscription(userId);
+  }
+
+  updateSubscription(userId: string, request: { planId: string; paymentMethodId?: string }): Promise<SubscriptionUpdateResult> {
+    return this.subscription.updateSubscription(userId, request.planId, request.paymentMethodId);
+  }
+
+  cancelSubscription(userId: string, reason?: string): Promise<void> {
+    return this.subscription.cancelSubscription(userId, reason);
+  }
+
+  // ============================================================================
+  // FEATURE SERVICES
+  // ============================================================================
+
+  checkFeatureAccess(userId: string, featureId: FeatureId): Promise<FeatureAccessResult> {
+    return this.feature.checkFeatureAccess(userId, featureId);
+  }
+
+  getAccessibleFeatures(userId: string): Promise<FeatureId[]> {
+    return this.feature.getUserAccessibleFeatures(userId);
+  }
+
+  getUpgradeSuggestions(userId: string, featureIds: FeatureId[]): Promise<Partial<Record<FeatureId, UpgradeSuggestion>>> {
+    return this.feature.getUpgradeSuggestions(userId, featureIds);
+  }
+
+  getSubscriptionPlans(): Promise<SubscriptionPlanResponse[]> {
+    return this.feature.getSubscriptionPlans();
+  }
+
+  // ============================================================================
   // UTILITY & LOCATION SERVICES
   // ============================================================================
 
-  /**
-   * Get location info by coordinates
-   */
   async getLocationInfo(lat: number, lng: number): Promise<LocationInfo> {
     const httpClient = new HttpClient(API_BASE_URL);
     const response = await httpClient.get<{
@@ -307,9 +324,6 @@ export class ApiClient {
     return response.data;
   }
 
-  /**
-   * Get weather info for location
-   */
   async getWeatherInfo(city: string): Promise<WeatherInfo> {
     const httpClient = new HttpClient(API_BASE_URL);
     const response = await httpClient.get<{
@@ -321,9 +335,6 @@ export class ApiClient {
     return response.data;
   }
 
-  /**
-   * Get weather forecast
-   */
   async getWeatherForecast(city: string): Promise<WeatherForecast> {
     const httpClient = new HttpClient(API_BASE_URL);
     const response = await httpClient.get<{
@@ -339,9 +350,6 @@ export class ApiClient {
   // ADDRESS & NATION MANAGEMENT
   // ============================================================================
 
-  /**
-   * Get collected addresses with pagination
-   */
   async getCollectedAddresses(page: number = 1, size: number = 10): Promise<{
     records: CollectedAddress[];
     total: number;
@@ -356,9 +364,6 @@ export class ApiClient {
     return response.data;
   }
 
-  /**
-   * Add collected address
-   */
   async addCollectedAddress(address: Omit<CollectedAddress, 'id' | 'userId' | 'createdAt'>): Promise<CollectedAddress> {
     const httpClient = new HttpClient(API_BASE_URL);
     const response = await httpClient.post<{
@@ -370,9 +375,6 @@ export class ApiClient {
     return response.data;
   }
 
-  /**
-   * Delete collected address
-   */
   async deleteCollectedAddress(id: number): Promise<boolean> {
     const httpClient = new HttpClient(API_BASE_URL);
     const response = await httpClient.delete<{
@@ -384,9 +386,6 @@ export class ApiClient {
     return response.data;
   }
 
-  /**
-   * Get nations list
-   */
   async getNations(page: number = 1, size: number = 100): Promise<NationInfo[]> {
     const httpClient = new HttpClient(API_BASE_URL);
     const response = await httpClient.get<{
@@ -403,139 +402,15 @@ export class ApiClient {
     }>(`/app/nation/getNationList?page=${page}&size=${size}`);
     return response.data.records;
   }
-
-  // ============================================================================
-  // UTILITY METHODS
-  // ============================================================================
-
-
-
-  // ============================================================================
-  // BACKWARDS COMPATIBILITY METHODS (deprecated, use service-specific methods)
-  // ============================================================================
-
-  /**
-   * @deprecated Use blog.getBlogs() instead
-   */
-  async getBlogList(page?: number, size?: number) {
-    return this.getBlogs(page, size);
-  }
-
-  /**
-   * @deprecated Use blog.createBlog() instead
-   */
-  async createBlogPost(blogData: BlogDto) {
-    return this.createBlog(blogData);
-  }
-
-  /**
-   * @deprecated Use payment.getSubscriptionStatus() instead
-   */
-  async getSubscriptionInfo() {
-    return this.getSubscriptionStatus();
-  }
-
-  /**
-   * @deprecated Use payment.getVipTypes() instead
-   */
-  async getVipPackages() {
-    return this.getVipTypes();
-  }
-
-  /**
-   * @deprecated Use payment.createVipOrder() instead
-   */
-  async purchaseVip(vipTypeId: number) {
-    return this.createVipOrder(vipTypeId);
-  }
-
-  /**
-   * @deprecated Use user.getUsers() instead
-   */
-  async getUsersList(page?: number, size?: number) {
-    return this.getUsers(page, size);
-  }
-
-  /**
-   * @deprecated Use user.searchUsers() instead
-   */
-  async searchUsersByKeyword(keyword: string) {
-    return this.searchUsers(keyword);
-  }
-
-  /**
-   * @deprecated Use payment.getSubscriptionStatus() instead
-   */
-  async getVipEndTime(): Promise<string> {
-    const status = await this.getSubscriptionStatus();
-    return status.endTime || '';
-  }
-
-  /**
-   * @deprecated Use payment.cancelVipOrder() instead
-   */
-  async deleteVipOrder(orderNo: string): Promise<boolean> {
-    return this.cancelVipOrder(orderNo);
-  }
-
-  /**
-   * @deprecated Free trial activation not implemented
-   */
-  async activateFreeVipTrial(): Promise<boolean> {
-    throw new Error('Free trial activation not implemented');
-  }
-
-  /**
-   * @deprecated Stripe payment not implemented
-   */
-  async createStripePayment(_params: {
-    amount: number;
-    currency: string;
-    description: string;
-    orderId?: string;
-  }): Promise<{ success: boolean; paymentUrl?: string; error?: string }> {
-    throw new Error(`Stripe payment not implemented ${JSON.stringify(_params)}`);
-  }
-
-  /**
-   * @deprecated VIP Stripe payment not implemented
-   */
-  async createVipStripePayment(_vipTypeId: number): Promise<{ success: boolean; paymentUrl?: string; error?: string }> {
-    throw new Error(`VIP Stripe payment not implemented ${JSON.stringify(_vipTypeId)}`);
-  }
-
-  /**
-   * @deprecated Payment status check not implemented
-   */
-  async checkPaymentStatus(_orderNo: string): Promise<{ status: string; success: boolean }> {
-    throw new Error(`Payment status check not implemented ${JSON.stringify(_orderNo)}`);
-  }
-
-  /**
-   * @deprecated Use weather.getWeatherInfo() instead
-   */
-  async getRealtimeWeather(cityCode: string): Promise<WeatherInfo> {
-    return this.getWeatherInfo(cityCode);
-  }
-
-  /**
-   * @deprecated File upload not implemented in refactored structure
-   */
-  async uploadFile(_file?: File): Promise<{ code: number; data: string }> {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    // This is a placeholder implementation
-    // File upload functionality should be implemented in a separate service
-    throw new Error(`File upload not implemented in refactored API client ${JSON.stringify(_file)}`);
-  }
 }
 
-// Export singleton instance for convenience
+// Export singleton instance
 export const apiClient = new ApiClient();
 
-// Re-export error classes for backwards compatibility
-export { ApiError } from './api/errors';
+// Re-export error classes
+export { ApiError, SubscriptionRequiredError } from './api/errors';
 
-// Export all types for backwards compatibility
+// Export all types
 export type {
   User,
   UserDto,
@@ -551,5 +426,5 @@ export type {
   WeatherForecast,
   CollectedAddress,
   NationInfo,
-  UserInfo // alias for User
+  UserInfo
 } from '../types/api';

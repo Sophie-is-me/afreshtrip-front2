@@ -44,6 +44,13 @@ export class ValidationError extends ApiError {
   }
 }
 
+export class SubscriptionRequiredError extends ApiError {
+  constructor(message = 'Subscription required for this feature') {
+    super(message, 403);
+    this.name = 'SubscriptionRequiredError';
+  }
+}
+
 /**
  * Error type guards
  */
@@ -61,6 +68,10 @@ export function isNetworkError(error: unknown): error is NetworkError {
 
 export function isTimeoutError(error: unknown): error is TimeoutError {
   return error instanceof TimeoutError;
+}
+
+export function isSubscriptionRequiredError(error: unknown): error is SubscriptionRequiredError {
+  return error instanceof SubscriptionRequiredError;
 }
 
 /**

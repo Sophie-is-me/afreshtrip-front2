@@ -2,6 +2,15 @@
   "off": "DE RÉDUCTION",
   "retry": "Réessayer",
   "home": "Accueil",
+  "cancel": "Annuler",
   "travelDestinations": "Destinations de voyage",
-  "exploreAmazingPlaces": "Explorez des endroits incroyables à travers le monde."
+  "exploreAmazingPlaces": "Explorez des endroits incroyables à travers le monde.",
+  "featureAccess": {
+    "upgradeRequired": "Mise à niveau requise",
+    "premiumFeature": "Fonction Premium",
+    "upgradeDescription": "Mettez à niveau votre plan pour débloquer cette fonctionnalité et accéder au contenu premium.",
+    "upgradeTo": "Passer à",
+    "viewAllPlans": "Voir tous les plans",
+    "viewPlans": "Voir les plans d'abonnement"
+  }
 }

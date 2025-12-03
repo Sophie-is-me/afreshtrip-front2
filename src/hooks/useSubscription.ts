@@ -3,29 +3,16 @@
 /**
  * FRONTEND ONLY - UX/UI Subscription Management Hook
  *
- * 🚨 SECURITY WARNING: This hook provides CLIENT-SIDE subscription UI only.
- * It enhances user experience for subscription management, but provides
- * NO SECURITY. All subscription operations MUST be validated on the BACKEND.
- *
- * Backend Implementation Required:
- * - See src/types/backend.ts for BackendSubscriptionService interface
- * - Implement server-side subscription validation and payment processing
- * - Use middleware to protect subscription management endpoints
- *
- * Critical Backend Endpoints Needed:
- * - GET /api/subscriptions/me - Get user's subscription (authenticated)
- * - POST /api/subscriptions/update - Update subscription (with payment)
- * - GET /api/features/accessible - Get user's accessible features
- *
- * Migration: Replace mock data with real API calls to backend services.
- * Keep UI logic, replace data fetching with authenticated API requests.
+ * Updates:
+ * - Uses unified "Source of Truth" for loading subscription status.
+ * - Implements the Payment Method Selection Flow for plan updates/purchases.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { subscriptionPlansData, type SubscriptionPlan, type UserSubscription } from '../types/subscription';
-import { mockApiClient } from '../services/mockApi';
-import type { UpdateSubscriptionRequest } from '../types/backend';
+import { apiClient } from '../services/apiClient';
+import { subscriptionService } from '../services/subscriptionService'; // Import the high-level orchestrator
 
 export const useSubscription = () => {
   const { user } = useAuth();
@@ -37,25 +24,36 @@ export const useSubscription = () => {
   const [isCancelling, setIsCancelling] = useState(false);
   const [errorKey, setErrorKey] = useState<string | null>(null);
   const [successKey, setSuccessKey] = useState<string | null>(null);
+  const [showPaymentMethodSelection, setShowPaymentMethodSelection] = useState(false);
+  const [pendingPlanId, setPendingPlanId] = useState<string | null>(null);
 
+  // 1. Load Subscription (Uses new Source of Truth via apiClient)
   useEffect(() => {
     const fetchSubscriptionData = async () => {
       try {
         setIsLoading(true);
         setErrorKey(null);
 
-        // Load plans (this would come from API in production)
-        setPlans(subscriptionPlansData.plans);
+        // Load plans from backend API
+        try {
+          // const backendPlans = await apiClient.getSubscriptionPlans();
+          // TODO: Transform backend plans to frontend format
+          // For now, keep using static data until transformation is implemented
+          setPlans(subscriptionPlansData.plans);
+        } catch (error) {
+          console.error('Error loading subscription plans:', error);
+          // Fallback to static data
+          setPlans(subscriptionPlansData.plans);
+        }
 
-        // Load user subscription using mock API
         if (user) {
-          const response = await mockApiClient.getSubscription(user.uid);
+          // This calls the updated low-level service which hits /api/v1/subscriptions/me
+          const subscription = await apiClient.getSubscription(user.uid);
 
-          if (response.success && response.data) {
-            setUserSubscription(response.data);
-            setSelectedPlanId(response.data.planId);
+          if (subscription) {
+            setUserSubscription(subscription);
+            setSelectedPlanId(subscription.planId);
           } else {
-            // User has no subscription
             setUserSubscription(null);
             setSelectedPlanId(null);
           }
@@ -74,31 +72,59 @@ export const useSubscription = () => {
     fetchSubscriptionData();
   }, [user]);
 
-
-  const handlePlanSelect = (planId: string) => {
+  // 2. Handle Plan Selection - Just selects the plan for preview
+  const handlePlanSelect = useCallback((planId: string) => {
     setSelectedPlanId(planId);
-  };
+    setErrorKey(null);
+    setSuccessKey(null);
+  }, []);
 
-  const handlePlanUpdate = useCallback(async (planId: string) => {
+  // 3. Handle Plan Purchase - Shows payment method selection modal
+  const handlePlanUpdate = useCallback((planId: string) => {
     if (!user) {
       setErrorKey('subscription.error.loginRequired');
       return;
     }
 
-    // Validation: Check if selecting the same plan
     if (userSubscription?.planId === planId) {
       setErrorKey('subscription.error.alreadySubscribed');
       return;
     }
 
-    // Validation: Check if plan exists
     const selectedPlan = plans.find(p => p.id === planId);
     if (!selectedPlan) {
       setErrorKey('subscription.error.planNotFound');
       return;
     }
 
-    // Validation: Check if plan is disabled
+    if (selectedPlan.isDisabled) {
+      setErrorKey('subscription.error.planDisabled');
+      return;
+    }
+
+    // Show payment method selection modal
+    setPendingPlanId(planId);
+    setShowPaymentMethodSelection(true);
+  }, [user, userSubscription, plans]);
+
+  // 4. Handle Payment Method Selection and Processing
+  const handlePaymentMethodSelect = useCallback(async (planId: string, paymentMethod: 'alipay' | 'stripe') => {
+    if (!user) {
+      setErrorKey('subscription.error.loginRequired');
+      return;
+    }
+
+    if (userSubscription?.planId === planId) {
+      setErrorKey('subscription.error.alreadySubscribed');
+      return;
+    }
+
+    const selectedPlan = plans.find(p => p.id === planId);
+    if (!selectedPlan) {
+      setErrorKey('subscription.error.planNotFound');
+      return;
+    }
+
     if (selectedPlan.isDisabled) {
       setErrorKey('subscription.error.planDisabled');
       return;
@@ -109,29 +135,34 @@ export const useSubscription = () => {
       setErrorKey(null);
       setSuccessKey(null);
 
-      // Use mock API client for subscription update
-      const request: UpdateSubscriptionRequest = {
+      // Close the payment method selection modal
+      setShowPaymentMethodSelection(false);
+      setPendingPlanId(null);
+
+      // Call the high-level service to orchestrate the payment flow
+      const result = await subscriptionService.purchaseVip(
+        user.uid,
         planId,
-        paymentMethodId: 'pm_mock123', // Mock payment method
-      };
+        paymentMethod
+      );
 
-      const response = await mockApiClient.updateSubscription(user.uid, request);
-
-      if (response.success && response.data?.subscription) {
-        setUserSubscription(response.data.subscription);
-        setSelectedPlanId(planId);
-        setSuccessKey('subscription.success.updateSuccess');
+      if (result.success && result.paymentUrl) {
+        // REDIRECT TO PAYMENT PROVIDER
+        // The user will leave the app and return to the callback URL
+        window.location.href = result.paymentUrl;
       } else {
-        setErrorKey(response.error?.message || 'subscription.error.updateFailed');
+        setErrorKey(result.error || 'subscription.error.updateFailed');
+        setIsUpdating(false); // Only stop loading if we didn't redirect
       }
     } catch (err) {
       setErrorKey('subscription.error.updateFailed');
       console.error('Error updating subscription:', err);
-    } finally {
       setIsUpdating(false);
     }
+    // Note: If success, we don't set isUpdating(false) because the page is unloading/redirecting
   }, [user, userSubscription, plans]);
 
+  // 5. Cancel Subscription
   const handleCancelSubscription = useCallback(async (reason?: string) => {
     if (!user) {
       setErrorKey('subscription.error.cancelLoginRequired');
@@ -148,16 +179,11 @@ export const useSubscription = () => {
       setErrorKey(null);
       setSuccessKey(null);
 
-      // Use mock API client for subscription cancellation
-      const response = await mockApiClient.cancelSubscription(user.uid, reason);
+      await apiClient.cancelSubscription(user.uid, reason);
 
-      if (response.success) {
-        // Update local state to reflect cancellation
-        setUserSubscription(prev => prev ? { ...prev, autoRenew: false } : null);
-        setSuccessKey('subscription.success.cancelSuccess');
-      } else {
-        setErrorKey(response.error?.message || 'subscription.error.cancelFailed');
-      }
+      // Optimistic update
+      setUserSubscription(prev => prev ? { ...prev, autoRenew: false } : null);
+      setSuccessKey('subscription.success.cancelSuccess');
     } catch (err) {
       setErrorKey('subscription.error.cancelFailed');
       console.error('Error cancelling subscription:', err);
@@ -166,7 +192,28 @@ export const useSubscription = () => {
     }
   }, [user, userSubscription]);
 
-  return {
+  // 6. Manual Refresh (Useful for the Return Page)
+  const refreshSubscription = useCallback(async () => {
+    if (!user) return;
+    setIsLoading(true);
+    try {
+      const subscription = await apiClient.getSubscription(user.uid);
+      setUserSubscription(subscription);
+      if (subscription) setSelectedPlanId(subscription.planId);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user]);
+
+  // 7. Close Payment Method Selection Modal
+  const closePaymentMethodSelection = useCallback(() => {
+    setShowPaymentMethodSelection(false);
+    setPendingPlanId(null);
+  }, []);
+
+  return useMemo(() => ({
     selectedPlanId,
     userSubscription,
     plans,
@@ -175,8 +222,30 @@ export const useSubscription = () => {
     isCancelling,
     errorKey,
     successKey,
+    showPaymentMethodSelection,
+    pendingPlanId,
     handlePlanSelect,
     handlePlanUpdate,
+    handlePaymentMethodSelect,
     handleCancelSubscription,
-  };
+    refreshSubscription,
+    closePaymentMethodSelection
+  }), [
+    selectedPlanId, 
+    userSubscription, 
+    plans, 
+    isLoading, 
+    isUpdating, 
+    isCancelling, 
+    errorKey, 
+    successKey,
+    showPaymentMethodSelection,
+    pendingPlanId,
+    handlePlanSelect, 
+    handlePlanUpdate, 
+    handlePaymentMethodSelect, 
+    handleCancelSubscription, 
+    refreshSubscription,
+    closePaymentMethodSelection
+  ]);
 };

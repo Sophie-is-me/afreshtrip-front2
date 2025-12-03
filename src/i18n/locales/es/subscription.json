@@ -1,6 +1,15 @@
 {
   "title": "Elige tu plan",
   "subtitle": "Selecciona el plan de suscripción perfecto para tus necesidades de viaje",
+  "selectPaymentMethod": "Seleccionar Método de Pago",
+  "selectedPlan": "Plan Seleccionado",
+  "recommended": "Recomendado",
+  "international": "Internacional",
+  "processingPayment": "Procesando Pago",
+  "alipay": "Alipay",
+  "alipayDescription": "Paga de forma segura con Alipay",
+  "stripe": "Stripe",
+  "stripeDescription": "Paga con tarjeta de crédito/débito",
   "error": {
     "loadFailed": "Error al cargar los datos de suscripción. Por favor, inténtalo de nuevo.",
     "loginRequired": "Debes iniciar sesión para actualizar tu suscripción",

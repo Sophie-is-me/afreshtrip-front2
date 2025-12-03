@@ -2,6 +2,15 @@
   "off": "DESCUENTO",
   "retry": "Reintentar",
   "home": "Inicio",
+  "cancel": "Cancelar",
   "travelDestinations": "Destinos de viaje",
-  "exploreAmazingPlaces": "Explora lugares increíbles alrededor del mundo."
+  "exploreAmazingPlaces": "Explora lugares increíbles alrededor del mundo.",
+  "featureAccess": {
+    "upgradeRequired": "Actualización Requerida",
+    "premiumFeature": "Función Premium",
+    "upgradeDescription": "Actualiza tu plan para desbloquear esta función y acceder a contenido premium.",
+    "upgradeTo": "Actualizar a",
+    "viewAllPlans": "Ver Todos los Planes",
+    "viewPlans": "Ver Planes de Suscripción"
+  }
 }

@@ -111,6 +111,119 @@ export interface ResultIPageUsers {
   timestamp?: number;
 }
 
+// --- NEW MEDIA & SUBSCRIPTION TYPES (Phase 1 Updates) ---
+
+export interface MediaPageVo {
+  records: string[]; // List of URLs
+  total: number;
+  size: number;
+  current: number;
+  pages: number;
+}
+
+export interface ResultMediaPageVo {
+  code: number;
+  message: string;
+  data: MediaPageVo;
+  timestamp?: number;
+}
+
+export interface SubscriptionVo {
+  status: 'active' | 'expired' | 'past_due' | 'pending' | 'cancelled';
+  planId: string; // e.g., "year", "month"
+  vipTypeId: number;
+  expiresAt: string; // ISO Date string
+  autoRenew: boolean;
+}
+
+export interface ResultSubscriptionVo {
+  code: number;
+  message: string;
+  data: SubscriptionVo;
+  timestamp?: number;
+}
+
+export interface ResultFeatureList {
+  code: number;
+  message: string;
+  data: string[]; // List of feature keys
+  timestamp?: number;
+}
+
+export interface FeatureAccessResponse {
+  hasAccess: boolean;
+  upgradeMessage: string;
+  requiredPlans: string[];
+}
+
+export interface ResultFeatureAccess {
+  code: number;
+  message: string;
+  data: FeatureAccessResponse;
+  timestamp?: number;
+}
+
+export interface SubscriptionPlanResponse {
+  planId: string;
+  name: string;
+  description: string;
+  price: number;
+  period: string;
+  features: string[];
+  featureNames: Record<string, string>;
+}
+
+export interface ResultSubscriptionPlans {
+  code: number;
+  message: string;
+  data: SubscriptionPlanResponse[];
+  timestamp?: number;
+}
+
+export interface UpgradeSuggestionResponse {
+  recommendedPlan: string;
+  features: string[];
+  price: number;
+  period: string;
+}
+
+export interface ResultUpgradeSuggestions {
+  code: number;
+  message: string;
+  data: Record<string, UpgradeSuggestionResponse>;
+  timestamp?: number;
+}
+
+// --- NEW PAYMENT TYPES (Alipay Integration Guide) ---
+
+export interface AliPayDto {
+  out_trade_no: string;
+  total_amount: number;
+  subject: string;
+}
+
+export interface PaymentStatusResponse {
+  success: boolean;
+  orderNo: string;
+  status: number; // 0 = pending, 1 = paid
+  amount: number;
+  isPaid: boolean;
+}
+
+export interface CreateOrderRequest {
+  planId: string; // 'week' | 'month' | 'year'
+}
+
+export interface PaymentResponse {
+  success: boolean;
+  paymentUrl?: string;
+  orderNo?: string;
+  errorMessage?: string;
+  errorCode?: string;
+}
+
+// -----------------------------------------------------------
+
 // Specific API response types
 export interface User {
   userId?: number;
@@ -167,16 +280,9 @@ export interface ResultMapStringObject {
 // Backwards compatibility alias
 export type UserInfo = User;
 
-export interface PaymentResponse {
-  success: boolean;
-  paymentUrl?: string;
-  orderNo?: string;
-  sessionId?: string;
-  errorMessage?: string;
-  errorCode?: string;
-}
-
 export interface VipOrder {
+  id?: number;
+  userId?: number;
   vipTypeId?: number;
   orderNo?: string;
   amount?: number;
@@ -184,6 +290,7 @@ export interface VipOrder {
   payType?: number;
   startTime?: string;
   endTime?: string;
+  createAt?: string;
 }
 
 export interface VipType {
@@ -198,7 +305,6 @@ export interface VipType {
 export interface BlogVo {
   blId?: number;
   userId?: number;
-  // Separated fields
   title: string;        
   excerpt?: string;
   content: string;      
@@ -206,7 +312,6 @@ export interface BlogVo {
   category?: string;
   isPublished?: boolean;
   slug?: string;
-  // Existing fields
   like?: number;
   play?: number;
   imageUrl?: Array<{ imgUrl: string }>;
@@ -261,14 +366,12 @@ export interface Video {
   isDeleted?: boolean;
 }
 
-// BlogPost is the generic/local type, kept for compatibility with other files if needed,
-// though ideally this should align with BlogVo eventually.
 export interface BlogPost {
   blId?: number;
   userId?: number;
   title?: string;
   content?: string;
-  blText?: string; // Kept as optional legacy
+  blText?: string;
   like?: number;
   play?: number;
   imageUrl?: Array<{ imgUrl: string }>;

@@ -1,9 +1,14 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { BlogPost, CreateBlogPostInput } from '../types/blog';
-import { apiClient, type BlogVo, type BlogDto } from '../services/apiClient';
+import { 
+  apiClient, 
+  type BlogVo, 
+  type BlogDto, 
+} from '../services/apiClient';
 import { useAuth } from './AuthContext';
+import { SubscriptionRequiredError } from '../services/api';
 
-// [convertApiBlogPost is correctly implemented as provided in your prompt]
+// Helper to convert Backend VO to Frontend Model
 const convertApiBlogPost = (apiPost: BlogVo): BlogPost => ({
   id: apiPost.blId?.toString() || '',
   title: apiPost.title || 'Untitled',
@@ -35,12 +40,18 @@ interface BlogContextType {
   getBlogPostById: (id: string) => BlogPost | undefined;
   addNewPost: (post: BlogPost) => void;
   createBlogPost: (post: CreateBlogPostInput) => Promise<string>;
-  // UPDATED: Now returns a Promise for auto-save UI feedback
-  updateBlogPost: (id: string, updates: Partial<BlogPost>) => Promise<void>; 
+  updateBlogPost: (id: string, updates: Partial<BlogPost>) => Promise<void>;
   updatePostStatistics: (id: string, stats: { views?: number; likes?: number; isLiked?: boolean; isSaved?: boolean }) => void;
   getRelatedPosts: (currentId: string, category: string, limit?: number) => BlogPost[];
   uploadImage: (file: File) => Promise<string>;
   refreshBlogPosts: () => Promise<void>;
+  
+  // Updated signature for pagination
+  getUserMediaLibrary: (page?: number, size?: number) => Promise<{
+    images: string[];
+    total: number;
+    hasMore: boolean;
+  }>;
 }
 
 const BlogContext = createContext<BlogContextType | undefined>(undefined);
@@ -103,6 +114,9 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
       addNewPost(newPost);
       return newPost.id;
     } catch (err) {
+      if (err instanceof SubscriptionRequiredError) {
+        throw err;
+      }
       const errorMessage = err instanceof Error ? err.message : 'Failed to create blog post';
       throw new Error(errorMessage);
     } finally {
@@ -110,39 +124,80 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // --- CRITICAL UPDATE ---
-  // Must be async to support "Saving..." indicators in UI
+  /**
+   * Updates a blog post using PATCH (Partial Update)
+   * This is safer than PUT as it doesn't overwrite fields not present in the update
+   */
   const updateBlogPost = async (id: string, updates: Partial<BlogPost>) => {
     // 1. Optimistic Update (UI feels fast)
     setBlogPosts(prev =>
       prev.map(p => p.id === id ? { ...p, ...updates, updatedAt: new Date().toISOString() } : p)
     );
 
-    // 2. Persist to Backend (Real consistency)
+    // 2. Persist to Backend via PATCH
     try {
-        // TODO: Replace with real API call when available
-        // const payload: BlogDto = { ...convertLocalToDto(updates) };
-        // await apiClient.updateBlog(id, payload);
-        
-        // Simulating network delay for now so Auto-Save indicator works
-        await new Promise(resolve => setTimeout(resolve, 500));
+      const blogId = parseInt(id, 10);
+      
+      // Construct Partial DTO
+      // We only include fields that are actually in the 'updates' object
+      const payload: Partial<BlogDto> = {};
+
+      if (updates.title !== undefined) payload.title = updates.title;
+      if (updates.content !== undefined) payload.content = updates.content;
+      if (updates.excerpt !== undefined) payload.excerpt = updates.excerpt;
+      if (updates.category !== undefined) payload.category = updates.category;
+      if (updates.tags !== undefined) payload.tags = updates.tags;
+      if (updates.isPublished !== undefined) payload.isPublished = updates.isPublished;
+      
+      // Special handling for images array
+      if (updates.images !== undefined) {
+        payload.imageUrl = updates.images.map(url => ({ imgUrl: url }));
+      }
+      
+      // Note: We do NOT explicitly set videoUrl to [] here. 
+      // The backend PATCH endpoint will ignore fields not present in the payload,
+      // preserving any existing videos on this post.
+
+      await apiClient.patchBlog(blogId, payload);
+
     } catch (err) {
-        console.error("Failed to persist update", err);
-        throw err; // Throwing allows the UI to show "Error Saving"
+      console.error("Failed to persist update", err);
+      
+      // Critical: Re-throw Subscription errors so the UI can show the paywall
+      if (err instanceof SubscriptionRequiredError) {
+        throw err;
+      }
+      // For other errors, the optimistic update might be out of sync, 
+      // but we allow the UI 'error' state to handle it.
+      throw err;
     }
   };
 
+  /**
+   * Uploads an image to the backend storage
+   */
   const uploadImage = async (file: File): Promise<string> => {
     try {
-      const response = await apiClient.uploadFile(file);
-      if (response.code === 200 && response.data) return response.data;
-      throw new Error('Failed to upload image');
-    } catch {
-      return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.readAsDataURL(file);
-      });
+      return await apiClient.uploadFile(file);
+    } catch (err) {
+      console.error('Upload failed:', err);
+      throw err;
+    }
+  };
+
+  /**
+   * Retrieves user's historical media with pagination
+   */
+  const getUserMediaLibrary = async (page: number = 1, size: number = 20): Promise<{
+    images: string[];
+    total: number;
+    hasMore: boolean;
+  }> => {
+    try {
+      return await apiClient.getUserMedia(page, size);
+    } catch (err) {
+      console.error('Failed to load media library:', err);
+      return { images: [], total: 0, hasMore: false };
     }
   };
 
@@ -157,7 +212,7 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const value = {
     blogPosts, loading, error, getAllBlogPosts, getPostById, getBlogPostById,
     addNewPost, createBlogPost, updateBlogPost, updatePostStatistics,
-    getRelatedPosts, uploadImage, refreshBlogPosts,
+    getRelatedPosts, uploadImage, refreshBlogPosts, getUserMediaLibrary,
   };
 
   return <BlogContext.Provider value={value}>{children}</BlogContext.Provider>;

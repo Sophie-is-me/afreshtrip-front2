@@ -65,7 +65,7 @@ export class TripService {
 
       const cityCode = cityCodeMap[destination] || 'CPH'; // Default to Copenhagen
 
-      const response = await apiClient.getRealtimeWeather(cityCode);
+      const response = await apiClient.getWeatherInfo(cityCode);
       return {
         location: response.city,
         temperature: response.temperature,

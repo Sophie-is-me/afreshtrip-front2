@@ -2,6 +2,15 @@
   "off": "折扣",
   "retry": "重试",
   "home": "首页",
+  "cancel": "取消",
   "travelDestinations": "旅行目的地",
-  "exploreAmazingPlaces": "探索世界各地令人惊叹的地方。"
+  "exploreAmazingPlaces": "探索世界各地令人惊叹的地方。",
+  "featureAccess": {
+    "upgradeRequired": "需要升级",
+    "premiumFeature": "高级功能",
+    "upgradeDescription": "升级您的计划以解锁此功能并访问高级内容。",
+    "upgradeTo": "升级到",
+    "viewAllPlans": "查看所有计划",
+    "viewPlans": "查看订阅计划"
+  }
 }

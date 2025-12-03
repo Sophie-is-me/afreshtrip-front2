@@ -15,11 +15,12 @@
  * Migration: Replace mock data with real API calls to backend services.
  */
 
+import { useCallback, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSubscription } from './useSubscription';
 import type { FeatureId, FeatureAccessResult } from '../types/features';
-import { FEATURE_REGISTRY, FEATURE_PLAN_MAPPING } from '../types/features';
-import { mockApiClient } from '../services/mockApi';
+import { FEATURE_REGISTRY } from '../types/features';
+import { apiClient } from '../services/apiClient';
 
 /**
  * Hook for checking feature access based on user subscription
@@ -29,7 +30,7 @@ export const useFeatureAccess = () => {
   const { user } = useAuth();
   const { userSubscription } = useSubscription();
 
-  const checkFeatureAccess = async (featureId: FeatureId): Promise<FeatureAccessResult> => {
+  const checkFeatureAccess = useCallback(async (featureId: FeatureId): Promise<FeatureAccessResult> => {
     if (!user) {
       const feature = FEATURE_REGISTRY[featureId];
       return {
@@ -40,66 +41,44 @@ export const useFeatureAccess = () => {
           description: 'Feature not found',
           category: 'planning',
         },
-        requiredPlans: FEATURE_PLAN_MAPPING[featureId] || [],
+        requiredPlans: [],
         userPlan: undefined,
         upgradeMessage: 'Authentication required',
       };
     }
 
-    // Use mock API service for feature access checking
-    const response = await mockApiClient.checkFeatureAccess(user.uid, featureId);
+    // Use API service for feature access checking
+    const result = await apiClient.checkFeatureAccess(user.uid, featureId);
 
-    if (response.success && response.data) {
-      // Map backend response to frontend format by adding feature info
-      const feature = FEATURE_REGISTRY[featureId];
-      return {
-        ...response.data,
-        feature: feature || {
-          id: featureId,
-          name: 'Unknown Feature',
-          description: 'Feature not found',
-          category: 'planning',
-        },
-      };
-    }
-
-    // Fallback for API errors
+    // Map backend response to frontend format by adding feature info
     const feature = FEATURE_REGISTRY[featureId];
     return {
-      hasAccess: false,
+      ...result,
       feature: feature || {
         id: featureId,
         name: 'Unknown Feature',
         description: 'Feature not found',
         category: 'planning',
       },
-      requiredPlans: FEATURE_PLAN_MAPPING[featureId] || [],
-      userPlan: userSubscription?.planId,
-      upgradeMessage: response.error?.message || 'Unable to check feature access',
     };
-  };
+  }, [user]);
 
-  const hasFeatureAccess = async (featureId: FeatureId): Promise<boolean> => {
+  const hasFeatureAccess = useCallback(async (featureId: FeatureId): Promise<boolean> => {
     const access = await checkFeatureAccess(featureId);
     return access.hasAccess;
-  };
+  }, [checkFeatureAccess]);
 
-  const getAccessibleFeatures = async (): Promise<FeatureId[]> => {
+  const getAccessibleFeatures = useCallback(async (): Promise<FeatureId[]> => {
     if (!user) {
       return [];
     }
 
-    // Use mock API to get accessible features
-    const response = await mockApiClient.getAccessibleFeatures(user.uid);
+    // Use API to get accessible features
+    const features = await apiClient.getAccessibleFeatures(user.uid);
+    return features;
+  }, [user]);
 
-    if (response.success && response.data) {
-      return response.data;
-    }
-
-    return [];
-  };
-
-  const getUpgradeSuggestions = async (featureIds: FeatureId[]): Promise<Partial<Record<FeatureId, { recommendedPlan: string; features: FeatureId[]; price: number; period: string }>>> => {
+  const getUpgradeSuggestions = useCallback(async (featureIds: FeatureId[]): Promise<Partial<Record<FeatureId, { recommendedPlan: string; features: FeatureId[]; price: number; period: string }>>> => {
     if (!user) {
       // Return empty suggestions for all features if not authenticated
       const suggestions: Partial<Record<FeatureId, { recommendedPlan: string; features: FeatureId[]; price: number; period: string }>> = {};
@@ -114,32 +93,17 @@ export const useFeatureAccess = () => {
       return suggestions;
     }
 
-    // Use mock API client for upgrade suggestions
-    const response = await mockApiClient.getUpgradeSuggestions(user.uid, featureIds);
-
-    if (response.success && response.data) {
-      return response.data;
-    }
-
-    // Fallback to basic suggestions on API error
-    const suggestions: Partial<Record<FeatureId, { recommendedPlan: string; features: FeatureId[]; price: number; period: string }>> = {};
-    featureIds.forEach(featureId => {
-      suggestions[featureId] = {
-        recommendedPlan: 'month',
-        features: [featureId],
-        price: 39,
-        period: 'month',
-      };
-    });
+    // Use API client for upgrade suggestions
+    const suggestions = await apiClient.getUpgradeSuggestions(user.uid, featureIds);
     return suggestions;
-  };
+  }, [user]);
 
-  return {
+  return useMemo(() => ({
     checkFeatureAccess,
     hasFeatureAccess,
     getAccessibleFeatures,
     getUpgradeSuggestions,
     userPlan: userSubscription?.planId,
     isSubscribed: userSubscription?.status === 'active',
-  };
+  }), [checkFeatureAccess, hasFeatureAccess, getAccessibleFeatures, getUpgradeSuggestions, userSubscription?.planId, userSubscription?.status]);
 };

@@ -45,7 +45,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Wait a moment for Firebase to fully initialize
         try {
           // Try to get ID token to ensure user is fully authenticated
-          await user.getIdToken(true);
+          await user.getIdToken(false);
           
           // Fetch user profile from backend when user is authenticated
           const response = await apiClient.getUserInfo();

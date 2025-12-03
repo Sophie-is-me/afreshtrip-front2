@@ -6,6 +6,7 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import Breadcrumb from '../components/Breadcrumb';
 import SubscriptionCard from '../components/SubscriptionCard';
+import PaymentMethodSelection from '../components/PaymentMethodSelection';
 import { useSubscription } from '../hooks/useSubscription';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
@@ -20,8 +21,12 @@ const Subscription: React.FC = () => {
     isUpdating,
     errorKey,
     successKey,
+    showPaymentMethodSelection,
+    pendingPlanId,
     handlePlanSelect,
     handlePlanUpdate,
+    handlePaymentMethodSelect,
+    closePaymentMethodSelection,
   } = useSubscription();
 
   const handleComparePlans = () => {
@@ -101,6 +106,17 @@ const Subscription: React.FC = () => {
         </div>
       </main>
       <Footer />
+
+      {/* Payment Method Selection Modal */}
+      {showPaymentMethodSelection && pendingPlanId && (
+        <PaymentMethodSelection
+          plan={plans.find(p => p.id === pendingPlanId)!}
+          isOpen={showPaymentMethodSelection}
+          onClose={closePaymentMethodSelection}
+          onSelectPaymentMethod={(paymentMethod) => handlePaymentMethodSelect(pendingPlanId, paymentMethod)}
+          isLoading={isUpdating}
+        />
+      )}
     </div>
   );
 };

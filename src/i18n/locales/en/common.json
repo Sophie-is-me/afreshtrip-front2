@@ -2,6 +2,15 @@
   "off": "OFF",
   "retry": "Retry",
   "home": "Home",
+  "cancel": "Cancel",
   "travelDestinations": "Travel Destinations",
-  "exploreAmazingPlaces": "Explore amazing places around the world."
+  "exploreAmazingPlaces": "Explore amazing places around the world.",
+  "featureAccess": {
+    "upgradeRequired": "Upgrade Required",
+    "premiumFeature": "Premium Feature",
+    "upgradeDescription": "Upgrade your plan to unlock this feature and access premium content.",
+    "upgradeTo": "Upgrade to",
+    "viewAllPlans": "View All Plans",
+    "viewPlans": "View Subscription Plans"
+  }
 }

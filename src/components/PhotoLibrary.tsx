@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiX, FiUploadCloud, FiImage, FiCheck } from 'react-icons/fi';
+import { FiX, FiUploadCloud, FiImage, FiCheck, FiLoader } from 'react-icons/fi';
 import { useBlog } from '../contexts/BlogContext';
 
 interface PhotoLibraryProps {
@@ -16,7 +16,7 @@ const PhotoLibrary: React.FC<PhotoLibraryProps> = ({
   onInsert,
 }) => {
   const { t } = useTranslation();
-  const { uploadImage } = useBlog(); // Use the real upload function
+  const { uploadImage, getUserMediaLibrary } = useBlog(); 
   
   const [activeTab, setActiveTab] = useState<'upload' | 'library'>('upload');
   const [isDragging, setIsDragging] = useState(false);
@@ -24,9 +24,12 @@ const PhotoLibrary: React.FC<PhotoLibraryProps> = ({
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // In a full production app, you would fetch this list from GET /api/user/images
-  // For now, we persist uploads in the session so the user can reuse them
-  const [sessionImages, setSessionImages] = useState<string[]>([]);
+  // Pagination State
+  const [libraryImages, setLibraryImages] = useState<string[]>([]);
+  const [isLoadingLibrary, setIsLoadingLibrary] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
 
   // Reset state when opening
   useEffect(() => {
@@ -35,6 +38,44 @@ const PhotoLibrary: React.FC<PhotoLibraryProps> = ({
       setIsUploading(false);
     }
   }, [isOpen]);
+
+  // Load images function
+  const loadImages = async (pageNum: number, reset: boolean) => {
+    if (reset) {
+      setIsLoadingLibrary(true);
+    } else {
+      setIsLoadingMore(true);
+    }
+
+    try {
+      const result = await getUserMediaLibrary(pageNum, 18); // Load 18 items (divisible by 2 and 3 columns)
+      
+      setLibraryImages(prev => reset ? result.images : [...prev, ...result.images]);
+      setHasMore(result.hasMore);
+      setPage(pageNum);
+    } catch (err) {
+      console.error("Failed to load library", err);
+      setError(t('photoLibrary.error.loadFailed', 'Failed to load images'));
+    } finally {
+      setIsLoadingLibrary(false);
+      setIsLoadingMore(false);
+    }
+  };
+
+  // Initial fetch when tab changes to library
+  useEffect(() => {
+    if (isOpen && activeTab === 'library') {
+      // Always reset to page 1 on tab switch/open
+      loadImages(1, true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, activeTab]);
+
+  const handleLoadMore = () => {
+    if (!isLoadingMore && hasMore) {
+      loadImages(page + 1, false);
+    }
+  };
 
   const processFile = async (file: File) => {
     // Validate file type
@@ -55,8 +96,8 @@ const PhotoLibrary: React.FC<PhotoLibraryProps> = ({
       
       const imageUrl = await uploadImage(file);
       
-      // Add to local session history
-      setSessionImages(prev => [imageUrl, ...prev]);
+      // Update library state: Prepend the new image
+      setLibraryImages(prev => [imageUrl, ...prev]);
       
       // Auto-insert if it's a direct upload action
       onInsert(imageUrl);
@@ -101,9 +142,9 @@ const PhotoLibrary: React.FC<PhotoLibraryProps> = ({
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
           >
-            <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden pointer-events-auto flex flex-col max-h-[80vh]">
+            <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden pointer-events-auto flex flex-col max-h-[85vh]">
               {/* Header */}
-              <div className="flex items-center justify-between p-4 border-b border-gray-100">
+              <div className="flex items-center justify-between p-4 border-b border-gray-100 shrink-0">
                 <h3 className="font-semibold text-lg">{t('photoLibrary.title', 'Insert Image')}</h3>
                 <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
                   <FiX className="w-5 h-5" />
@@ -111,7 +152,7 @@ const PhotoLibrary: React.FC<PhotoLibraryProps> = ({
               </div>
 
               {/* Tabs */}
-              <div className="flex border-b border-gray-100 px-4">
+              <div className="flex border-b border-gray-100 px-4 shrink-0">
                 <button
                   onClick={() => setActiveTab('upload')}
                   className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
@@ -131,16 +172,11 @@ const PhotoLibrary: React.FC<PhotoLibraryProps> = ({
                   }`}
                 >
                   {t('photoLibrary.library', 'Recent Uploads')}
-                  {sessionImages.length > 0 && (
-                    <span className="ml-2 bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full text-xs">
-                      {sessionImages.length}
-                    </span>
-                  )}
                 </button>
               </div>
 
               {/* Content */}
-              <div className="p-6 overflow-y-auto min-h-[300px]">
+              <div className="p-6 overflow-y-auto flex-1 min-h-[300px]">
                 {activeTab === 'upload' && (
                   <div
                     onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
@@ -187,13 +223,18 @@ const PhotoLibrary: React.FC<PhotoLibraryProps> = ({
                 )}
 
                 {activeTab === 'library' && (
-                  <div>
-                    {sessionImages.length === 0 ? (
-                      <div className="text-center py-12">
+                  <div className="flex flex-col h-full">
+                    {isLoadingLibrary ? (
+                      <div className="flex flex-col items-center justify-center py-12 h-full">
+                         <FiLoader className="w-8 h-8 animate-spin text-gray-400 mb-2" />
+                         <span className="text-gray-400 text-sm">{t('common.loading', 'Loading...')}</span>
+                      </div>
+                    ) : libraryImages.length === 0 ? (
+                      <div className="text-center py-12 flex flex-col items-center justify-center h-full">
                         <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
                           <FiImage className="w-8 h-8 text-gray-300" />
                         </div>
-                        <p className="text-gray-500">{t('photoLibrary.noImages', 'No images uploaded in this session')}</p>
+                        <p className="text-gray-500">{t('photoLibrary.noImages', 'No images found in your library')}</p>
                         <button 
                           onClick={() => setActiveTab('upload')}
                           className="mt-4 text-blue-600 font-medium hover:underline"
@@ -202,21 +243,37 @@ const PhotoLibrary: React.FC<PhotoLibraryProps> = ({
                         </button>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                        {sessionImages.map((src, index) => (
-                          <div 
-                            key={index}
-                            onClick={() => onInsert(src)}
-                            className="group relative aspect-square rounded-lg overflow-hidden cursor-pointer border border-gray-100 hover:border-blue-500 hover:ring-2 hover:ring-blue-500/20 transition-all"
-                          >
-                            <img src={src} alt="" className="w-full h-full object-cover" />
-                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
-                            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 p-1.5 rounded-full text-blue-600 shadow-sm">
-                              <FiCheck className="w-4 h-4" />
+                      <>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pb-4">
+                          {libraryImages.map((src, index) => (
+                            <div 
+                              key={`${src}-${index}`} // Use index as fallback unique key if src dupes exist
+                              onClick={() => onInsert(src)}
+                              className="group relative aspect-square rounded-lg overflow-hidden cursor-pointer border border-gray-100 hover:border-blue-500 hover:ring-2 hover:ring-blue-500/20 transition-all"
+                            >
+                              <img src={src} alt="" className="w-full h-full object-cover" loading="lazy" />
+                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+                              <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 p-1.5 rounded-full text-blue-600 shadow-sm">
+                                <FiCheck className="w-4 h-4" />
+                              </div>
                             </div>
+                          ))}
+                        </div>
+                        
+                        {/* Load More Trigger */}
+                        {hasMore && (
+                          <div className="flex justify-center mt-2 pb-2">
+                             <button
+                               onClick={handleLoadMore}
+                               disabled={isLoadingMore}
+                               className="text-sm font-medium text-gray-500 hover:text-black py-2 px-4 rounded-full hover:bg-gray-100 transition-colors flex items-center gap-2"
+                             >
+                               {isLoadingMore && <FiLoader className="animate-spin w-4 h-4" />}
+                               {isLoadingMore ? t('common.loading', 'Loading...') : t('common.loadMore', 'Load More')}
+                             </button>
                           </div>
-                        ))}
-                      </div>
+                        )}
+                      </>
                     )}
                   </div>
                 )}

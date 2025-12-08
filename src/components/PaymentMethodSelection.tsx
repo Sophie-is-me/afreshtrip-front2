@@ -50,10 +50,10 @@ const PaymentMethodSelection: React.FC<PaymentMethodSelectionProps> = ({
             {t('subscription.selectPaymentMethod')}
           </h2>
           <p className="text-gray-600">
-            {t('subscription.selectedPlan')}: {t(plan.nameKey)}
+            {t('subscription.selectedPlan')}: {plan.planName}
           </p>
           <p className="text-lg font-semibold text-teal-600 mt-2">
-            ${plan.price} {t(plan.periodKey)}
+            ${plan.price} /{plan.durationDays === 7 ? 'week' : plan.durationDays === 30 ? 'month' : plan.durationDays === 90 ? 'quarter' : plan.durationDays === 365 ? 'year' : `${plan.durationDays} days`}
           </p>
         </div>
 

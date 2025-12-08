@@ -8,6 +8,7 @@ import type {
 } from '../../types/backend';
 import { FeatureId, FEATURE_REGISTRY } from '../../types/features';
 import type { ResultFeatureList, ResultFeatureAccess, ResultUpgradeSuggestions, SubscriptionPlanResponse, ResultSubscriptionPlans } from '../../types/api';
+import i18n from '../../i18n';
 
 /**
  * Feature service implementing BackendFeatureService interface
@@ -115,7 +116,10 @@ export class FeatureService extends HttpClient implements BackendFeatureService 
    */
   async getSubscriptionPlans(): Promise<SubscriptionPlanResponse[]> {
     try {
-      const response = await this.get<ResultSubscriptionPlans>('/api/v1/features/subscription-plans');
+      const currentLang = i18n.language || 'en';
+      const response = await this.get<ResultSubscriptionPlans>(`/api/v1/features/subscription-plans?lang=${currentLang}`, {
+        requiresAuth: false
+      });
       return response.data;
     } catch (error) {
       console.error('Error getting subscription plans:', error);

@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import type { BlogPost, CreateBlogPostInput } from '../types/blog';
-import { 
-  apiClient, 
-  type BlogVo, 
-  type BlogDto, 
+import type { BlogPost, CreateBlogPostInput, Comment } from '../types/blog';
+import type { Comment as ApiComment } from '../types/api';
+import {
+  apiClient,
+  type BlogVo,
+  type BlogDto,
 } from '../services/apiClient';
 import { useAuth } from './AuthContext';
 import { SubscriptionRequiredError } from '../services/api';
@@ -17,7 +18,7 @@ const convertApiBlogPost = (apiPost: BlogVo): BlogPost => ({
   images: apiPost.imageUrl?.map(img => img.imgUrl) || [],
   author: {
     id: apiPost.userId?.toString() || 'unknown',
-    name: apiPost.author?.nickname || 'Anonymous', 
+    name: apiPost.author?.nickname || 'Anonymous',
     avatar: apiPost.author?.avatar || '',
   },
   date: apiPost.createdAt || new Date().toISOString(),
@@ -31,13 +32,59 @@ const convertApiBlogPost = (apiPost: BlogVo): BlogPost => ({
   updatedAt: apiPost.updatedAt || new Date().toISOString(),
 });
 
+// Helper to convert API Comment to Frontend Comment
+const convertApiComment = (apiComment: ApiComment): Comment => {
+  try {
+    // Comprehensive null checks
+    const author = apiComment.author;
+    const nickname = author?.nickname || 'Anonymous';
+    const avatar = author?.avatar || '';
+
+    return {
+      id: apiComment.id?.toString() || '',
+      author: {
+        name: nickname,
+        avatar: avatar,
+      },
+      content: apiComment.content || '',
+      date: apiComment.createdAt || new Date().toISOString(),
+      likes: apiComment.likes || 0,
+      isLiked: apiComment.isLiked || false,
+      replies: [], // Note: Handle nested replies if backend supports
+    };
+  } catch (error) {
+    console.error('Error converting API comment:', error, apiComment);
+    // Return a safe fallback comment
+    return {
+      id: 'error-comment',
+      author: {
+        name: 'Anonymous',
+        avatar: '',
+      },
+      content: 'Error loading comment',
+      date: new Date().toISOString(),
+      likes: 0,
+      isLiked: false,
+      replies: [],
+    };
+  }
+};
+
 interface BlogContextType {
   blogPosts: BlogPost[];
   loading: boolean;
   error: string | null;
   getAllBlogPosts: () => BlogPost[];
+  getBlogPostsPaginated: (page: number, size: number) => Promise<{
+    posts: BlogPost[];
+    total: number;
+    hasMore: boolean;
+  }>;
   getPostById: (id: string) => BlogPost | undefined;
   getBlogPostById: (id: string) => BlogPost | undefined;
+  getBlogDetails: (id: string) => Promise<{ post: BlogPost; comments: Comment[] }>;
+  toggleCommentLike: (commentId: string) => Promise<boolean>;
+  addComment: (blogId: string, content: string, replyToId?: string) => Promise<Comment>;
   addNewPost: (post: BlogPost) => void;
   createBlogPost: (post: CreateBlogPostInput) => Promise<string>;
   updateBlogPost: (id: string, updates: Partial<BlogPost>) => Promise<void>;
@@ -45,7 +92,7 @@ interface BlogContextType {
   getRelatedPosts: (currentId: string, category: string, limit?: number) => BlogPost[];
   uploadImage: (file: File) => Promise<string>;
   refreshBlogPosts: () => Promise<void>;
-  
+
   // Updated signature for pagination
   getUserMediaLibrary: (page?: number, size?: number) => Promise<{
     images: string[];
@@ -91,6 +138,22 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [refreshBlogPosts]);
 
   const getAllBlogPosts = () => blogPosts;
+
+  const getBlogPostsPaginated = async (page: number, size: number) => {
+    try {
+      const response = await apiClient.getBlogs(page, size);
+      const posts = response.records.map(convertApiBlogPost);
+      return {
+        posts,
+        total: response.total,
+        hasMore: response.current * response.size < response.total
+      };
+    } catch (err) {
+      console.error('Error fetching paginated blog posts:', err);
+      throw err;
+    }
+  };
+
   const getPostById = (id: string) => blogPosts.find(p => p.id === id);
   const getBlogPostById = getPostById;
   const addNewPost = (post: BlogPost) => setBlogPosts(prev => [...prev, post]);
@@ -104,7 +167,7 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
         content: post.content,
         excerpt: post.excerpt,
         tags: post.tags,
-        category: post.category,
+        categoryId: post.categoryId || 1, // Default to first category if not specified
         isPublished: post.isPublished,
         imageUrl: post.images?.map(img => ({ imgUrl: img })) || [],
         videoUrl: [],
@@ -145,7 +208,7 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (updates.title !== undefined) payload.title = updates.title;
       if (updates.content !== undefined) payload.content = updates.content;
       if (updates.excerpt !== undefined) payload.excerpt = updates.excerpt;
-      if (updates.category !== undefined) payload.category = updates.category;
+      if (updates.category !== undefined) payload.categoryId = updates.categoryId || 1; // Map category to categoryId
       if (updates.tags !== undefined) payload.tags = updates.tags;
       if (updates.isPublished !== undefined) payload.isPublished = updates.isPublished;
       
@@ -205,12 +268,43 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setBlogPosts(prev => prev.map(p => p.id === id ? { ...p, ...stats } : p));
   };
 
+  const getBlogDetails = async (id: string): Promise<{ post: BlogPost; comments: Comment[] }> => {
+    try {
+      const blogCommentVo = await apiClient.getBlogById(parseInt(id, 10));
+      const post = convertApiBlogPost(blogCommentVo);
+      const comments = (blogCommentVo.comment || []).map(convertApiComment);
+      return { post, comments };
+    } catch (err) {
+      console.error('Error fetching blog details:', err);
+      throw err;
+    }
+  };
+
+  const toggleCommentLike = async (commentId: string): Promise<boolean> => {
+    try {
+      return await apiClient.toggleCommentLike(parseInt(commentId, 10));
+    } catch (err) {
+      console.error('Error toggling comment like:', err);
+      throw err;
+    }
+  };
+
+  const addComment = async (blogId: string, content: string, replyToId?: string): Promise<Comment> => {
+    try {
+      const apiComment = await apiClient.addComment(parseInt(blogId, 10), content, replyToId ? parseInt(replyToId, 10) : undefined);
+      return convertApiComment(apiComment);
+    } catch (err) {
+      console.error('Error adding comment:', err);
+      throw err;
+    }
+  };
+
   const getRelatedPosts = (currentId: string, category: string, limit: number = 3) => {
     return blogPosts.filter(p => p.id !== currentId && p.category === category && p.isPublished).slice(0, limit);
   };
 
   const value = {
-    blogPosts, loading, error, getAllBlogPosts, getPostById, getBlogPostById,
+    blogPosts, loading, error, getAllBlogPosts, getBlogPostsPaginated, getPostById, getBlogPostById, getBlogDetails, toggleCommentLike, addComment,
     addNewPost, createBlogPost, updateBlogPost, updatePostStatistics,
     getRelatedPosts, uploadImage, refreshBlogPosts, getUserMediaLibrary,
   };

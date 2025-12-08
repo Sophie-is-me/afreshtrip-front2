@@ -1,0 +1,18 @@
+{
+  "editProfile": "تحرير معلومات الملف الشخصي",
+  "username": "اسم المستخدم",
+  "email": "البريد الإلكتروني",
+  "mobile": "رقم الهاتف المحمول",
+  "dob": "تاريخ الميلاد",
+  "password": "كلمة المرور",
+  "confirmPassword": "تأكيد كلمة المرور",
+  "gender": "الجنس",
+  "male": "ذكر",
+  "female": "أنثى",
+  "update": "تحديث",
+  "usernamePlaceholder": "اسم المستخدم الخاص بك",
+  "mobilePlaceholder": "رقم هاتفك المحمول",
+  "passwordPlaceholder": "كلمة المرور الخاصة بك",
+  "confirmPasswordPlaceholder": "أكد كلمة المرور",
+  "contentComingSoon": "سيتم تنفيذ محتوى {{tab}} هنا قريباً."
+}

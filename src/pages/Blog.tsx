@@ -5,7 +5,12 @@ import Footer from '../components/Footer';
 import GalleryCard from '../components/GalleryCard';
 import { useTranslation } from 'react-i18next';
 import { useBlog } from '../contexts/BlogContext';
+import { NewsletterService } from '../services/api/newsletterService';
+import { CategoryService } from '../services/api/categoryService';
+import { newsletterSchema, sanitizeText } from '../utils/validationSchemas';
+import { useDebounce } from '../hooks/useDebounce';
 import type { BlogPost } from '../types/blog';
+import type { Category } from '../services/api/categoryService';
 
 
 const LoadingSpinner: React.FC = () => (
@@ -46,11 +51,12 @@ const EmptyState: React.FC = () => {
 
 const Blog: React.FC = () => {
   const { t } = useTranslation();
-  const { getAllBlogPosts } = useBlog();
+  const { getBlogPostsPaginated } = useBlog();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
+  const [totalPosts, setTotalPosts] = useState(0);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [filteredPosts, setFilteredPosts] = useState<BlogPost[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
@@ -62,20 +68,48 @@ const Blog: React.FC = () => {
   const [email, setEmail] = useState('');
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [newsletterError, setNewsletterError] = useState<string | null>(null);
+  const [newsletterLoading, setNewsletterLoading] = useState(false);
   const postsRef = useRef<HTMLDivElement>(null);
+  const newsletterService = new NewsletterService(import.meta.env.VITE_API_BASE_URL || '');
+  const categoryService = new CategoryService(import.meta.env.VITE_API_BASE_URL || '');
 
-  // Fetch blog posts
+  // Debounce search term
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+
+  // Fetch categories
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const fetchedCategories = await categoryService.getCategories();
+        setCategories(fetchedCategories);
+      } catch (err) {
+        console.error('Error fetching categories:', err);
+        // Fallback to default categories
+        setCategories([
+          { id: 1, name: 'Travel', slug: 'travel', color: '#3B82F6', icon: 'plane' },
+          { id: 2, name: 'Food', slug: 'food', color: '#EF4444', icon: 'utensils' },
+          { id: 3, name: 'Culture', slug: 'culture', color: '#8B5CF6', icon: 'landmark' },
+          { id: 4, name: 'Adventure', slug: 'adventure', color: '#F59E0B', icon: 'mountain' },
+          { id: 5, name: 'Nature', slug: 'nature', color: '#10B981', icon: 'tree' },
+          { id: 6, name: 'City Guide', slug: 'city-guide', color: '#6B7280', icon: 'building' },
+          { id: 7, name: 'Tips & Tricks', slug: 'tips-tricks', color: '#EC4899', icon: 'lightbulb' },
+          { id: 8, name: 'Photography', slug: 'photography', color: '#6366F1', icon: 'camera' },
+        ]);
+      }
+    };
+
+    fetchCategories();
+  }, [categoryService]);
+
+  // Fetch blog posts with pagination
   useEffect(() => {
     const fetchBlogPosts = async () => {
       try {
         setLoading(true);
         setError(null);
-        const posts = await getAllBlogPosts();
+        const { posts, total } = await getBlogPostsPaginated(currentPage, postsPerPage);
         setBlogPosts(posts);
-
-        // Extract unique categories
-        const uniqueCategories = [...new Set(posts.map(post => post.category))];
-        setCategories(uniqueCategories);
+        setTotalPosts(total);
       } catch (err) {
         console.error('Error fetching blog posts:', err);
         setError(t('blog.errorLoadingPosts'));
@@ -85,23 +119,23 @@ const Blog: React.FC = () => {
     };
 
     fetchBlogPosts();
-  }, [getAllBlogPosts, t]);
+  }, [getBlogPostsPaginated, currentPage, postsPerPage, t]);
 
   // Filter and sort posts
   useEffect(() => {
     let filtered = [...blogPosts];
 
-    // Filter by search term
-    if (searchTerm) {
+    // Filter by debounced search term
+    if (debouncedSearchTerm) {
       filtered = filtered.filter(post =>
-        post.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (post.excerpt?.toLowerCase().includes(searchTerm.toLowerCase()) || false)
+        post.title.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        (post.excerpt?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) || false)
       );
     }
 
     // Filter by category
     if (selectedCategory) {
-      filtered = filtered.filter(post => post.category === selectedCategory);
+      filtered = filtered.filter(post => post.category === selectedCategory || post.categoryId?.toString() === selectedCategory);
     }
 
     // Sort posts
@@ -121,7 +155,7 @@ const Blog: React.FC = () => {
 
     setFilteredPosts(filtered);
     setCurrentPage(1); // Reset to first page when filters change
-  }, [blogPosts, searchTerm, selectedCategory, sortBy]);
+  }, [blogPosts, debouncedSearchTerm, selectedCategory, sortBy]);
 
   // Update URL when filters change
   useEffect(() => {
@@ -145,10 +179,8 @@ const Blog: React.FC = () => {
   }, []);
 
   // Calculate pagination
-  const totalPages = Math.ceil(filteredPosts.length / postsPerPage);
-  const indexOfLastPost = currentPage * postsPerPage;
-  const indexOfFirstPost = indexOfLastPost - postsPerPage;
-  const currentPosts = filteredPosts.slice(indexOfFirstPost, indexOfLastPost);
+  const totalPages = Math.ceil(totalPosts / postsPerPage);
+  const currentPosts = filteredPosts; // Since we load only current page, filteredPosts is the current page
 
   // Handle pagination
   const handlePageChange = (pageNumber: number) => {
@@ -159,21 +191,30 @@ const Blog: React.FC = () => {
   };
 
   // Handle newsletter subscription
-  const handleNewsletterSubmit = (e: React.FormEvent) => {
+  const handleNewsletterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setNewsletterError(null);
-    
-    if (!email) {
-      setNewsletterError(t('blog.emailRequired'));
-      return;
-    }
-    
-    // Simulate API call
-    setTimeout(() => {
+
+    try {
+      const sanitizedEmail = sanitizeText(email);
+      const validatedData = newsletterSchema.parse({ email: sanitizedEmail });
+
+      setNewsletterLoading(true);
+      await newsletterService.subscribe(validatedData.email);
       setIsSubscribed(true);
       setEmail('');
+      // Keep success message for 3 seconds
       setTimeout(() => setIsSubscribed(false), 3000);
-    }, 500);
+    } catch (err) {
+      console.error('Newsletter subscription error:', err);
+      if (err instanceof Error) {
+        setNewsletterError(err.message);
+      } else {
+        setNewsletterError(t('blog.subscriptionFailed', 'Failed to subscribe. Please try again.'));
+      }
+    } finally {
+      setNewsletterLoading(false);
+    }
   };
 
   // Scroll to top
@@ -191,17 +232,9 @@ const Blog: React.FC = () => {
 
   // Translate category
   const translateCategory = (category: string) => {
-    switch (category) {
-      case 'Travel': return t('blog.travel');
-      case 'Food': return t('blog.food');
-      case 'Culture': return t('blog.culture');
-      case 'Adventure': return t('blog.adventure');
-      case 'Nature': return t('blog.nature');
-      case 'City Guide': return t('blog.cityGuide');
-      case 'Tips & Tricks': return t('blog.tipsTricks');
-      case 'Photography': return t('blog.photography');
-      default: return category;
-    }
+    // For now, return the category name as is, or use translation keys if available
+    // In a real app, you might have translation keys for each category
+    return category;
   };
 
   return (
@@ -251,15 +284,15 @@ const Blog: React.FC = () => {
             </button>
             {categories.map((category) => (
               <button
-                key={category}
-                onClick={() => setSelectedCategory(category)}
+                key={category.id}
+                onClick={() => setSelectedCategory(category.slug)}
                 className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                  selectedCategory === category
+                  selectedCategory === category.slug
                     ? 'bg-teal-600 text-white'
                     : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
               >
-                {translateCategory(category)}
+                {translateCategory(category.name)}
               </button>
             ))}
           </div>
@@ -380,9 +413,10 @@ const Blog: React.FC = () => {
               />
               <button
                 type="submit"
-                className="px-6 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500"
+                disabled={newsletterLoading}
+                className="px-6 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {t('blog.subscribe')}
+                {newsletterLoading ? t('blog.subscribing', 'Subscribing...') : t('blog.subscribe')}
               </button>
             </form>
             

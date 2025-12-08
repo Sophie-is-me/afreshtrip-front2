@@ -6,7 +6,9 @@ import type {
   BlogCommentVo,
   BlogDto,
   ResultIPageBlogVo,
-  ResultBlogCommentVo
+  ResultBlogCommentVo,
+  Comment,
+  ResultCommentVo
 } from '../../types/api';
 
 /**
@@ -128,17 +130,25 @@ export class BlogService extends HttpClient {
   /**
    * Add comment to blog
    */
-  async addComment(blId: number, content: string, replyToCommentId?: number): Promise<boolean> {
+  async addComment(blId: number, content: string, replyToCommentId?: number): Promise<Comment> {
     const params = new URLSearchParams({ content });
     if (replyToCommentId !== undefined) {
       params.append('replyToCommentId', replyToCommentId.toString());
     }
+    const response = await this.post<ResultCommentVo>(`/api/v1/blogs/${blId}/comments?${params}`, {});
+    return response.data;
+  }
+
+  /**
+   * Toggle like on comment
+   */
+  async toggleCommentLike(commentId: number): Promise<boolean> {
     const response = await this.post<{
       code: number;
       message: string;
-      data: number;
+      data: boolean;
       timestamp?: number;
-    }>(`/api/v1/blogs/${blId}/comments?${params}`, {});
-    return response.data > 0;
+    }>(`/api/v1/blogs/comments/${commentId}/like`);
+    return response.data;
   }
 }

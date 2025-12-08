@@ -19,6 +19,7 @@ interface ImageCarouselProps {
   transitionDuration?: number;
   enableSwipe?: boolean;
   enableKeyboardNavigation?: boolean;
+  responsiveImages?: boolean;
 }
 
 const ImageCarousel: React.FC<ImageCarouselProps> = ({
@@ -39,6 +40,7 @@ const ImageCarousel: React.FC<ImageCarouselProps> = ({
   transitionDuration = 300,
   enableSwipe = true,
   enableKeyboardNavigation = true,
+  responsiveImages = true,
 }) => {
   const { t } = useTranslation();
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -183,6 +185,20 @@ const ImageCarousel: React.FC<ImageCarouselProps> = ({
     setErrorImages((prev) => new Set(prev).add(index));
   };
 
+  // Generate responsive image attributes
+  const getResponsiveImageProps = (src: string) => {
+    if (!responsiveImages) return { src };
+
+    // For now, assume the backend provides different sizes
+    // In production, you'd have multiple sizes like image_400w.jpg, image_800w.jpg, etc.
+    // This is a basic implementation - in reality, you'd need backend support for multiple sizes
+    return {
+      src,
+      srcSet: `${src} 1x`,
+      sizes: "(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+    };
+  };
+
   if (!images || images.length === 0) return null;
 
   return (
@@ -210,7 +226,7 @@ const ImageCarousel: React.FC<ImageCarouselProps> = ({
             </div>
           ) : (
             <img
-              src={images[currentIndex]}
+              {...getResponsiveImageProps(images[currentIndex])}
               alt={`${altPrefix} - Image ${currentIndex + 1}`}
               className={`w-full ${height} object-${objectFit} cursor-pointer transition-opacity ${isTransitioning ? 'opacity-90' : 'opacity-100'}`}
               style={{ transitionDuration: `${transitionDuration}ms` }}

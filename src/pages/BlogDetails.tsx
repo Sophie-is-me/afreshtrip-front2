@@ -18,13 +18,15 @@ import Lightbox from '../components/Lightbox';
 import BackToTopButton from '../components/BackToTopButton';
 import { useBlog } from '../contexts/BlogContext';
 import { useAuth } from '../contexts/AuthContext';
+import { createSanitizedHtml } from '../utils/sanitizeHtml';
+import { commentSchema, sanitizeText } from '../utils/validationSchemas';
 import type { BlogPost, Comment } from '../types/blog';
 
 const BlogDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const { blogPosts, updatePostStatistics, getRelatedPosts } = useBlog();
+  const { updatePostStatistics, getRelatedPosts, getBlogDetails, toggleCommentLike, addComment } = useBlog();
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -53,57 +55,17 @@ const BlogDetails: React.FC = () => {
         setLoading(true);
         setError(null);
 
-        const foundPost = blogPosts.find(p => p.id === id);
-        if (foundPost) {
-          setPost(foundPost);
-          setIsLiked(foundPost.isLiked || false);
-          setIsSaved(foundPost.isSaved || false);
+        const { post, comments: fetchedComments } = await getBlogDetails(id!);
+        setPost(post);
+        setIsLiked(post.isLiked || false);
+        setIsSaved(post.isSaved || false);
 
-          // Get related posts
-          const related = getRelatedPosts(foundPost.id, foundPost.category);
-          setRelatedPosts(related);
+        // Get related posts
+        const related = getRelatedPosts(post.id, post.category);
+        setRelatedPosts(related);
 
-          // Fetch comments (mock data for now)
-          setComments([
-            {
-              id: '1',
-              author: {
-                name: 'John Doe',
-                avatar: 'https://picsum.photos/seed/user1/100/100.jpg'
-              },
-              content: 'Great article! I really enjoyed reading this and learned a lot.',
-              date: '2023-05-15',
-              likes: 5,
-              isLiked: false
-            },
-            {
-              id: '2',
-              author: {
-                name: 'Jane Smith',
-                avatar: 'https://picsum.photos/seed/user2/100/100.jpg'
-              },
-              content: 'Thanks for sharing this. I have a question about the third point...',
-              date: '2023-05-16',
-              likes: 2,
-              isLiked: true,
-              replies: [
-                {
-                  id: '2-1',
-                  author: {
-                    name: 'Blog Author',
-                    avatar: 'https://picsum.photos/seed/author/100/100.jpg'
-                  },
-                  content: 'Great question! Let me clarify that point for you...',
-                  date: '2023-05-17',
-                  likes: 1,
-                  isLiked: false
-                }
-              ]
-            }
-          ]);
-        } else {
-          setError(t('blog.blogPostNotFound'));
-        }
+        // Set comments from API
+        setComments(fetchedComments);
       } catch (err) {
         console.error('Error fetching blog post:', err);
         setError(t('blog.errorLoadingPost'));
@@ -112,8 +74,10 @@ const BlogDetails: React.FC = () => {
       }
     };
 
-    fetchPost();
-  }, [blogPosts, id, t, getRelatedPosts]);
+    if (id) {
+      fetchPost();
+    }
+  }, [id, t, getBlogDetails, getRelatedPosts]);
 
   // Extract headings for table of contents after content is rendered
   useEffect(() => {
@@ -166,39 +130,65 @@ const BlogDetails: React.FC = () => {
   };
 
   // Handle add comment
-  const handleAddComment = async (comment: string) => {
+  const handleAddComment = async (comment: string, replyToId?: string) => {
     if (!user) {
       navigate('/login');
       return;
     }
-    
-    const newComment: Comment = {
-      id: Date.now().toString(),
-      author: {
-        name: user.displayName || user.email || 'Anonymous',
-        avatar: user.photoURL || 'https://picsum.photos/seed/default/100/100.jpg'
-      },
-      content: comment,
-      date: new Date().toISOString(),
-      likes: 0,
-      isLiked: false
-    };
-    
-    setComments([newComment, ...comments]);
+
+    if (!id) return;
+
+    try {
+      // Validate and sanitize comment
+      const sanitizedComment = sanitizeText(comment);
+      commentSchema.parse(sanitizedComment);
+
+      // Call API to persist comment
+      const newComment = await addComment(id, sanitizedComment, replyToId);
+
+      // Add the new comment to the list
+      setComments(prevComments => [newComment, ...prevComments]);
+    } catch (err) {
+      console.error('Failed to add comment:', err);
+      // Show error message
+      if (err instanceof Error) {
+        alert(err.message);
+      } else {
+        alert(t('blog.commentAddFailed', 'Failed to add comment. Please try again.'));
+      }
+    }
   };
 
   // Handle like comment
-  const handleLikeComment = (commentId: string) => {
-    setComments(comments.map(comment => {
+  const handleLikeComment = async (commentId: string) => {
+    try {
+      const isLiked = await toggleCommentLike(commentId);
+      // Update local state optimistically
+      setComments(prevComments => updateCommentLikes(prevComments, commentId, isLiked));
+    } catch (err) {
+      console.error('Error liking comment:', err);
+      // Could show error message to user
+    }
+  };
+
+  // Helper to update comment likes recursively
+  const updateCommentLikes = (comments: Comment[], commentId: string, isLiked: boolean): Comment[] => {
+    return comments.map(comment => {
       if (comment.id === commentId) {
         return {
           ...comment,
-          likes: comment.isLiked ? comment.likes - 1 : comment.likes + 1,
-          isLiked: !comment.isLiked
+          likes: isLiked ? comment.likes + 1 : comment.likes - 1,
+          isLiked
+        };
+      }
+      if (comment.replies) {
+        return {
+          ...comment,
+          replies: updateCommentLikes(comment.replies, commentId, isLiked)
         };
       }
       return comment;
-    }));
+    });
   };
 
   // Scroll to top
@@ -260,6 +250,7 @@ const BlogDetails: React.FC = () => {
               images={post.images}
               altPrefix={post.title}
               onImageClick={setLightboxImage}
+              responsiveImages={true}
             />
           )}
 
@@ -269,7 +260,7 @@ const BlogDetails: React.FC = () => {
               <div
                 ref={contentRef}
                 className="prose prose-lg max-w-none mb-8"
-                dangerouslySetInnerHTML={{ __html: post.content }}
+                dangerouslySetInnerHTML={createSanitizedHtml(post.content)}
               />
             </div>
 
@@ -292,7 +283,7 @@ const BlogDetails: React.FC = () => {
           {/* Comments Section */}
           <CommentSection
             comments={comments}
-            onAddComment={handleAddComment}
+            onAddComment={(comment, replyToId) => handleAddComment(comment, replyToId)}
             onLikeComment={handleLikeComment}
           />
 

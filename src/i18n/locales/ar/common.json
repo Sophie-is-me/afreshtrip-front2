@@ -1,0 +1,16 @@
+{
+  "off": "خصم",
+  "retry": "إعادة المحاولة",
+  "home": "الرئيسية",
+  "cancel": "إلغاء",
+  "travelDestinations": "وجهات السفر",
+  "exploreAmazingPlaces": "استكشف أماكن رائعة حول العالم.",
+  "featureAccess": {
+    "upgradeRequired": "ترقية مطلوبة",
+    "premiumFeature": "ميزة مميزة",
+    "upgradeDescription": "قم بترقية خطتك لفتح هذه الميزة والوصول إلى المحتوى المميز.",
+    "upgradeTo": "ترقية إلى",
+    "viewAllPlans": "عرض جميع الخطط",
+    "viewPlans": "عرض خطط الاشتراك"
+  }
+}

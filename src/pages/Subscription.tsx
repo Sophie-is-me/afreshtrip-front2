@@ -8,7 +8,6 @@ import Breadcrumb from '../components/Breadcrumb';
 import SubscriptionCard from '../components/SubscriptionCard';
 import PaymentMethodSelection from '../components/PaymentMethodSelection';
 import { useSubscription } from '../hooks/useSubscription';
-import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
 
 const Subscription: React.FC = () => {
@@ -84,25 +83,37 @@ const Subscription: React.FC = () => {
             <p className="text-lg text-gray-600">{t('subscription.subtitle')}</p>
           </div>
 
-          {isLoading && plans.length === 0 ? (
-            <div className="flex justify-center py-12">
-              <LoadingSpinner size="lg" />
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {plans.map((plan) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {isLoading && plans.length === 0 ? (
+              // Show skeleton cards during initial loading
+              [...Array(4)].map((_, index) => (
                 <SubscriptionCard
-                  key={plan.id}
+                  key={`skeleton-${index}`}
+                  plan={{
+                    planId: `skeleton-${index}`,
+                    planName: '',
+                    price: 0,
+                    durationDays: 0,
+                    features: [],
+                    featureNames: []
+                  }}
+                  isLoading={true}
+                />
+              ))
+            ) : (
+              plans.map((plan) => (
+                <SubscriptionCard
+                  key={plan.planId}
                   plan={plan}
-                  isSelected={userSubscription?.planId === plan.id}
-                  isLoading={isUpdating && selectedPlanId === plan.id}
-                  onClick={() => handlePlanSelect(plan.id)}
-                  onButtonClick={() => handlePlanUpdate(plan.id)}
+                  isSelected={userSubscription?.planId === plan.planId}
+                  isLoading={isUpdating && selectedPlanId === plan.planId}
+                  onClick={() => handlePlanSelect(plan.planId)}
+                  onButtonClick={() => handlePlanUpdate(plan.planId)}
                   onCompareClick={handleComparePlans}
                 />
-              ))}
-            </div>
-          )}
+              ))
+            )}
+          </div>
         </div>
       </main>
       <Footer />
@@ -110,7 +121,7 @@ const Subscription: React.FC = () => {
       {/* Payment Method Selection Modal */}
       {showPaymentMethodSelection && pendingPlanId && (
         <PaymentMethodSelection
-          plan={plans.find(p => p.id === pendingPlanId)!}
+          plan={plans.find(p => p.planId === pendingPlanId)!}
           isOpen={showPaymentMethodSelection}
           onClose={closePaymentMethodSelection}
           onSelectPaymentMethod={(paymentMethod) => handlePaymentMethodSelect(pendingPlanId, paymentMethod)}

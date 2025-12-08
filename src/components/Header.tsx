@@ -70,7 +70,7 @@ const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="bg-gradient-to-r from-teal-700 to-teal-800 text-white sticky top-0 z-50 shadow-lg">
+    <header className="bg-linear-to-r from-teal-700 to-teal-800 text-white sticky top-0 z-50 shadow-lg">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center py-3 md:py-4">
            {/* Left side: Logo and Language */}
@@ -121,6 +121,12 @@ const Header: React.FC<HeaderProps> = ({
                      onClick={() => changeLanguage('zh')}
                    >
                      <span>🇨🇳</span> {t('header.chinese')}
+                   </button>
+                   <button
+                     className={`flex items-center gap-3 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 ${i18n.language === 'ar' ? 'bg-gray-100' : ''}`}
+                     onClick={() => changeLanguage('ar')}
+                   >
+                     <span>🇸🇦</span> {t('header.arabic')}
                    </button>
                  </div>
                )}

@@ -190,44 +190,71 @@ export class SubscriptionService {
   }
 
   /**
-   * Handle payment completion (Polling Mechanism)
+   * Handle payment completion (Enhanced Polling Mechanism)
    * Call this when user returns to the app, or periodically while waiting.
-   * It polls the backend multiple times to see if the Alipay webhook has processed.
+   * Uses exponential backoff and better error handling.
    */
   async handlePaymentReturn(userId: string, orderNo: string): Promise<{
     success: boolean;
     subscription?: VipStatus;
     error?: string;
   }> {
-    const maxAttempts = 10;
-    const pollInterval = 2000; // 2 seconds
+    const maxAttempts = 15;
+    const baseInterval = 1000; // Start with 1 second
+    const maxInterval = 10000; // Max 10 seconds
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      const status = await this.checkPaymentStatus(orderNo);
+      try {
+        const status = await this.checkPaymentStatus(orderNo);
 
-      // Status 1 = Paid (Verified by backend)
-      if (status.isPaid || status.status === 1) {
-        // Payment successful, refresh and return the new status
-        // We fetch the latest status from the Source of Truth endpoint
-        const subscription = await this.getVipStatus(userId);
+        // Status 1 = Paid (Verified by backend)
+        if (status.isPaid || status.status === 1) {
+          // Payment successful, refresh and return the new status
+          const subscription = await this.getVipStatus(userId);
+          return {
+            success: true,
+            subscription
+          };
+        }
+
+        // Status 2 = Cancelled/Failed
+        if (status.status === 2) {
+          return { success: false, error: 'Payment was cancelled or failed' };
+        }
+
+        // Status -1 = Not found (might be an error)
+        if (status.status === -1) {
+          return { success: false, error: 'Order not found. Please contact support.' };
+        }
+
+        // If still pending (0), wait with exponential backoff
+        if (attempt < maxAttempts - 1) {
+          const interval = Math.min(baseInterval * Math.pow(1.5, attempt), maxInterval);
+          await new Promise(resolve => setTimeout(resolve, interval));
+        }
+
+      } catch (error) {
+        console.error(`Payment status check failed on attempt ${attempt + 1}:`, error);
+
+        // If it's a network error, retry with shorter interval
+        if (error instanceof Error && error.message.includes('network')) {
+          if (attempt < maxAttempts - 1) {
+            await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second retry for network issues
+            continue;
+          }
+        }
+
+        // For other errors, fail immediately
         return {
-          success: true,
-          subscription
+          success: false,
+          error: 'Unable to verify payment status. Please check your order history.'
         };
       }
-
-      // Status 2 = Cancelled
-      if (status.status === 2) {
-         return { success: false, error: 'Payment was cancelled' };
-      }
-
-      // If pending (0), wait before next poll
-      await new Promise(resolve => setTimeout(resolve, pollInterval));
     }
 
     return {
       success: false,
-      error: 'Payment verification timeout. Please check your order history.'
+      error: 'Payment verification timeout. Your payment may still be processing. Please check your order history or contact support.'
     };
   }
 

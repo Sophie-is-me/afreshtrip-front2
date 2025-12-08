@@ -2,10 +2,13 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Comment } from '../types/blog';
 
-const CommentSection: React.FC<{ comments: Comment[]; onAddComment: (comment: string) => void; onLikeComment: (commentId: string) => void }> = ({ comments, onAddComment, onLikeComment }) => {
+const CommentSection: React.FC<{ comments: Comment[]; onAddComment: (comment: string, replyToId?: string) => void; onLikeComment: (commentId: string) => void }> = ({ comments, onAddComment, onLikeComment }) => {
   const { t, i18n } = useTranslation();
   const [newComment, setNewComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [replyToId, setReplyToId] = useState<string | null>(null);
+  const [replyComment, setReplyComment] = useState('');
+  const [isSubmittingReply, setIsSubmittingReply] = useState(false);
 
   const getLocale = () => {
     switch (i18n.language) {
@@ -24,6 +27,26 @@ const CommentSection: React.FC<{ comments: Comment[]; onAddComment: (comment: st
     await onAddComment(newComment);
     setNewComment('');
     setIsSubmitting(false);
+  };
+
+  const handleReplySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!replyComment.trim() || !replyToId) return;
+
+    setIsSubmittingReply(true);
+    await onAddComment(replyComment, replyToId);
+    setReplyComment('');
+    setReplyToId(null);
+    setIsSubmittingReply(false);
+  };
+
+  const handleReplyClick = (commentId: string) => {
+    setReplyToId(commentId);
+  };
+
+  const cancelReply = () => {
+    setReplyToId(null);
+    setReplyComment('');
   };
 
   return (
@@ -76,10 +99,44 @@ const CommentSection: React.FC<{ comments: Comment[]; onAddComment: (comment: st
                     </svg>
                     {comment.likes}
                   </button>
-                  <button className="text-sm text-gray-500 hover:text-teal-600 transition-colors">
+                  <button
+                    onClick={() => handleReplyClick(comment.id)}
+                    className="text-sm text-gray-500 hover:text-teal-600 transition-colors"
+                  >
                     {t('blog.reply')}
                   </button>
                 </div>
+
+                {/* Reply Form */}
+                {replyToId === comment.id && (
+                  <form onSubmit={handleReplySubmit} className="mt-4 ml-8">
+                    <div className="mb-3">
+                      <textarea
+                        value={replyComment}
+                        onChange={(e) => setReplyComment(e.target.value)}
+                        placeholder={t('blog.writeReply')}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                        rows={3}
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="submit"
+                        disabled={!replyComment.trim() || isSubmittingReply}
+                        className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isSubmittingReply ? t('blog.submitting') : t('blog.postReply')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={cancelReply}
+                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                      >
+                        {t('blog.cancel')}
+                      </button>
+                    </div>
+                  </form>
+                )}
 
                 {/* Replies */}
                 {comment.replies && comment.replies.length > 0 && (
@@ -96,7 +153,18 @@ const CommentSection: React.FC<{ comments: Comment[]; onAddComment: (comment: st
                             <h5 className="font-medium text-sm text-gray-900">{reply.author.name}</h5>
                             <span className="ml-auto text-xs text-gray-500">{new Date(reply.date).toLocaleDateString(getLocale())}</span>
                           </div>
-                          <p className="text-sm text-gray-700">{reply.content}</p>
+                          <p className="text-sm text-gray-700 mb-2">{reply.content}</p>
+                          <div className="flex items-center gap-4">
+                            <button
+                              onClick={() => onLikeComment(reply.id)}
+                              className={`flex items-center gap-1 text-xs ${reply.isLiked ? 'text-red-500' : 'text-gray-500'} hover:text-red-500 transition-colors`}
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill={reply.isLiked ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                              </svg>
+                              {reply.likes}
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ))}

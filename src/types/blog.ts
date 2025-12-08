@@ -22,6 +22,7 @@ export interface BlogPost {
   isLiked?: boolean; // User-specific like status
   isSaved?: boolean; // User-specific save status
   category: string;
+  categoryId?: number; // Category ID for API operations
   tags?: string[]; // Optional tags for filtering/searching
   slug: string; // URL-friendly identifier
   isPublished: boolean;
@@ -33,7 +34,7 @@ export interface CreateBlogPostInput {
   title: string;
   content: string;
   excerpt?: string;
-  category: string;
+  categoryId: number; // Use categoryId for API
   tags?: string[];
   images: string[];
   isPublished: boolean;

@@ -82,6 +82,13 @@ export interface ResultBlogCommentVo {
   timestamp?: number;
 }
 
+export interface ResultCommentVo {
+  code: number;
+  message: string;
+  data: Comment;
+  timestamp?: number;
+}
+
 export interface ResultLocalDateTime {
   code: number;
   message: string;
@@ -165,12 +172,11 @@ export interface ResultFeatureAccess {
 
 export interface SubscriptionPlanResponse {
   planId: string;
-  name: string;
-  description: string;
+  planName: string;
   price: number;
-  period: string;
+  durationDays: number;
   features: string[];
-  featureNames: Record<string, string>;
+  featureNames: string[];
 }
 
 export interface ResultSubscriptionPlans {
@@ -192,6 +198,12 @@ export interface ResultUpgradeSuggestions {
   message: string;
   data: Record<string, UpgradeSuggestionResponse>;
   timestamp?: number;
+}
+
+// Author type for API responses
+export interface Author {
+  nickname: string;
+  avatar?: string;
 }
 
 // --- NEW PAYMENT TYPES (Alipay Integration Guide) ---
@@ -305,11 +317,12 @@ export interface VipType {
 export interface BlogVo {
   blId?: number;
   userId?: number;
-  title: string;        
+  title: string;
   excerpt?: string;
-  content: string;      
+  content: string;
   tags?: string[];
   category?: string;
+  categoryId?: number;
   isPublished?: boolean;
   slug?: string;
   like?: number;
@@ -329,7 +342,7 @@ export interface BlogDto {
   content: string;
   excerpt?: string;
   tags?: string[];
-  category?: string;
+  categoryId?: number;
   isPublished?: boolean;
   imageUrl?: Array<{ imgUrl: string }>;
   videoUrl?: Array<{ viUrl: string }>;
@@ -340,10 +353,17 @@ export interface BlogCommentVo extends BlogVo {
 }
 
 export interface Comment {
+  id?: number;
+  blogId?: number;
   userId?: number;
   content: string;
   replyToCommentId?: number;
+  createdAt?: string;
+  updatedAt?: string;
   isDeleted?: boolean;
+  author?: Author;
+  likes?: number;
+  isLiked?: boolean;
 }
 
 export interface ResultListString {

@@ -21,6 +21,7 @@ import type {
   BlogVo,
   BlogCommentVo,
   BlogDto,
+  Comment,
   VipOrder,
   VipType,
   IPageUsers,
@@ -159,8 +160,12 @@ export class ApiClient {
     return this.blog.getUserBlogs(page, size);
   }
 
-  addComment(blId: number, content: string, replyToCommentId?: number): Promise<boolean> {
+  addComment(blId: number, content: string, replyToCommentId?: number): Promise<Comment> {
     return this.blog.addComment(blId, content, replyToCommentId);
+  }
+
+  toggleCommentLike(commentId: number): Promise<boolean> {
+    return this.blog.toggleCommentLike(commentId);
   }
 
   // ============================================================================

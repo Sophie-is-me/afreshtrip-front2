@@ -6,6 +6,7 @@ import fr from './locales/fr';
 import es from './locales/es';
 import en from './locales/en';
 import zh from './locales/zh';
+import ar from './locales/ar';
 
 const resources = {
   en: {
@@ -19,6 +20,9 @@ const resources = {
   },
   zh: {
     translation: zh,
+  },
+  ar: {
+    translation: ar,
   },
 };
 

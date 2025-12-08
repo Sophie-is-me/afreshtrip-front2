@@ -8,14 +8,38 @@
  * - Implements the Payment Method Selection Flow for plan updates/purchases.
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { subscriptionPlansData, type SubscriptionPlan, type UserSubscription } from '../types/subscription';
 import { apiClient } from '../services/apiClient';
 import { subscriptionService } from '../services/subscriptionService'; // Import the high-level orchestrator
+import type { SubscriptionPlanResponse } from '../types/api';
+import { useTranslation } from 'react-i18next';
+
+/**
+ * Transform backend subscription plan response to frontend format
+ */
+const transformBackendPlanToFrontend = (backendPlan: SubscriptionPlanResponse): SubscriptionPlan => {
+  // Determine plan popularity based on planId
+  const isPopular = backendPlan.planId === 'VIP_MONTH';
+  const isBestValue = backendPlan.planId === 'VIP_QUARTER';
+
+  return {
+    planId: backendPlan.planId,
+    planName: backendPlan.planName,
+    price: backendPlan.price,
+    durationDays: backendPlan.durationDays,
+    features: backendPlan.features,
+    featureNames: backendPlan.featureNames,
+    isPopular,
+    isBestValue,
+    isDisabled: false
+  };
+};
 
 export const useSubscription = () => {
   const { user } = useAuth();
+  const { i18n } = useTranslation();
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [userSubscription, setUserSubscription] = useState<UserSubscription | null>(null);
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
@@ -27,6 +51,17 @@ export const useSubscription = () => {
   const [showPaymentMethodSelection, setShowPaymentMethodSelection] = useState(false);
   const [pendingPlanId, setPendingPlanId] = useState<string | null>(null);
 
+  // Simple cache for subscription data
+  const subscriptionCache = useRef<{
+    data: UserSubscription | null;
+    timestamp: number;
+    ttl: number; // Time to live in milliseconds
+  }>({
+    data: null,
+    timestamp: 0,
+    ttl: 5 * 60 * 1000 // 5 minutes
+  });
+
   // 1. Load Subscription (Uses new Source of Truth via apiClient)
   useEffect(() => {
     const fetchSubscriptionData = async () => {
@@ -36,30 +71,59 @@ export const useSubscription = () => {
 
         // Load plans from backend API
         try {
-          // const backendPlans = await apiClient.getSubscriptionPlans();
-          // TODO: Transform backend plans to frontend format
-          // For now, keep using static data until transformation is implemented
-          setPlans(subscriptionPlansData.plans);
+          const backendPlans = await apiClient.getSubscriptionPlans();
+          console.log(backendPlans);
+          // Transform backend plans to frontend format
+          const frontendPlans = backendPlans.map(transformBackendPlanToFrontend);
+          setPlans(frontendPlans);
         } catch (error) {
-          console.error('Error loading subscription plans:', error);
-          // Fallback to static data
-          setPlans(subscriptionPlansData.plans);
+          console.error('Error loading subscription plans from backend:', error);
+          // SECURITY: Only fallback to static data in development, not production
+          // Check if we're in development by looking for Vite's dev server
+          const isDevelopment = import.meta.env?.DEV || window.location.hostname === 'localhost';
+
+          if (isDevelopment) {
+            console.warn('Using static fallback data in development mode');
+            setPlans(subscriptionPlansData.plans);
+          } else {
+            // In production, set empty plans and show error
+            setPlans([]);
+            setErrorKey('subscription.error.loadFailed');
+          }
         }
 
         if (user) {
-          // This calls the updated low-level service which hits /api/v1/subscriptions/me
-          const subscription = await apiClient.getSubscription(user.uid);
+          // Check cache first
+          const now = Date.now();
+          const cacheValid = subscriptionCache.current.data !== undefined &&
+                           (now - subscriptionCache.current.timestamp) < subscriptionCache.current.ttl;
 
-          if (subscription) {
-            setUserSubscription(subscription);
-            setSelectedPlanId(subscription.planId);
+          if (cacheValid && subscriptionCache.current.data !== null) {
+            // Use cached data
+            setUserSubscription(subscriptionCache.current.data);
+            setSelectedPlanId(subscriptionCache.current.data.planId);
           } else {
-            setUserSubscription(null);
-            setSelectedPlanId(null);
+            // Fetch fresh data
+            const subscription = await apiClient.getSubscription(user.uid);
+
+            // Update cache
+            subscriptionCache.current.data = subscription;
+            subscriptionCache.current.timestamp = now;
+
+            if (subscription) {
+              setUserSubscription(subscription);
+              setSelectedPlanId(subscription.planId);
+            } else {
+              setUserSubscription(null);
+              setSelectedPlanId(null);
+            }
           }
         } else {
           setUserSubscription(null);
           setSelectedPlanId(null);
+          // Clear cache when user logs out
+          subscriptionCache.current.data = null;
+          subscriptionCache.current.timestamp = 0;
         }
       } catch (err) {
         setErrorKey('subscription.error.loadFailed');
@@ -70,7 +134,7 @@ export const useSubscription = () => {
     };
 
     fetchSubscriptionData();
-  }, [user]);
+  }, [user, i18n.language]);
 
   // 2. Handle Plan Selection - Just selects the plan for preview
   const handlePlanSelect = useCallback((planId: string) => {
@@ -91,7 +155,7 @@ export const useSubscription = () => {
       return;
     }
 
-    const selectedPlan = plans.find(p => p.id === planId);
+    const selectedPlan = plans.find(p => p.planId === planId);
     if (!selectedPlan) {
       setErrorKey('subscription.error.planNotFound');
       return;
@@ -119,7 +183,7 @@ export const useSubscription = () => {
       return;
     }
 
-    const selectedPlan = plans.find(p => p.id === planId);
+    const selectedPlan = plans.find(p => p.planId === planId);
     if (!selectedPlan) {
       setErrorKey('subscription.error.planNotFound');
       return;
@@ -147,16 +211,35 @@ export const useSubscription = () => {
       );
 
       if (result.success && result.paymentUrl) {
+        // Store payment context for return handling
+        sessionStorage.setItem('pendingPayment', JSON.stringify({
+          orderNo: result.orderNo,
+          planId,
+          paymentMethod,
+          timestamp: Date.now()
+        }));
+
         // REDIRECT TO PAYMENT PROVIDER
         // The user will leave the app and return to the callback URL
         window.location.href = result.paymentUrl;
       } else {
-        setErrorKey(result.error || 'subscription.error.updateFailed');
+        setErrorKey(result.error || 'subscription.error.paymentFailed');
         setIsUpdating(false); // Only stop loading if we didn't redirect
       }
     } catch (err) {
-      setErrorKey('subscription.error.updateFailed');
-      console.error('Error updating subscription:', err);
+      console.error('Error initiating payment:', err);
+      if (err instanceof Error) {
+        // Handle specific error types
+        if (err.message.includes('network') || err.message.includes('fetch')) {
+          setErrorKey('subscription.error.networkError');
+        } else if (err.message.includes('timeout')) {
+          setErrorKey('subscription.error.timeout');
+        } else {
+          setErrorKey('subscription.error.paymentFailed');
+        }
+      } else {
+        setErrorKey('subscription.error.updateFailed');
+      }
       setIsUpdating(false);
     }
     // Note: If success, we don't set isUpdating(false) because the page is unloading/redirecting
@@ -198,6 +281,12 @@ export const useSubscription = () => {
     setIsLoading(true);
     try {
       const subscription = await apiClient.getSubscription(user.uid);
+
+      // Update cache
+      const now = Date.now();
+      subscriptionCache.current.data = subscription;
+      subscriptionCache.current.timestamp = now;
+
       setUserSubscription(subscription);
       if (subscription) setSelectedPlanId(subscription.planId);
     } catch (e) {

@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { BlogProvider } from './contexts/BlogContext';
+import ErrorBoundary from './components/ErrorBoundary';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Blog from './pages/Blog';
@@ -32,10 +33,10 @@ function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/blog" element={<BlogProvider><Blog /></BlogProvider>} />
-          <Route path="/blog/:id" element={<BlogProvider><BlogDetails /></BlogProvider>} />
-          <Route path="/blog/publish-success" element={<BlogProvider><PublishSuccess /></BlogProvider>} />
-          <Route path="/blog/create" element={<BlogProvider><ProtectedRoute><BlogEditor /></ProtectedRoute></BlogProvider>} />
+          <Route path="/blog" element={<BlogProvider><ErrorBoundary><Blog /></ErrorBoundary></BlogProvider>} />
+          <Route path="/blog/:id" element={<BlogProvider><ErrorBoundary><BlogDetails /></ErrorBoundary></BlogProvider>} />
+          <Route path="/blog/publish-success" element={<BlogProvider><ErrorBoundary><PublishSuccess /></ErrorBoundary></BlogProvider>} />
+          <Route path="/blog/create" element={<BlogProvider><ProtectedRoute><ErrorBoundary><BlogEditor /></ErrorBoundary></ProtectedRoute></BlogProvider>} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/subscription" element={<Subscription />} />
           <Route path="/trips" element={<Trips />} />

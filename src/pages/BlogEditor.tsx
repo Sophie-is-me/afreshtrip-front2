@@ -3,13 +3,14 @@ import { useForm, Controller } from 'react-hook-form';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiSettings, FiArrowLeft, FiImage, FiX, FiCheck, FiGlobe, FiLock, FiAlertCircle } from 'react-icons/fi';
+import { FiSettings, FiArrowLeft, FiImage, FiX, FiCheck, FiGlobe, FiLock, FiAlertCircle, FiList, FiLink, FiRefreshCcw, FiRefreshCw } from 'react-icons/fi';
 // import { useAuth } from '../contexts/AuthContext';
 import { useBlog } from '../contexts/BlogContext';
 import { useDebounce } from '../hooks/useDebounce';
 import FeatureGate from '../components/FeatureGate';
 import { FeatureId } from '../types/features';
 import PhotoLibrary from '../components/PhotoLibrary';
+import { CategoryService } from '../services/api/categoryService';
 
 // --- TIPTAP V3 IMPORTS ---
 import { useEditor, EditorContent } from '@tiptap/react';
@@ -25,7 +26,7 @@ interface BlogFormValues {
   title: string;
   content: string;
   excerpt: string;
-  category: string;
+  categoryId: number;
   tags: string[];
   featuredImage: string | null;
   isPublished: boolean;
@@ -42,13 +43,19 @@ const BlogEditor: React.FC = () => {
   const [isPhotoLibraryOpen, setIsPhotoLibraryOpen] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error' | 'forbidden'>('idle');
   const [postId, setPostId] = useState<string | null>(null);
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [wordCount, setWordCount] = useState(0);
+  const [readingTime, setReadingTime] = useState(0);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [isPreview, setIsPreview] = useState(false);
   
-  const { 
-    register, 
-    control, 
-    handleSubmit, 
-    watch, 
-    setValue, 
+  const {
+    register,
+    control,
+    handleSubmit,
+    watch,
+    setValue,
     reset,
     getValues,
     formState: { isDirty }
@@ -57,7 +64,7 @@ const BlogEditor: React.FC = () => {
       title: '',
       content: '',
       excerpt: '',
-      category: 'Travel',
+      categoryId: 1, // Default to first category
       tags: [],
       featuredImage: null,
       isPublished: false
@@ -81,10 +88,20 @@ const BlogEditor: React.FC = () => {
     content: '',
     onUpdate: ({ editor }) => {
       setValue('content', editor.getHTML(), { shouldDirty: true });
+      // Calculate word count and reading time
+      const text = editor.getText();
+      const words = text.trim().split(/\s+/).filter(word => word.length > 0);
+      const count = words.length;
+      setWordCount(count);
+      setReadingTime(Math.ceil(count / 200)); // 200 words per minute
     },
     editorProps: {
       attributes: {
         class: 'prose prose-lg max-w-none focus:outline-none min-h-[50vh] outline-none',
+        role: 'textbox',
+        'aria-label': t('blog.contentPlaceholder', 'Tell your story...'),
+        'aria-multiline': 'true',
+        'aria-describedby': 'editor-help',
       },
     },
   });
@@ -104,7 +121,7 @@ const BlogEditor: React.FC = () => {
               title: post.title,
               content: post.content,
               excerpt: post.excerpt || '',
-              category: post.category,
+              categoryId: post.categoryId || 1,
               tags: post.tags || [],
               featuredImage: post.images?.[0] || null,
               isPublished: post.isPublished
@@ -121,6 +138,49 @@ const BlogEditor: React.FC = () => {
     }
   }, [location.search, getBlogPostById, reset, editor]);
 
+  // Fetch categories
+  useEffect(() => {
+    const categoryService = new CategoryService(import.meta.env.VITE_API_BASE_URL || '');
+    const fetchCategories = async () => {
+      try {
+        const fetchedCategories = await categoryService.getCategories();
+        // Convert Category[] to expected format
+        const formattedCategories = fetchedCategories.map(cat => ({
+          id: cat.id.toString(),
+          name: cat.name
+        }));
+        setCategories(formattedCategories);
+      } catch (err) {
+        console.error('Error fetching categories:', err);
+        // Fallback
+        setCategories([
+          { id: '1', name: 'Travel' },
+          { id: '2', name: 'Food' },
+          { id: '3', name: 'Culture' },
+          { id: '4', name: 'Adventure' },
+        ]);
+      }
+    };
+
+    fetchCategories();
+  }, []);
+
+  // Auto-hide toast
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
+
+  // Detect mobile
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   // --- AUTO-SAVE LOGIC ---
   useEffect(() => {
     if (!isDirty || !postId) return;
@@ -133,7 +193,7 @@ const BlogEditor: React.FC = () => {
           content: debouncedValues.content,
           excerpt: debouncedValues.excerpt,
           tags: debouncedValues.tags,
-          category: debouncedValues.category,
+          categoryId: debouncedValues.categoryId,
           images: debouncedValues.featuredImage ? [debouncedValues.featuredImage] : [],
           isPublished: debouncedValues.isPublished,
         };
@@ -157,7 +217,7 @@ const BlogEditor: React.FC = () => {
   // --- HANDLERS ---
   const onSubmit = async (data: BlogFormValues) => {
     if (!data.title.trim()) {
-        alert(t('blog.titleRequired'));
+        setToast({ message: t('blog.titleRequired'), type: 'error' });
         return;
     }
 
@@ -167,7 +227,7 @@ const BlogEditor: React.FC = () => {
         title: data.title,
         content: data.content,
         excerpt: data.excerpt,
-        category: data.category,
+        categoryId: data.categoryId,
         tags: data.tags,
         images: data.featuredImage ? [data.featuredImage] : [],
         isPublished: data.isPublished
@@ -186,7 +246,7 @@ const BlogEditor: React.FC = () => {
       console.error('Save failed:', error);
       if (error instanceof SubscriptionRequiredError) {
         setSaveStatus('forbidden');
-        alert(t('blog.upgradeRequired', 'Subscription required to save changes.'));
+        setToast({ message: t('blog.upgradeRequired', 'Subscription required to save changes.'), type: 'error' });
       } else {
         setSaveStatus('error');
       }
@@ -211,7 +271,7 @@ const BlogEditor: React.FC = () => {
         
         if (error instanceof SubscriptionRequiredError) {
           setSaveStatus('forbidden');
-          alert(t('blog.upgradeRequired', 'Subscription required to publish.'));
+          setToast({ message: t('blog.upgradeRequired', 'Subscription required to publish.'), type: 'error' });
         } else {
           setSaveStatus('error');
         }
@@ -285,6 +345,9 @@ const BlogEditor: React.FC = () => {
                   </span>
                 )}
                 {saveStatus === 'idle' && <span className="text-gray-400">{isDirty ? t('blog.unsavedChanges') : t('blog.uptodate')}</span>}
+                <span className="text-gray-500">
+                  {wordCount} {t('blog.words', 'words')} • {readingTime} {t('blog.minRead', 'min read')}
+                </span>
               </div>
             </div>
           </div>
@@ -310,6 +373,13 @@ const BlogEditor: React.FC = () => {
             </button>
             
             <button
+              onClick={() => setIsPreview(!isPreview)}
+              className={`p-2 rounded-full transition-colors ${isPreview ? 'bg-gray-100 text-black' : 'text-gray-500 hover:bg-gray-50'}`}
+            >
+              <FiGlobe className="w-6 h-6" />
+            </button>
+
+            <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               className={`p-2 rounded-full transition-colors ${isSidebarOpen ? 'bg-gray-100 text-black' : 'text-gray-500 hover:bg-gray-50'}`}
             >
@@ -318,67 +388,169 @@ const BlogEditor: React.FC = () => {
           </div>
         </header>
 
-        {/* EDITOR */}
+        {/* EDITOR / PREVIEW */}
         <main className="flex-1 max-w-4xl mx-auto w-full px-4 py-12 flex relative">
           <div className="w-full">
-            <input
-              {...register('title')}
-              placeholder={t('blog.titlePlaceholder', 'Article Title')}
-              className="w-full text-4xl md:text-5xl font-bold placeholder-gray-300 border-none outline-none focus:ring-0 bg-transparent mb-8"
-              autoFocus
-            />
+            {isPreview ? (
+              <div className="prose prose-lg max-w-none">
+                <h1 className="text-4xl md:text-5xl font-bold mb-8">
+                  {watch('title') || t('blog.untitled')}
+                </h1>
 
-            {watch('featuredImage') && !isSidebarOpen && (
-              <div className="relative w-full h-64 md:h-96 mb-8 rounded-xl overflow-hidden group">
-                <img 
-                  src={watch('featuredImage')!} 
-                  alt="Cover" 
-                  className="w-full h-full object-cover" 
-                />
+                {watch('featuredImage') && (
+                  <div className="relative w-full h-64 md:h-96 mb-8 rounded-xl overflow-hidden">
+                    <img
+                      src={watch('featuredImage')!}
+                      alt="Cover"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
+
+                <div dangerouslySetInnerHTML={{ __html: editor?.getHTML() || '' }} />
               </div>
-            )}
+            ) : (
+              <>
+                <input
+                  {...register('title')}
+                  placeholder={t('blog.titlePlaceholder', 'Article Title')}
+                  className="w-full text-4xl md:text-5xl font-bold placeholder-gray-300 border-none outline-none focus:ring-0 bg-transparent mb-8"
+                  autoFocus
+                  aria-label={t('blog.titlePlaceholder', 'Article Title')}
+                  role="textbox"
+                  aria-multiline="false"
+                />
 
-            {/* V3 BUBBLE MENU */}
-            {editor && (
-              <BubbleMenu 
-                editor={editor} 
-                className="bg-white shadow-xl border border-gray-100 rounded-lg overflow-hidden flex divide-x divide-gray-100"
-              >
-                <button
-                  type="button"
-                  onClick={() => editor.chain().focus().toggleBold().run()}
-                  className={`p-2 hover:bg-gray-50 ${editor.isActive('bold') ? 'text-blue-600' : 'text-gray-600'}`}
-                >
-                  B
-                </button>
-                <button
-                  type="button"
-                  onClick={() => editor.chain().focus().toggleItalic().run()}
-                  className={`p-2 hover:bg-gray-50 ${editor.isActive('italic') ? 'text-blue-600' : 'text-gray-600'}`}
-                >
-                  I
-                </button>
-                <button
-                  type="button"
-                  onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-                  className={`p-2 hover:bg-gray-50 ${editor.isActive('heading', { level: 2 }) ? 'text-blue-600' : 'text-gray-600'}`}
-                >
-                  H2
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsSidebarOpen(false); 
-                    setIsPhotoLibraryOpen(true);
-                  }}
-                  className="p-2 hover:bg-gray-50 text-gray-600"
-                >
-                  <FiImage />
-                </button>
-              </BubbleMenu>
-            )}
+                {watch('featuredImage') && (
+                  <div className="relative w-full h-64 md:h-96 mb-8 rounded-xl overflow-hidden group">
+                    <img
+                      src={watch('featuredImage')!}
+                      alt="Cover"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
 
-            <EditorContent editor={editor} />
+                {/* V3 BUBBLE MENU */}
+                {editor && (
+                  <BubbleMenu
+                    editor={editor}
+                    className="bg-white shadow-xl border border-gray-100 rounded-lg overflow-hidden flex flex-wrap divide-x divide-gray-100 max-w-sm"
+                    role="toolbar"
+                    aria-label={t('blog.formattingToolbar', 'Text formatting toolbar')}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => editor.chain().focus().toggleBold().run()}
+                      className={`p-3 md:p-2 hover:bg-gray-50 ${editor.isActive('bold') ? 'text-blue-600' : 'text-gray-600'}`}
+                      aria-label={t('blog.toggleBold', 'Toggle bold')}
+                      aria-pressed={editor.isActive('bold')}
+                    >
+                      B
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => editor.chain().focus().toggleItalic().run()}
+                      className={`p-3 md:p-2 hover:bg-gray-50 ${editor.isActive('italic') ? 'text-blue-600' : 'text-gray-600'}`}
+                      aria-label={t('blog.toggleItalic', 'Toggle italic')}
+                      aria-pressed={editor.isActive('italic')}
+                    >
+                      I
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+                      className={`p-3 md:p-2 hover:bg-gray-50 ${editor.isActive('heading', { level: 1 }) ? 'text-blue-600' : 'text-gray-600'}`}
+                      aria-label={t('blog.toggleHeading1', 'Toggle heading level 1')}
+                      aria-pressed={editor.isActive('heading', { level: 1 })}
+                    >
+                      H1
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+                      className={`p-3 md:p-2 hover:bg-gray-50 ${editor.isActive('heading', { level: 2 }) ? 'text-blue-600' : 'text-gray-600'}`}
+                      aria-label={t('blog.toggleHeading2', 'Toggle heading level 2')}
+                      aria-pressed={editor.isActive('heading', { level: 2 })}
+                    >
+                      H2
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+                      className={`p-3 md:p-2 hover:bg-gray-50 ${editor.isActive('heading', { level: 3 }) ? 'text-blue-600' : 'text-gray-600'}`}
+                      aria-label={t('blog.toggleHeading3', 'Toggle heading level 3')}
+                      aria-pressed={editor.isActive('heading', { level: 3 })}
+                    >
+                      H3
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => editor.chain().focus().toggleBulletList().run()}
+                      className={`p-3 md:p-2 hover:bg-gray-50 ${editor.isActive('bulletList') ? 'text-blue-600' : 'text-gray-600'}`}
+                      aria-label={t('blog.toggleBulletList', 'Toggle bullet list')}
+                      aria-pressed={editor.isActive('bulletList')}
+                    >
+                      <FiList />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => editor.chain().focus().toggleOrderedList().run()}
+                      className={`p-3 md:p-2 hover:bg-gray-50 ${editor.isActive('orderedList') ? 'text-blue-600' : 'text-gray-600'}`}
+                      aria-label={t('blog.toggleOrderedList', 'Toggle ordered list')}
+                      aria-pressed={editor.isActive('orderedList')}
+                    >
+                      1.
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const url = window.prompt('Enter URL:');
+                        if (url) {
+                          editor.chain().focus().setLink({ href: url }).run();
+                        }
+                      }}
+                      className={`p-3 md:p-2 hover:bg-gray-50 ${editor.isActive('link') ? 'text-blue-600' : 'text-gray-600'}`}
+                      aria-label={t('blog.insertLink', 'Insert link')}
+                      aria-pressed={editor.isActive('link')}
+                    >
+                      <FiLink />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsSidebarOpen(false);
+                        setIsPhotoLibraryOpen(true);
+                      }}
+                      className="p-3 md:p-2 hover:bg-gray-50 text-gray-600"
+                      aria-label={t('blog.insertImage', 'Insert image')}
+                    >
+                      <FiImage />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => editor.chain().focus().undo().run()}
+                      disabled={!editor.can().undo()}
+                      className="p-3 md:p-2 hover:bg-gray-50 text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                      aria-label={t('blog.undo', 'Undo')}
+                    >
+                      <FiRefreshCcw />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => editor.chain().focus().redo().run()}
+                      disabled={!editor.can().redo()}
+                      className="p-3 md:p-2 hover:bg-gray-50 text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                      aria-label={t('blog.redo', 'Redo')}
+                    >
+                      <FiRefreshCw />
+                    </button>
+                  </BubbleMenu>
+                )}
+
+                <EditorContent editor={editor} />
+              </>
+            )}
           </div>
         </main>
 
@@ -395,11 +567,15 @@ const BlogEditor: React.FC = () => {
               />
               
               <motion.div
-                initial={{ x: '100%' }}
-                animate={{ x: 0 }}
-                exit={{ x: '100%' }}
+                initial={isMobile ? { y: '100%' } : { x: '100%' }}
+                animate={{ x: 0, y: 0 }}
+                exit={isMobile ? { y: '100%' } : { x: '100%' }}
                 transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                className="fixed right-0 top-0 bottom-0 w-80 md:w-96 bg-white shadow-2xl z-50 overflow-y-auto border-l border-gray-100"
+                className={`fixed bg-white shadow-2xl z-50 overflow-y-auto ${
+                  isMobile
+                    ? 'bottom-0 left-0 right-0 h-3/4 border-t border-gray-100'
+                    : 'right-0 top-0 bottom-0 w-96 border-l border-gray-100'
+                }`}
               >
                 <div className="p-6">
                   <div className="flex items-center justify-between mb-8">
@@ -451,13 +627,14 @@ const BlogEditor: React.FC = () => {
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">{t('blog.category')}</label>
                       <select
-                        {...register('category')}
+                        {...register('categoryId')}
                         className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none appearance-none"
                       >
-                        <option value="Travel">{t('blog.travel')}</option>
-                        <option value="Food">{t('blog.food')}</option>
-                        <option value="Lifestyle">{t('blog.lifestyle')}</option>
-                        <option value="Tech">{t('blog.tech')}</option>
+                        {categories.map((category) => (
+                          <option key={category.id} value={parseInt(category.id)}>
+                            {category.name}
+                          </option>
+                        ))}
                       </select>
                     </div>
 
@@ -486,6 +663,21 @@ const BlogEditor: React.FC = () => {
                         )}
                       />
                     </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">{t('blog.seoPreview', 'SEO Preview')}</label>
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                        <div className="text-blue-600 text-lg font-medium hover:underline cursor-pointer">
+                          {watch('title') || t('blog.untitled')}
+                        </div>
+                        <div className="text-green-600 text-sm">
+                          {window.location.origin}/blog/{postId || 'new'}
+                        </div>
+                        <div className="text-gray-600 text-sm mt-1">
+                          {watch('excerpt') || t('blog.excerptHint')}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </motion.div>
@@ -493,11 +685,27 @@ const BlogEditor: React.FC = () => {
           )}
         </AnimatePresence>
 
-        <PhotoLibrary 
+        <PhotoLibrary
           isOpen={isPhotoLibraryOpen}
           onClose={() => setIsPhotoLibraryOpen(false)}
           onInsert={insertImageFromLibrary}
         />
+
+        {/* Toast Notification */}
+        <AnimatePresence>
+          {toast && (
+            <motion.div
+              initial={{ opacity: 0, y: -50 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -50 }}
+              className={`fixed top-4 right-4 z-50 px-4 py-2 rounded-lg shadow-lg text-white ${
+                toast.type === 'error' ? 'bg-red-500' : 'bg-green-500'
+              }`}
+            >
+              {toast.message}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </FeatureGate>
   );

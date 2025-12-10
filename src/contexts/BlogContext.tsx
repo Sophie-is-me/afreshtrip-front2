@@ -150,7 +150,12 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
     } catch (err) {
       console.error('Error fetching paginated blog posts:', err);
-      throw err;
+      // Return empty result for network errors or API issues
+      return {
+        posts: [],
+        total: 0,
+        hasMore: false
+      };
     }
   };
 
@@ -276,7 +281,11 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { post, comments };
     } catch (err) {
       console.error('Error fetching blog details:', err);
-      throw err;
+      // Return empty result instead of throwing
+      return {
+        post: {} as BlogPost,
+        comments: []
+      };
     }
   };
 

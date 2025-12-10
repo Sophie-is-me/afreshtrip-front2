@@ -34,6 +34,13 @@
     "processing": "معالجة...",
     "comparePlans": "مقارنة الخطط"
   },
+  "periods": {
+    "week": "أسبوع",
+    "month": "شهر",
+    "quarter": "ربع",
+    "year": "سنة",
+    "days": "أيام"
+  },
   "plans": {
     "week": {
       "name": "أسبوع",

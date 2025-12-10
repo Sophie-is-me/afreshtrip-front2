@@ -5,7 +5,6 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import ImageCarousel from '../components/ImageCarousel';
 import LoadingSkeleton from '../components/LoadingSkeleton';
-import ErrorMessage from '../components/ErrorMessage';
 import TableOfContents from '../components/TableOfContents';
 import SocialShareButtons from '../components/SocialShareButtons';
 import CommentSection from '../components/CommentSection';
@@ -18,8 +17,10 @@ import Lightbox from '../components/Lightbox';
 import BackToTopButton from '../components/BackToTopButton';
 import { useBlog } from '../contexts/BlogContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useSnackbar } from '../contexts/SnackbarContext';
 import { createSanitizedHtml } from '../utils/sanitizeHtml';
 import { commentSchema, sanitizeText } from '../utils/validationSchemas';
+import { i18nErrorHandler } from '../utils/i18nErrorHandler';
 import type { BlogPost, Comment } from '../types/blog';
 
 const BlogDetails: React.FC = () => {
@@ -28,8 +29,8 @@ const BlogDetails: React.FC = () => {
   const { t } = useTranslation();
   const { updatePostStatistics, getRelatedPosts, getBlogDetails, toggleCommentLike, addComment } = useBlog();
   const { user } = useAuth();
+  const { showSuccess } = useSnackbar();
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [post, setPost] = useState<BlogPost | null>(null);
   const [relatedPosts, setRelatedPosts] = useState<BlogPost[]>([]);
   const [isLiked, setIsLiked] = useState(false);
@@ -53,7 +54,6 @@ const BlogDetails: React.FC = () => {
     const fetchPost = async () => {
       try {
         setLoading(true);
-        setError(null);
 
         const { post, comments: fetchedComments } = await getBlogDetails(id!);
         setPost(post);
@@ -68,7 +68,18 @@ const BlogDetails: React.FC = () => {
         setComments(fetchedComments);
       } catch (err) {
         console.error('Error fetching blog post:', err);
-        setError(t('blog.errorLoadingPost'));
+        i18nErrorHandler.showErrorToUser(
+          err,
+          { component: 'BlogDetails', action: 'fetchPost' },
+          [
+            {
+              label: t('common.retry'),
+              onClick: () => window.location.reload(),
+              style: 'primary'
+            }
+          ],
+          t.bind(t)
+        );
       } finally {
         setLoading(false);
       }
@@ -148,14 +159,15 @@ const BlogDetails: React.FC = () => {
 
       // Add the new comment to the list
       setComments(prevComments => [newComment, ...prevComments]);
+      showSuccess(t('blog.commentAdded', 'Comment added successfully!'));
     } catch (err) {
       console.error('Failed to add comment:', err);
-      // Show error message
-      if (err instanceof Error) {
-        alert(err.message);
-      } else {
-        alert(t('blog.commentAddFailed', 'Failed to add comment. Please try again.'));
-      }
+      i18nErrorHandler.showErrorToUser(
+        err,
+        { component: 'BlogDetails', action: 'addComment' },
+        [],
+        t.bind(t)
+      );
     }
   };
 
@@ -167,7 +179,12 @@ const BlogDetails: React.FC = () => {
       setComments(prevComments => updateCommentLikes(prevComments, commentId, isLiked));
     } catch (err) {
       console.error('Error liking comment:', err);
-      // Could show error message to user
+      i18nErrorHandler.showErrorToUser(
+        err,
+        { component: 'BlogDetails', action: 'likeComment' },
+        [],
+        t.bind(t)
+      );
     }
   };
 
@@ -204,13 +221,9 @@ const BlogDetails: React.FC = () => {
     window.print();
   };
 
-  // Retry fetching post
-  const handleRetry = () => {
-    window.location.reload();
-  };
+
 
   if (loading) return <LoadingSkeleton />;
-  if (error) return <ErrorMessage error={error} onRetry={handleRetry} />;
   if (!post) return null; // Should not happen
 
   const currentUrl = window.location.href;

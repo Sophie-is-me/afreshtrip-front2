@@ -35,7 +35,7 @@ export class CategoryService extends HttpClient {
         message: string;
         data: Category[];
         timestamp?: number;
-      }>('/api/v1/categories');
+      }>('/api/v1/categories', { requiresAuth: false });
       return response.data;
     } catch (err) {
       console.error('Failed to fetch categories:', err);

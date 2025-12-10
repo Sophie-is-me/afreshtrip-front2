@@ -2,8 +2,10 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { FiCheckCircle, FiXCircle, FiArrowRight } from 'react-icons/fi';
-import { subscriptionService } from '../services/subscriptionService';
+import { unifiedSubscriptionService } from '../services/subscription/UnifiedSubscriptionService';
 import { useAuth } from '../contexts/AuthContext';
+import { useSnackbar } from '../contexts/SnackbarContext';
+import { i18nErrorHandler } from '../utils/i18nErrorHandler';
 
 const PaymentResult: React.FC = () => {
   const { t } = useTranslation();
@@ -12,7 +14,7 @@ const PaymentResult: React.FC = () => {
   const { user, refreshUserProfile } = useAuth();
   
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
-  const [errorMessage, setErrorMessage] = useState<string>('');
+  const { showSuccess } = useSnackbar();
   
   // Prevent double-firing in strict mode
   const processingRef = useRef(false);
@@ -25,16 +27,38 @@ const PaymentResult: React.FC = () => {
       const transactionId = orderNo || outTradeNo;
 
       if (!transactionId) {
+        i18nErrorHandler.showErrorToUser(
+          new Error('No order number found'),
+          { component: 'PaymentResult', action: 'verifyPayment' },
+          [
+            {
+              label: t('common.retry'),
+              onClick: () => window.location.reload(),
+              style: 'primary'
+            }
+          ],
+          t.bind(t)
+        );
         setStatus('error');
-        setErrorMessage(t('payment.error.noOrderNo', 'No order number found.'));
         return;
       }
 
       if (!user) {
         // If user is not logged in (session lost during redirect), redirect to login
         // In a real app, you might store the orderNo in local storage and check after login
+        i18nErrorHandler.showErrorToUser(
+          new Error('Please log in to verify payment'),
+          { component: 'PaymentResult', action: 'verifyPayment' },
+          [
+            {
+              label: t('common.login'),
+              onClick: () => navigate('/login'),
+              style: 'primary'
+            }
+          ],
+          t.bind(t)
+        );
         setStatus('error');
-        setErrorMessage(t('payment.error.loginRequired', 'Please log in to verify payment.'));
         return;
       }
 
@@ -42,21 +66,44 @@ const PaymentResult: React.FC = () => {
       processingRef.current = true;
 
       try {
-        // Start polling the backend
-        const result = await subscriptionService.handlePaymentReturn(user.uid, transactionId);
+        // Start polling the backend using the new unified payment system
+        const result = await unifiedSubscriptionService.handlePaymentReturn(user.uid, transactionId);
 
         if (result.success) {
           setStatus('success');
           // Refresh the global user profile/auth context so the UI updates immediately
-          await refreshUserProfile(); 
+          await refreshUserProfile();
+          showSuccess(t('payment.success.title', 'Payment Successful!')); 
         } else {
+          i18nErrorHandler.showErrorToUser(
+            new Error(result.error || 'Payment verification failed'),
+            { component: 'PaymentResult', action: 'verifyPayment' },
+            [
+              {
+                label: t('common.retry'),
+                onClick: () => window.location.reload(),
+                style: 'primary'
+              }
+            ],
+            t.bind(t)
+          );
           setStatus('error');
-          setErrorMessage(result.error || t('payment.error.verificationFailed', 'Payment verification failed.'));
         }
       } catch (err) {
         console.error(err);
+        i18nErrorHandler.showErrorToUser(
+          err,
+          { component: 'PaymentResult', action: 'verifyPayment' },
+          [
+            {
+              label: t('common.retry'),
+              onClick: () => window.location.reload(),
+              style: 'primary'
+            }
+          ],
+          t.bind(t)
+        );
         setStatus('error');
-        setErrorMessage(t('payment.error.generic', 'An unexpected error occurred.'));
       }
     };
 
@@ -124,7 +171,7 @@ const PaymentResult: React.FC = () => {
               {t('payment.failed.title', 'Payment Failed')}
             </h2>
             <p className="mt-2 text-gray-600 mb-8">
-              {errorMessage}
+              {t('payment.error.verificationFailed', 'Payment verification failed. Please try again or contact support.')}
             </p>
             <div className="flex flex-col gap-3 w-full">
               <button

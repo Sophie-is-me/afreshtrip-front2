@@ -22,6 +22,16 @@ const PaymentMethodSelection: React.FC<PaymentMethodSelectionProps> = ({
 
   if (!isOpen) return null;
 
+  const getPeriodKey = (durationDays: number): string => {
+    switch (durationDays) {
+      case 7: return 'week';
+      case 30: return 'month';
+      case 90: return 'quarter';
+      case 365: return 'year';
+      default: return 'custom';
+    }
+  };
+
   const handlePaymentMethodSelect = (paymentMethod: 'alipay' | 'stripe') => {
     onSelectPaymentMethod(paymentMethod);
   };
@@ -53,7 +63,7 @@ const PaymentMethodSelection: React.FC<PaymentMethodSelectionProps> = ({
             {t('subscription.selectedPlan')}: {plan.planName}
           </p>
           <p className="text-lg font-semibold text-teal-600 mt-2">
-            ${plan.price} /{plan.durationDays === 7 ? 'week' : plan.durationDays === 30 ? 'month' : plan.durationDays === 90 ? 'quarter' : plan.durationDays === 365 ? 'year' : `${plan.durationDays} days`}
+            ${plan.price} /{getPeriodKey(plan.durationDays) === 'custom' ? `${plan.durationDays} ${t('subscription.periods.days')}` : t(`subscription.periods.${getPeriodKey(plan.durationDays)}`)}
           </p>
         </div>
 

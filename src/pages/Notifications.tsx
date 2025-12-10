@@ -72,7 +72,7 @@ const Notifications: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-white">
-      <Header showIconButtons showNavLinks={false} />
+      <Header showNavLinks={false} />
       <main className="px-8 py-8">
         <div className="max-w-4xl mx-auto">
           <Link to="/profile" className="flex items-center space-x-2 text-gray-600 hover:text-teal-600 transition-colors mb-4">

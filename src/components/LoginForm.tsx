@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
+import { useSnackbar } from '../contexts/SnackbarContext';
+import { i18nErrorHandler } from '../utils/i18nErrorHandler';
 import type { AuthError } from 'firebase/auth';
 
 interface LoginFormData {
@@ -28,7 +30,6 @@ const LoginForm: React.FC<LoginFormProps> = ({
 }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [loginError, setLoginError] = useState<string | null>(null);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const { register, handleSubmit, watch, formState: { errors, isValid } } = useForm<LoginFormData>({
@@ -37,38 +38,10 @@ const LoginForm: React.FC<LoginFormProps> = ({
   const { loginWithEmail, registerWithEmail, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
   const { t } = useTranslation();
-
-  const getErrorMessage = (error: AuthError) => {
-    switch (error.code) {
-      case 'auth/user-not-found':
-        return t('loginForm.userNotFound');
-      case 'auth/wrong-password':
-        return t('loginForm.wrongPassword');
-      case 'auth/email-already-in-use':
-        return t('loginForm.emailAlreadyInUse');
-      case 'auth/invalid-email':
-        return t('loginForm.invalidEmail');
-      case 'auth/weak-password':
-        return t('loginForm.weakPassword');
-      case 'auth/too-many-requests':
-        return t('loginForm.tooManyRequests');
-      case 'auth/network-request-failed':
-        return t('loginForm.networkError');
-      default:
-        return error.message;
-    }
-  };
-
-  // Clear error messages when form values change
-  useEffect(() => {
-    if (loginError) {
-      setLoginError(null);
-    }
-  }, [errors.email, errors.password, errors.confirmPassword, loginError]);
+  const { showSuccess } = useSnackbar();
 
   const onSubmit = async (data: LoginFormData) => {
     setIsSubmitting(true);
-    setLoginError(null);
 
     console.log('Attempting auth:', { isRegisterMode, email: data.email });
 
@@ -79,6 +52,7 @@ const LoginForm: React.FC<LoginFormProps> = ({
         await loginWithEmail(data.email, data.password);
       }
       setShowSuccessMessage(true);
+      showSuccess(isRegisterMode ? t('loginForm.registrationSuccess') : t('loginForm.loginSuccess'));
 
       // Call the success callback if provided
       if (onLoginSuccess) {
@@ -93,8 +67,13 @@ const LoginForm: React.FC<LoginFormProps> = ({
       console.error(`${isRegisterMode ? 'Registration' : 'Login'} failed:`, error);
       const authError = error as AuthError;
       console.log('Auth error details:', { code: authError.code, message: authError.message });
-      const errorMessage = getErrorMessage(authError);
-      setLoginError(errorMessage);
+      
+      i18nErrorHandler.showErrorToUser(
+        authError,
+        { component: 'LoginForm', action: 'onSubmit' },
+        [],
+        t.bind(t)
+      );
 
       // Call the error callback if provided
       if (onLoginError && error instanceof Error) {
@@ -107,11 +86,11 @@ const LoginForm: React.FC<LoginFormProps> = ({
 
   const handleGoogleLogin = async () => {
     setIsSubmitting(true);
-    setLoginError(null);
 
     try {
       await loginWithGoogle();
       setShowSuccessMessage(true);
+      showSuccess(t('loginForm.loginSuccess'));
       
       // Call the success callback if provided
       if (onLoginSuccess) {
@@ -124,8 +103,13 @@ const LoginForm: React.FC<LoginFormProps> = ({
       }, 1000);
     } catch (error) {
       console.error('Google login failed:', error);
-      const errorMessage = error instanceof Error ? error.message : t('loginForm.googleLoginFailed');
-      setLoginError(errorMessage);
+      
+      i18nErrorHandler.showErrorToUser(
+        error,
+        { component: 'LoginForm', action: 'handleGoogleLogin' },
+        [],
+        t.bind(t)
+      );
       
       // Call the error callback if provided
       if (onLoginError && error instanceof Error) {
@@ -158,12 +142,7 @@ const LoginForm: React.FC<LoginFormProps> = ({
           </div>
         )}
 
-        {/* Error Message */}
-        {loginError && (
-          <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg">
-            {loginError}
-          </div>
-        )}
+
 
 
         {/* Toggle Button */}
@@ -345,7 +324,6 @@ const LoginForm: React.FC<LoginFormProps> = ({
             type="submit"
             disabled={!isValid || isSubmitting}
             className="w-full p-4 bg-teal-800 text-white border-none rounded-lg text-lg font-medium cursor-pointer hover:bg-teal-700 transition disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2"
-            aria-describedby={loginError ? 'login-error' : undefined}
           >
             {isSubmitting ? (
               <span className="flex items-center justify-center">

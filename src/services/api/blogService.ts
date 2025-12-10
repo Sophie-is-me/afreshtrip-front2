@@ -30,7 +30,8 @@ export class BlogService extends HttpClient {
     pages: number;
   }> {
     const response = await this.get<ResultIPageBlogVo>(
-      `/api/v1/blogs?current=${page}&size=${size}`
+      `/api/v1/blogs?current=${page}&size=${size}`,
+      { requiresAuth: false }
     );
     return response.data;
   }
@@ -39,7 +40,9 @@ export class BlogService extends HttpClient {
    * Get blog by ID
    */
   async getBlogById(blId: number): Promise<BlogCommentVo> {
-    const response = await this.get<ResultBlogCommentVo>(`/api/v1/blogs/${blId}`);
+    const response = await this.get<ResultBlogCommentVo>(`/api/v1/blogs/${blId}`, {
+      requiresAuth: false
+    });
     return response.data;
   }
 

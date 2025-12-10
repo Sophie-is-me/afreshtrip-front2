@@ -19,11 +19,30 @@
     "updateFailed": "Échec de la mise à jour de l'abonnement. Veuillez réessayer.",
     "cancelLoginRequired": "Vous devez être connecté pour annuler votre abonnement",
     "noSubscription": "Aucun abonnement actif trouvé",
-    "cancelFailed": "Échec de l'annulation de l'abonnement. Veuillez réessayer."
+    "cancelFailed": "Échec de l'annulation de l'abonnement. Veuillez réessayer.",
+    "paymentFailed": "Le paiement a échoué. Veuillez réessayer.",
+    "popupBlocked": "Popup bloqué. Veuillez autoriser les popups pour ce site.",
+    "paymentNotCompleted": "Le paiement n'a pas été complété avec succès.",
+    "paymentStatusCheckFailed": "Échec de la vérification du statut du paiement.",
+    "networkError": "Erreur réseau. Veuillez vérifier votre connexion.",
+    "timeout": "La demande a expiré. Veuillez réessayer."
   },
   "success": {
     "updateSuccess": "Abonnement mis à jour avec succès !",
-    "cancelSuccess": "Abonnement annulé avec succès. Votre accès continuera jusqu'à la fin de la période de facturation en cours."
+    "cancelSuccess": "Abonnement annulé avec succès. Votre accès continuera jusqu'à la fin de la période de facturation en cours.",
+    "paymentCompleted": "Paiement complété avec succès !"
+  },
+  "alipayPayment": "Paiement Alipay",
+  "completePaymentInNewWindow": "Complétez votre paiement dans la nouvelle fenêtre qui s'est ouverte.",
+  "orderNumber": "Numéro de Commande",
+  "iveCompletedPayment": "J'ai Terminé le Paiement",
+  "paymentWindowBlocked": "La fenêtre de paiement a été bloquée par votre navigateur.",
+  "iframeFallbackNotice": "Utilisation de l'alternative iframe pour le paiement.",
+  "loadingPayment": "Chargement du paiement...",
+  "payment": {
+    "windowBlocked": "Popup bloqué. Veuillez autoriser les popups pour ce site et réessayer.",
+    "redirecting": "Redirection vers le paiement...",
+    "processing": "Traitement du paiement..."
   },
   "card": {
     "bestValue": "Meilleur rapport qualité-prix",
@@ -33,6 +52,13 @@
     "selectPlan": "Sélectionner le plan",
     "processing": "Traitement...",
     "comparePlans": "Comparer les plans"
+  },
+  "periods": {
+    "week": "semaine",
+    "month": "mois",
+    "quarter": "trimestre",
+    "year": "année",
+    "days": "jours"
   },
   "plans": {
     "week": {

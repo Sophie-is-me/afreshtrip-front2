@@ -2,7 +2,9 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { BlogProvider } from './contexts/BlogContext';
-import ErrorBoundary from './components/ErrorBoundary';
+import { SnackbarProvider } from './contexts/SnackbarContext';
+import { PageErrorBoundary } from './components/error-boundaries/PageErrorBoundary';
+import { SectionErrorBoundary } from './components/error-boundaries/SectionErrorBoundary';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Blog from './pages/Blog';
@@ -29,32 +31,34 @@ import PaymentResult from './pages/PaymentResult';
 function App() {
   return (
     <AuthProvider>
-      <Router>
+      <SnackbarProvider>
+        <Router>
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/blog" element={<BlogProvider><ErrorBoundary><Blog /></ErrorBoundary></BlogProvider>} />
-          <Route path="/blog/:id" element={<BlogProvider><ErrorBoundary><BlogDetails /></ErrorBoundary></BlogProvider>} />
-          <Route path="/blog/publish-success" element={<BlogProvider><ErrorBoundary><PublishSuccess /></ErrorBoundary></BlogProvider>} />
-          <Route path="/blog/create" element={<BlogProvider><ProtectedRoute><ErrorBoundary><BlogEditor /></ErrorBoundary></ProtectedRoute></BlogProvider>} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/subscription" element={<Subscription />} />
-          <Route path="/trips" element={<Trips />} />
-          <Route path="/notifications" element={<Notifications />} />
-          <Route path="/support" element={<Support />} />
-          <Route path="/about" element={<About />} />
-          <Route path="/destinations" element={<Destinations />} />
-          <Route path="/tours" element={<Tours />} />
-          <Route path="/faq" element={<FAQ />} />
-          <Route path="/privacy" element={<Privacy />} />
-          <Route path="/terms" element={<Terms />} />
-          <Route path="/cookies" element={<Cookies />} />
-          <Route path="/accessibility" element={<Accessibility />} />
-          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/payment/result" element={<PaymentResult />} />
+          <Route path="/login" element={<PageErrorBoundary pageName="login"><Login /></PageErrorBoundary>} />
+          <Route path="/blog" element={<PageErrorBoundary pageName="blog"><BlogProvider><SectionErrorBoundary sectionName="maincontent"><Blog /></SectionErrorBoundary></BlogProvider></PageErrorBoundary>} />
+          <Route path="/blog/:id" element={<PageErrorBoundary pageName="blogdetails"><BlogProvider><SectionErrorBoundary sectionName="maincontent"><BlogDetails /></SectionErrorBoundary></BlogProvider></PageErrorBoundary>} />
+          <Route path="/blog/publish-success" element={<PageErrorBoundary pageName="publishsuccess"><BlogProvider><PublishSuccess /></BlogProvider></PageErrorBoundary>} />
+          <Route path="/blog/create" element={<PageErrorBoundary pageName="blogeditor"><BlogProvider><ProtectedRoute><BlogEditor /></ProtectedRoute></BlogProvider></PageErrorBoundary>} />
+          <Route path="/profile" element={<PageErrorBoundary pageName="profile"><Profile /></PageErrorBoundary>} />
+          <Route path="/subscription" element={<PageErrorBoundary pageName="subscription"><Subscription /></PageErrorBoundary>} />
+          <Route path="/trips" element={<PageErrorBoundary pageName="trips"><Trips /></PageErrorBoundary>} />
+          <Route path="/notifications" element={<PageErrorBoundary pageName="notifications"><Notifications /></PageErrorBoundary>} />
+          <Route path="/support" element={<PageErrorBoundary pageName="support"><Support /></PageErrorBoundary>} />
+          <Route path="/about" element={<PageErrorBoundary pageName="about"><About /></PageErrorBoundary>} />
+          <Route path="/destinations" element={<PageErrorBoundary pageName="destinations"><Destinations /></PageErrorBoundary>} />
+          <Route path="/tours" element={<PageErrorBoundary pageName="tours"><Tours /></PageErrorBoundary>} />
+          <Route path="/faq" element={<PageErrorBoundary pageName="faq"><FAQ /></PageErrorBoundary>} />
+          <Route path="/privacy" element={<PageErrorBoundary pageName="privacy"><Privacy /></PageErrorBoundary>} />
+          <Route path="/terms" element={<PageErrorBoundary pageName="terms"><Terms /></PageErrorBoundary>} />
+          <Route path="/cookies" element={<PageErrorBoundary pageName="cookies"><Cookies /></PageErrorBoundary>} />
+          <Route path="/accessibility" element={<PageErrorBoundary pageName="accessibility"><Accessibility /></PageErrorBoundary>} />
+          <Route path="/dashboard" element={<PageErrorBoundary pageName="dashboard"><ProtectedRoute><Dashboard /></ProtectedRoute></PageErrorBoundary>} />
+          <Route path="/payment/result" element={<PageErrorBoundary pageName="paymentresult"><PaymentResult /></PageErrorBoundary>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
-      </Router>
+        </Router>
+      </SnackbarProvider>
     </AuthProvider>
   );
 };

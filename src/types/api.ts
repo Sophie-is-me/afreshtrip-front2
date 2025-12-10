@@ -228,7 +228,8 @@ export interface CreateOrderRequest {
 
 export interface PaymentResponse {
   success: boolean;
-  paymentUrl?: string;
+  paymentHtml?: string;
+  paymentUrl?: string; // Keep for backwards compatibility with Stripe
   orderNo?: string;
   errorMessage?: string;
   errorCode?: string;

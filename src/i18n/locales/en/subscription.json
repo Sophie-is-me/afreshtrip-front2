@@ -19,11 +19,30 @@
     "updateFailed": "Failed to update subscription. Please try again.",
     "cancelLoginRequired": "You must be logged in to cancel your subscription",
     "noSubscription": "No active subscription found",
-    "cancelFailed": "Failed to cancel subscription. Please try again."
+    "cancelFailed": "Failed to cancel subscription. Please try again.",
+    "paymentFailed": "Payment failed. Please try again.",
+    "popupBlocked": "Popup blocked. Please allow popups for this site.",
+    "paymentNotCompleted": "Payment was not completed successfully.",
+    "paymentStatusCheckFailed": "Failed to check payment status.",
+    "networkError": "Network error. Please check your connection.",
+    "timeout": "Request timed out. Please try again."
   },
   "success": {
     "updateSuccess": "Subscription updated successfully!",
-    "cancelSuccess": "Subscription cancelled successfully. Your access will continue until the end of the current billing period."
+    "cancelSuccess": "Subscription cancelled successfully. Your access will continue until the end of the current billing period.",
+    "paymentCompleted": "Payment completed successfully!"
+  },
+  "alipayPayment": "Alipay Payment",
+  "completePaymentInNewWindow": "Complete your payment in the new window that opened.",
+  "orderNumber": "Order Number",
+  "iveCompletedPayment": "I've Completed Payment",
+  "paymentWindowBlocked": "Payment window was blocked by your browser.",
+  "iframeFallbackNotice": "Using iframe fallback for payment.",
+  "loadingPayment": "Loading payment...",
+  "payment": {
+    "windowBlocked": "Popup blocked. Please allow popups for this site and try again.",
+    "redirecting": "Redirecting to payment...",
+    "processing": "Processing payment..."
   },
   "card": {
     "bestValue": "Best Value",
@@ -33,6 +52,13 @@
     "selectPlan": "Select Plan",
     "processing": "Processing...",
     "comparePlans": "Compare Plans"
+  },
+  "periods": {
+    "week": "week",
+    "month": "month",
+    "quarter": "quarter",
+    "year": "year",
+    "days": "days"
   },
   "plans": {
     "week": {

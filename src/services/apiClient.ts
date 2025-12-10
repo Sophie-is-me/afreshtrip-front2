@@ -5,7 +5,7 @@ import { UserService } from './api/userService';
 import { BlogService } from './api/blogService';
 import { PaymentService } from './api/paymentService';
 import { StorageService } from './api/storageService';
-import { SubscriptionService } from './api/subscriptionService';
+import { unifiedSubscriptionService } from './subscription/UnifiedSubscriptionService';
 import { FeatureService } from './api/featureService';
 
 // Import Types
@@ -23,11 +23,7 @@ import type {
   BlogDto,
   Comment,
   VipOrder,
-  VipType,
-  IPageUsers,
-  PaymentResponse,
-  AliPayDto,
-  PaymentStatusResponse
+  IPageUsers
 } from '../types/api';
 
 import type { FeatureId } from '../types/features';
@@ -51,7 +47,7 @@ export class ApiClient {
   private readonly blog: BlogService;
   private readonly payment: PaymentService;
   private readonly storage: StorageService;
-  private readonly subscription: SubscriptionService;
+  // Removed subscription service - now using unified service directly
   private readonly feature: FeatureService;
 
   constructor(baseUrl: string = API_BASE_URL) {
@@ -60,7 +56,7 @@ export class ApiClient {
     this.blog = new BlogService(baseUrl);
     this.payment = new PaymentService(baseUrl);
     this.storage = new StorageService(baseUrl);
-    this.subscription = new SubscriptionService(baseUrl);
+    // Removed subscription service - now using unified service directly
     this.feature = new FeatureService(baseUrl);
   }
 
@@ -173,93 +169,87 @@ export class ApiClient {
   // ============================================================================
 
   /**
-   * Step 1: Create VIP Order
-   * @param planId - 'week' | 'month' | 'year'
-   * @returns Promise with order details (orderNo, amount)
+   * Unified payment initiation (NEW)
+   * @param vipType - VIP_WEEK | VIP_MONTH | VIP_QUARTER | VIP_YEAR
+   * @param paymentMethod - ALIPAY | STRIPE
    */
-  createVipOrder(planId: string): Promise<{
+  initiatePayment(vipType: 'VIP_WEEK' | 'VIP_MONTH' | 'VIP_QUARTER' | 'VIP_YEAR', paymentMethod: 'ALIPAY' | 'STRIPE'): Promise<{
     success: boolean;
     orderNo: string;
-    amount: number;
+    paymentMethod: 'ALIPAY' | 'STRIPE';
+    paymentHtml?: string;
+    clientSecret?: string;
     errorMessage?: string;
+    errorCode?: string;
   }> {
-    return this.payment.createVipOrder(planId);
+    return this.payment.initiatePayment(vipType, paymentMethod);
   }
 
   /**
-   * Step 2: Initiate Alipay Payment with Order Details
-   * @param orderNo - Order number from Step 1
-   * @param amount - Payment amount from Step 1
-   * @param planId - Plan identifier
-   * @returns Promise with payment URL
-   */
-  initiateAlipayPaymentForOrder(orderNo: string, amount: number, planId: string): Promise<PaymentResponse> {
-    return this.payment.initiateAlipayPaymentForOrder(orderNo, amount, planId);
-  }
-
-  /**
-   * Step 4: Check Payment Status (for polling)
+   * Check payment status (UPDATED)
    * @param orderNo - Order number to check
-   * @returns Promise with payment status
    */
-  checkPaymentStatusForOrder(orderNo: string): Promise<{
+  checkPaymentStatus(orderNo: string): Promise<{
     success: boolean;
     isPaid: boolean;
-    status: number;
-    errorMessage?: string;
+    status: string;
+    orderNo: string;
+    message?: string;
   }> {
-    return this.payment.checkPaymentStatusForOrder(orderNo);
-  }
-
-  /**
-   * Step 2: Initiate Alipay Payment
-   * @param paymentData - Data returned from createVipOrder
-   */
-  initiateAliPayPayment(paymentData: AliPayDto): Promise<PaymentResponse> {
-    return this.payment.initiateAliPayPayment(paymentData);
-  }
-
-  /**
-   * Step 3: Check Payment Status
-   * @param orderNo - The order number to verify
-   */
-  checkPaymentStatus(orderNo: string): Promise<PaymentStatusResponse> {
     return this.payment.checkPaymentStatus(orderNo);
   }
 
   /**
-   * Step 4: Create Stripe Order (for Stripe payments)
-   * @param planId - 'week' | 'month' | 'year'
+   * Get subscription information (UPDATED)
    */
-  createStripeOrder(planId: string): Promise<PaymentResponse> {
-    return this.payment.createStripeOrder(planId);
-  }
-
-  getVipTypes(): Promise<VipType[]> {
-    return this.payment.getVipTypes();
-  }
-
-  getVipOrders(page?: number, size?: number): Promise<{
-    records: VipOrder[];
-    total: number;
-    size: number;
-    current: number;
-    pages: number;
+  getSubscriptionInfo(): Promise<{
+    success: boolean;
+    status?: 'active' | 'expired';
+    planId?: string;
+    vipTypeId?: string;
+    expiresAt?: string;
+    autoRenew?: boolean;
+    message?: string;
   }> {
-    return this.payment.getVipOrders(page, size);
+    return this.payment.getSubscription();
   }
 
-  cancelVipOrder(orderNo: string): Promise<boolean> {
-    return this.payment.cancelVipOrder(orderNo);
-  }
-
-  getSubscriptionStatus(): Promise<{
-    isSubscribed: boolean;
-    vipType?: VipType;
-    endTime?: string;
-    remainingDays?: number;
+  /**
+   * Activate free trial (NEW)
+   */
+  activateFreeTrial(): Promise<{
+    success: boolean;
+    message?: string;
+    errorMessage?: string;
   }> {
-    return this.payment.getSubscriptionStatus();
+    return this.payment.activateFreeTrial();
+  }
+
+  /**
+   * Get order history (UPDATED)
+   */
+  getOrders(page?: number, size?: number): Promise<{
+    success: boolean;
+    data?: {
+      records: VipOrder[];
+      total: number;
+      size: number;
+      current: number;
+      pages: number;
+    };
+    message?: string;
+  }> {
+    return this.payment.getOrders(page, size);
+  }
+
+  /**
+   * Delete/cancel order (UPDATED)
+   */
+  deleteOrder(orderNo: string): Promise<{
+    success: boolean;
+    message?: string;
+  }> {
+    return this.payment.deleteOrder(orderNo);
   }
 
   // ============================================================================
@@ -283,15 +273,34 @@ export class ApiClient {
   // ============================================================================
 
   getSubscription(userId: string): Promise<UserSubscription | null> {
-    return this.subscription.getUserSubscription(userId);
+    return unifiedSubscriptionService.getUserSubscription(userId);
   }
 
-  updateSubscription(userId: string, request: { planId: string; paymentMethodId?: string }): Promise<SubscriptionUpdateResult> {
-    return this.subscription.updateSubscription(userId, request.planId, request.paymentMethodId);
+  async updateSubscription(userId: string, request: { planId: string; paymentMethodId?: string }): Promise<SubscriptionUpdateResult> {
+    // Map to unified service method
+    const result = await unifiedSubscriptionService.purchaseVip(
+      userId, 
+      request.planId, 
+      request.paymentMethodId === 'stripe' ? 'stripe' : 'alipay'
+    );
+    return {
+      success: result.success,
+      subscription: result.success ? {
+        id: result.orderNo || `sub_${Date.now()}`,
+        userId,
+        planId: request.planId,
+        status: 'active' as const,
+        startDate: new Date(),
+        endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Default 30 days
+        autoRenew: true,
+        paymentMethodId: request.paymentMethodId || 'alipay'
+      } : {} as UserSubscription,
+      error: result.error
+    };
   }
 
   cancelSubscription(userId: string, reason?: string): Promise<void> {
-    return this.subscription.cancelSubscription(userId, reason);
+    return unifiedSubscriptionService.cancelSubscription(userId, reason);
   }
 
   // ============================================================================

@@ -19,11 +19,30 @@
     "updateFailed": "更新订阅失败。请重试。",
     "cancelLoginRequired": "您必须登录才能取消订阅",
     "noSubscription": "未找到活跃订阅",
-    "cancelFailed": "取消订阅失败。请重试。"
+    "cancelFailed": "取消订阅失败。请重试。",
+    "paymentFailed": "支付失败。请重试。",
+    "popupBlocked": "弹窗被阻止。请允许此网站的弹窗。",
+    "paymentNotCompleted": "支付未成功完成。",
+    "paymentStatusCheckFailed": "检查支付状态失败。",
+    "networkError": "网络错误。请检查您的连接。",
+    "timeout": "请求超时。请重试。"
   },
   "success": {
     "updateSuccess": "订阅更新成功！",
-    "cancelSuccess": "订阅取消成功。您的访问权限将持续到当前计费周期结束。"
+    "cancelSuccess": "订阅取消成功。您的访问权限将持续到当前计费周期结束。",
+    "paymentCompleted": "支付成功完成！"
+  },
+  "alipayPayment": "支付宝支付",
+  "completePaymentInNewWindow": "在新打开的窗口中完成您的支付。",
+  "orderNumber": "订单号",
+  "iveCompletedPayment": "我已完成支付",
+  "paymentWindowBlocked": "支付窗口被您的浏览器阻止。",
+  "iframeFallbackNotice": "使用iframe备用方案进行支付。",
+  "loadingPayment": "加载支付中...",
+  "payment": {
+    "windowBlocked": "弹窗被阻止。请允许此网站的弹窗并重试。",
+    "redirecting": "正在跳转到支付...",
+    "processing": "处理支付中..."
   },
   "card": {
     "bestValue": "最佳价值",
@@ -33,6 +52,13 @@
     "selectPlan": "选择计划",
     "processing": "处理中...",
     "comparePlans": "比较计划"
+  },
+  "periods": {
+    "week": "周",
+    "month": "月",
+    "quarter": "季度",
+    "year": "年",
+    "days": "天"
   },
   "plans": {
     "week": {

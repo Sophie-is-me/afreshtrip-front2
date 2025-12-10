@@ -43,7 +43,7 @@ const Profile: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-white">
-      <Header showIconButtons showNavLinks={false} />
+      <Header showNavLinks={false} />
       <main className="px-8 py-8">
         <div className="max-w-4xl mx-auto">
           <Breadcrumb

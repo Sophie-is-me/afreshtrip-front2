@@ -6,11 +6,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FiSettings, FiArrowLeft, FiImage, FiX, FiCheck, FiGlobe, FiLock, FiAlertCircle, FiList, FiLink, FiRefreshCcw, FiRefreshCw } from 'react-icons/fi';
 // import { useAuth } from '../contexts/AuthContext';
 import { useBlog } from '../contexts/BlogContext';
+import { useSnackbar } from '../contexts/SnackbarContext';
 import { useDebounce } from '../hooks/useDebounce';
 import FeatureGate from '../components/FeatureGate';
 import { FeatureId } from '../types/features';
 import PhotoLibrary from '../components/PhotoLibrary';
 import { CategoryService } from '../services/api/categoryService';
+import { i18nErrorHandler } from '../utils/i18nErrorHandler';
 
 // --- TIPTAP V3 IMPORTS ---
 import { useEditor, EditorContent } from '@tiptap/react';
@@ -38,6 +40,7 @@ const BlogEditor: React.FC = () => {
   const { t } = useTranslation();
   // const { user } = useAuth();
   const { createBlogPost, updateBlogPost, getBlogPostById } = useBlog();
+  const { showError, showSuccess } = useSnackbar();
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isPhotoLibraryOpen, setIsPhotoLibraryOpen] = useState(false);
@@ -46,7 +49,6 @@ const BlogEditor: React.FC = () => {
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [wordCount, setWordCount] = useState(0);
   const [readingTime, setReadingTime] = useState(0);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [isPreview, setIsPreview] = useState(false);
   
@@ -132,6 +134,12 @@ const BlogEditor: React.FC = () => {
           }
         } catch (error) {
           console.error('Error loading post:', error);
+          i18nErrorHandler.showErrorToUser(
+            error,
+            { component: 'BlogEditor', action: 'loadPost' },
+            [],
+            t.bind(t)
+          );
         }
       };
       loadPost();
@@ -152,6 +160,18 @@ const BlogEditor: React.FC = () => {
         setCategories(formattedCategories);
       } catch (err) {
         console.error('Error fetching categories:', err);
+        i18nErrorHandler.showErrorToUser(
+          err,
+          { component: 'BlogEditor', action: 'fetchCategories' },
+          [
+            {
+              label: t('common.retry'),
+              onClick: () => window.location.reload(),
+              style: 'primary'
+            }
+          ],
+          t.bind(t)
+        );
         // Fallback
         setCategories([
           { id: '1', name: 'Travel' },
@@ -165,13 +185,7 @@ const BlogEditor: React.FC = () => {
     fetchCategories();
   }, []);
 
-  // Auto-hide toast
-  useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => setToast(null), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [toast]);
+
 
   // Detect mobile
   useEffect(() => {
@@ -208,6 +222,12 @@ const BlogEditor: React.FC = () => {
         } else {
           setSaveStatus('error');
         }
+        i18nErrorHandler.showErrorToUser(
+          error,
+          { component: 'BlogEditor', action: 'autoSave' },
+          [],
+          t.bind(t)
+        );
       }
     };
 
@@ -217,8 +237,8 @@ const BlogEditor: React.FC = () => {
   // --- HANDLERS ---
   const onSubmit = async (data: BlogFormValues) => {
     if (!data.title.trim()) {
-        setToast({ message: t('blog.titleRequired'), type: 'error' });
-        return;
+      showError(t('blog.titleRequired', 'Title is required'));
+      return;
     }
 
     setSaveStatus('saving');
@@ -236,20 +256,33 @@ const BlogEditor: React.FC = () => {
       if (postId) {
         await updateBlogPost(postId, payload);
         setSaveStatus('saved');
+        showSuccess(t('blog.postUpdated', 'Post updated successfully!'));
       } else {
         const newId = await createBlogPost(payload);
         setPostId(newId);
         window.history.replaceState(null, '', `?edit=${newId}`);
         setSaveStatus('saved');
+        showSuccess(t('blog.postCreated', 'Post created successfully!'));
       }
     } catch (error) {
       console.error('Save failed:', error);
       if (error instanceof SubscriptionRequiredError) {
         setSaveStatus('forbidden');
-        setToast({ message: t('blog.upgradeRequired', 'Subscription required to save changes.'), type: 'error' });
       } else {
         setSaveStatus('error');
       }
+      i18nErrorHandler.showErrorToUser(
+        error,
+        { component: 'BlogEditor', action: 'onSubmit' },
+        error instanceof SubscriptionRequiredError ? [
+          {
+            label: t('common.contactSupport'),
+            onClick: () => navigate('/subscription'),
+            style: 'secondary'
+          }
+        ] : [],
+        t.bind(t)
+      );
     }
   };
 
@@ -271,9 +304,26 @@ const BlogEditor: React.FC = () => {
         
         if (error instanceof SubscriptionRequiredError) {
           setSaveStatus('forbidden');
-          setToast({ message: t('blog.upgradeRequired', 'Subscription required to publish.'), type: 'error' });
+          i18nErrorHandler.showErrorToUser(
+            error,
+            { component: 'BlogEditor', action: 'handlePublishToggle' },
+            [
+              {
+                label: t('common.contactSupport'),
+                onClick: () => navigate('/subscription'),
+                style: 'secondary'
+              }
+            ],
+            t.bind(t)
+          );
         } else {
           setSaveStatus('error');
+          i18nErrorHandler.showErrorToUser(
+            error,
+            { component: 'BlogEditor', action: 'handlePublishToggle' },
+            [],
+            t.bind(t)
+          );
         }
       }
     }
@@ -690,22 +740,6 @@ const BlogEditor: React.FC = () => {
           onClose={() => setIsPhotoLibraryOpen(false)}
           onInsert={insertImageFromLibrary}
         />
-
-        {/* Toast Notification */}
-        <AnimatePresence>
-          {toast && (
-            <motion.div
-              initial={{ opacity: 0, y: -50 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -50 }}
-              className={`fixed top-4 right-4 z-50 px-4 py-2 rounded-lg shadow-lg text-white ${
-                toast.type === 'error' ? 'bg-red-500' : 'bg-green-500'
-              }`}
-            >
-              {toast.message}
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
     </FeatureGate>
   );

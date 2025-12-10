@@ -12,9 +12,11 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { subscriptionPlansData, type SubscriptionPlan, type UserSubscription } from '../types/subscription';
 import { apiClient } from '../services/apiClient';
-import { subscriptionService } from '../services/subscriptionService'; // Import the high-level orchestrator
+import { unifiedSubscriptionService } from '../services/subscription/UnifiedSubscriptionService'; // Use unified service
 import type { SubscriptionPlanResponse } from '../types/api';
 import { useTranslation } from 'react-i18next';
+import { useSnackbar } from '../contexts/SnackbarContext';
+import { i18nErrorHandler } from '../utils/i18nErrorHandler';
 
 /**
  * Transform backend subscription plan response to frontend format
@@ -40,14 +42,23 @@ const transformBackendPlanToFrontend = (backendPlan: SubscriptionPlanResponse): 
 export const useSubscription = () => {
   const { user } = useAuth();
   const { i18n } = useTranslation();
+  const { showSuccess } = useSnackbar();
+
+  // Local error handler wrapper to reduce repetitive code
+  const showError = useCallback((error: unknown, action: string) => {
+    i18nErrorHandler.showErrorToUser(
+      error instanceof Error ? error : new Error('Unknown error'),
+      { component: 'useSubscription', action },
+      [],
+      i18n.t.bind(i18n)
+    );
+  }, [i18n]);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [userSubscription, setUserSubscription] = useState<UserSubscription | null>(null);
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
-  const [errorKey, setErrorKey] = useState<string | null>(null);
-  const [successKey, setSuccessKey] = useState<string | null>(null);
   const [showPaymentMethodSelection, setShowPaymentMethodSelection] = useState(false);
   const [pendingPlanId, setPendingPlanId] = useState<string | null>(null);
 
@@ -67,7 +78,6 @@ export const useSubscription = () => {
     const fetchSubscriptionData = async () => {
       try {
         setIsLoading(true);
-        setErrorKey(null);
 
         // Load plans from backend API
         try {
@@ -88,7 +98,7 @@ export const useSubscription = () => {
           } else {
             // In production, set empty plans and show error
             setPlans([]);
-            setErrorKey('subscription.error.loadFailed');
+            showError('Failed to load subscription plans', 'fetchPlans');
           }
         }
 
@@ -126,8 +136,7 @@ export const useSubscription = () => {
           subscriptionCache.current.timestamp = 0;
         }
       } catch (err) {
-        setErrorKey('subscription.error.loadFailed');
-        console.error('Error fetching subscription data:', err);
+        showError(err, 'fetchSubscriptionData');
       } finally {
         setIsLoading(false);
       }
@@ -139,30 +148,28 @@ export const useSubscription = () => {
   // 2. Handle Plan Selection - Just selects the plan for preview
   const handlePlanSelect = useCallback((planId: string) => {
     setSelectedPlanId(planId);
-    setErrorKey(null);
-    setSuccessKey(null);
   }, []);
 
   // 3. Handle Plan Purchase - Shows payment method selection modal
   const handlePlanUpdate = useCallback((planId: string) => {
     if (!user) {
-      setErrorKey('subscription.error.loginRequired');
+      showError('Authentication required', 'handlePlanUpdate');
       return;
     }
 
     if (userSubscription?.planId === planId) {
-      setErrorKey('subscription.error.alreadySubscribed');
+      showError('Already subscribed to this plan', 'handlePlanUpdate');
       return;
     }
 
     const selectedPlan = plans.find(p => p.planId === planId);
     if (!selectedPlan) {
-      setErrorKey('subscription.error.planNotFound');
+      showError('Plan not found', 'handlePlanUpdate');
       return;
     }
 
     if (selectedPlan.isDisabled) {
-      setErrorKey('subscription.error.planDisabled');
+      showError('Plan is disabled', 'handlePlanUpdate');
       return;
     }
 
@@ -174,43 +181,41 @@ export const useSubscription = () => {
   // 4. Handle Payment Method Selection and Processing
   const handlePaymentMethodSelect = useCallback(async (planId: string, paymentMethod: 'alipay' | 'stripe') => {
     if (!user) {
-      setErrorKey('subscription.error.loginRequired');
+      showError('Authentication required', 'handlePaymentMethodSelect');
       return;
     }
 
     if (userSubscription?.planId === planId) {
-      setErrorKey('subscription.error.alreadySubscribed');
+      showError('Already subscribed to this plan', 'handlePaymentMethodSelect');
       return;
     }
 
     const selectedPlan = plans.find(p => p.planId === planId);
     if (!selectedPlan) {
-      setErrorKey('subscription.error.planNotFound');
+      showError('Plan not found', 'handlePaymentMethodSelect');
       return;
     }
 
     if (selectedPlan.isDisabled) {
-      setErrorKey('subscription.error.planDisabled');
+      showError('Plan is disabled', 'handlePaymentMethodSelect');
       return;
     }
 
     try {
       setIsUpdating(true);
-      setErrorKey(null);
-      setSuccessKey(null);
 
       // Close the payment method selection modal
       setShowPaymentMethodSelection(false);
       setPendingPlanId(null);
 
-      // Call the high-level service to orchestrate the payment flow
-      const result = await subscriptionService.purchaseVip(
+      // Call the unified service to orchestrate the payment flow
+      const result = await unifiedSubscriptionService.purchaseVip(
         user.uid,
         planId,
         paymentMethod
       );
 
-      if (result.success && result.paymentUrl) {
+      if (result.success) {
         // Store payment context for return handling
         sessionStorage.setItem('pendingPayment', JSON.stringify({
           orderNo: result.orderNo,
@@ -219,27 +224,115 @@ export const useSubscription = () => {
           timestamp: Date.now()
         }));
 
-        // REDIRECT TO PAYMENT PROVIDER
-        // The user will leave the app and return to the callback URL
-        window.location.href = result.paymentUrl;
-      } else {
-        setErrorKey(result.error || 'subscription.error.paymentFailed');
-        setIsUpdating(false); // Only stop loading if we didn't redirect
-      }
-    } catch (err) {
-      console.error('Error initiating payment:', err);
-      if (err instanceof Error) {
-        // Handle specific error types
-        if (err.message.includes('network') || err.message.includes('fetch')) {
-          setErrorKey('subscription.error.networkError');
-        } else if (err.message.includes('timeout')) {
-          setErrorKey('subscription.error.timeout');
+        if (paymentMethod === 'alipay' && result.paymentHtml) {
+          // FIXED ALIPAY FLOW: Open payment window immediately to avoid popup blocker
+          const paymentWindow = window.open('', '_blank', 'width=800,height=600');
+          if (paymentWindow) {
+            // Show loading state immediately in the new window
+            const loadingHtml = `
+              <!DOCTYPE html>
+              <html>
+                <head>
+                  <meta charset="UTF-8">
+                  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                  <title>Alipay Payment</title>
+                  <style>
+                    body { margin: 0; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+                    .loading { text-align: center; padding: 50px; color: #666; }
+                    .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 20px; }
+                    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+                  </style>
+                </head>
+                <body>
+                  <div class="loading">
+                    <div class="spinner"></div>
+                    <h2>Processing Payment...</h2>
+                    <p>Please wait while we prepare your payment page.</p>
+                  </div>
+                </body>
+              </html>
+            `;
+            
+            paymentWindow.document.write(loadingHtml);
+            paymentWindow.document.close();
+            
+            // Now make the API call (window is already open, so no popup blocker)
+            try {
+              // Wrap the HTML content in a proper document structure
+              const fullHtml = `
+                <!DOCTYPE html>
+                <html>
+                  <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Alipay Payment</title>
+                    <style>
+                      body { margin: 0; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+                      .success { text-align: center; padding: 50px; color: #27ae60; }
+                    </style>
+                  </head>
+                  <body>
+                    <div class="success">
+                      <h2>Payment Ready!</h2>
+                      <p>Complete your payment in the Alipay window.</p>
+                    </div>
+                    ${result.paymentHtml}
+                  </body>
+                </html>
+              `;
+              
+              paymentWindow.document.write(fullHtml);
+              paymentWindow.document.close();
+              
+              // Monitor window close and check payment status
+              const checkClosed = setInterval(() => {
+                if (paymentWindow.closed) {
+                  clearInterval(checkClosed);
+                  setIsUpdating(false);
+                  // Check payment status after window closes
+                  handlePaymentReturn(result.orderNo!);
+                }
+              }, 1000);
+              
+              setIsUpdating(false);
+            } catch (error) {
+              console.error('Error writing payment content to window:', error);
+              paymentWindow.document.write('<html><body><h2>Error loading payment</h2></body></html>');
+              paymentWindow.document.close();
+              showError('Failed to load payment page', 'handlePaymentMethodSelect');
+              setIsUpdating(false);
+            }
+          } else {
+            showError('Popup blocked. Please allow popups for this site to complete payment.', 'handlePaymentMethodSelect');
+            setIsUpdating(false);
+          }
+        } else if (paymentMethod === 'stripe' && result.clientSecret) {
+          // NEW STRIPE FLOW: Use Stripe.js for on-site payment confirmation
+          console.log('Stripe client secret received:', result.clientSecret);
+          
+          // TODO: Implement proper Stripe.js integration
+          // For now, we'll show an error since this requires Stripe.js setup
+          showError(
+            'Stripe payment processing requires additional setup. Please contact support.',
+            'handlePaymentMethodSelect'
+          );
+          setIsUpdating(false);
+          
+          // Alternative: If backend supports it, we could redirect to a Stripe-hosted page
+          // window.location.href = `/payment-result?orderNo=${result.orderNo}&clientSecret=${result.clientSecret}`;
+        } else if (paymentMethod === 'stripe' && result.paymentUrl) {
+          // LEGACY STRIPE FLOW: Redirect to payment URL
+          window.location.href = result.paymentUrl;
         } else {
-          setErrorKey('subscription.error.paymentFailed');
+          showError('Payment failed - no payment data received', 'handlePaymentMethodSelect');
+          setIsUpdating(false);
         }
       } else {
-        setErrorKey('subscription.error.updateFailed');
+        showError(result.error || 'Payment failed', 'handlePaymentMethodSelect');
+        setIsUpdating(false);
       }
+    } catch (err) {
+      showError(err, 'handlePaymentMethodSelect');
       setIsUpdating(false);
     }
     // Note: If success, we don't set isUpdating(false) because the page is unloading/redirecting
@@ -248,28 +341,32 @@ export const useSubscription = () => {
   // 5. Cancel Subscription
   const handleCancelSubscription = useCallback(async (reason?: string) => {
     if (!user) {
-      setErrorKey('subscription.error.cancelLoginRequired');
+      showError('Authentication required to cancel subscription', 'handleCancelSubscription');
       return;
     }
 
     if (!userSubscription) {
-      setErrorKey('subscription.error.noSubscription');
+      showError('No active subscription found', 'handleCancelSubscription');
       return;
     }
 
     try {
       setIsCancelling(true);
-      setErrorKey(null);
-      setSuccessKey(null);
 
       await apiClient.cancelSubscription(user.uid, reason);
 
       // Optimistic update
       setUserSubscription(prev => prev ? { ...prev, autoRenew: false } : null);
-      setSuccessKey('subscription.success.cancelSuccess');
+      showSuccess(
+        i18n.t('subscription.success.cancelSuccess') || 'Subscription cancelled successfully. Your access will continue until the end of the current billing period.'
+      );
     } catch (err) {
-      setErrorKey('subscription.error.cancelFailed');
-      console.error('Error cancelling subscription:', err);
+      i18nErrorHandler.showErrorToUser(
+        err,
+        { component: 'useSubscription', action: 'handleCancelSubscription' },
+        [],
+        i18n.t.bind(i18n)
+      );
     } finally {
       setIsCancelling(false);
     }
@@ -296,7 +393,29 @@ export const useSubscription = () => {
     }
   }, [user]);
 
-  // 7. Close Payment Method Selection Modal
+  // 7. Handle Payment Return Status Check
+  const handlePaymentReturn = useCallback(async (orderNo: string) => {
+    try {
+      setIsLoading(true);
+      const result = await unifiedSubscriptionService.handlePaymentReturn(user?.uid || '', orderNo);
+      
+      if (result.success && result.subscription) {
+        // Payment successful, update user subscription
+        await refreshSubscription();
+        showSuccess(
+          i18n.t('subscription.success.paymentCompleted') || 'Payment completed successfully!'
+        );
+      } else {
+        showError(result.error || 'Payment not completed', 'handlePaymentReturn');
+      }
+    } catch (error) {
+      showError(error, 'handlePaymentReturn');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user, refreshSubscription]);
+
+  // 8. Close Payment Method Selection Modal
   const closePaymentMethodSelection = useCallback(() => {
     setShowPaymentMethodSelection(false);
     setPendingPlanId(null);
@@ -309,8 +428,6 @@ export const useSubscription = () => {
     isLoading,
     isUpdating,
     isCancelling,
-    errorKey,
-    successKey,
     showPaymentMethodSelection,
     pendingPlanId,
     handlePlanSelect,
@@ -318,6 +435,7 @@ export const useSubscription = () => {
     handlePaymentMethodSelect,
     handleCancelSubscription,
     refreshSubscription,
+    handlePaymentReturn,
     closePaymentMethodSelection
   }), [
     selectedPlanId, 
@@ -325,9 +443,7 @@ export const useSubscription = () => {
     plans, 
     isLoading, 
     isUpdating, 
-    isCancelling, 
-    errorKey, 
-    successKey,
+    isCancelling,
     showPaymentMethodSelection,
     pendingPlanId,
     handlePlanSelect, 
@@ -335,6 +451,7 @@ export const useSubscription = () => {
     handlePaymentMethodSelect, 
     handleCancelSubscription, 
     refreshSubscription,
+    handlePaymentReturn,
     closePaymentMethodSelection
   ]);
 };

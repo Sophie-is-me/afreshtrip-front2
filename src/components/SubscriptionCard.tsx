@@ -31,11 +31,11 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
 
   const getPeriod = (durationDays: number) => {
     switch (durationDays) {
-      case 7: return 'week';
-      case 30: return 'month';
-      case 90: return 'quarter';
-      case 365: return 'year';
-      default: return `${durationDays} days`;
+      case 7: return t('subscription.periods.week');
+      case 30: return t('subscription.periods.month');
+      case 90: return t('subscription.periods.quarter');
+      case 365: return t('subscription.periods.year');
+      default: return `${durationDays} ${t('subscription.periods.days')}`;
     }
   };
 

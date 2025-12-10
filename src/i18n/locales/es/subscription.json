@@ -19,11 +19,30 @@
     "updateFailed": "Error al actualizar la suscripción. Por favor, inténtalo de nuevo.",
     "cancelLoginRequired": "Debes iniciar sesión para cancelar tu suscripción",
     "noSubscription": "No se encontró suscripción activa",
-    "cancelFailed": "Error al cancelar la suscripción. Por favor, inténtalo de nuevo."
+    "cancelFailed": "Error al cancelar la suscripción. Por favor, inténtalo de nuevo.",
+    "paymentFailed": "El pago falló. Por favor, inténtalo de nuevo.",
+    "popupBlocked": "Ventana emergente bloqueada. Por favor, permite ventanas emergentes para este sitio.",
+    "paymentNotCompleted": "El pago no se completó exitosamente.",
+    "paymentStatusCheckFailed": "Error al verificar el estado del pago.",
+    "networkError": "Error de red. Por favor, verifica tu conexión.",
+    "timeout": "La solicitud expiró. Por favor, inténtalo de nuevo."
   },
   "success": {
     "updateSuccess": "¡Suscripción actualizada exitosamente!",
-    "cancelSuccess": "Suscripción cancelada exitosamente. Tu acceso continuará hasta el final del período de facturación actual."
+    "cancelSuccess": "Suscripción cancelada exitosamente. Tu acceso continuará hasta el final del período de facturación actual.",
+    "paymentCompleted": "¡Pago completado exitosamente!"
+  },
+  "alipayPayment": "Pago con Alipay",
+  "completePaymentInNewWindow": "Completa tu pago en la nueva ventana que se abrió.",
+  "orderNumber": "Número de Pedido",
+  "iveCompletedPayment": "He Completado el Pago",
+  "paymentWindowBlocked": "La ventana de pago fue bloqueada por tu navegador.",
+  "iframeFallbackNotice": "Usando alternativa iframe para el pago.",
+  "loadingPayment": "Cargando pago...",
+  "payment": {
+    "windowBlocked": "Ventana emergente bloqueada. Por favor, permite ventanas emergentes para este sitio e inténtalo de nuevo.",
+    "redirecting": "Redirigiendo al pago...",
+    "processing": "Procesando pago..."
   },
   "card": {
     "bestValue": "Mejor valor",
@@ -33,6 +52,13 @@
     "selectPlan": "Seleccionar plan",
     "processing": "Procesando...",
     "comparePlans": "Comparar planes"
+  },
+  "periods": {
+    "week": "semana",
+    "month": "mes",
+    "quarter": "trimestre",
+    "year": "año",
+    "days": "días"
   },
   "plans": {
     "week": {

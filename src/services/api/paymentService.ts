@@ -1,17 +1,9 @@
 import { HttpClient } from './httpClient';
-import type {
-  ApiResponse,
-  VipOrder,
-  VipType,
-  ResultIPageVipOrder,
-  ResultListVipType,
-  PaymentResponse,
-  AliPayDto,
-  PaymentStatusResponse
-} from '../../types/api';
+import type { VipOrder } from '../../types/api';
 
 /**
- * Payment service for handling payment-related endpoints
+ * New unified Payment Service for the refactored backend
+ * Uses single endpoint: /api/v1/payments/*
  */
 export class PaymentService extends HttpClient {
   constructor(baseUrl: string) {
@@ -19,97 +11,201 @@ export class PaymentService extends HttpClient {
   }
 
   /**
-   * Step 1: Create VIP Order
-   * Returns order details (orderNo, amount, etc.) that are needed for payment initiation
+   * Unified payment initiation for both Alipay and Stripe
+   * Replaces: /alipay/api/initiate-payment, /api/v1/vip/orders/*
    */
-  async createVipOrder(planId: string): Promise<{
+  async initiatePayment(vipType: 'VIP_WEEK' | 'VIP_MONTH' | 'VIP_QUARTER' | 'VIP_YEAR', paymentMethod: 'ALIPAY' | 'STRIPE'): Promise<{
     success: boolean;
     orderNo: string;
-    amount: number;
+    paymentMethod: 'ALIPAY' | 'STRIPE';
+    paymentHtml?: string;
+    clientSecret?: string;
     errorMessage?: string;
+    errorCode?: string;
   }> {
     try {
-      // Step 1: Create a unique order identifier for backend tracking
-      // In a real implementation, this would come from a proper backend order creation endpoint
-      const orderNo = `VIP_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
-      const amount = this.getPlanPrice(planId);
-      
-      return {
-        success: true,
-        orderNo,
-        amount,
-        errorMessage: undefined
-      };
+      const response = await this.post<{
+        success: boolean;
+        orderNo: string;
+        paymentMethod: 'ALIPAY' | 'STRIPE';
+        paymentHtml?: string;
+        clientSecret?: string;
+        errorMessage?: string;
+        errorCode?: string;
+      }>('/api/v1/payments/initiate', {
+        vipType,
+        paymentMethod
+      });
+
+      return response;
     } catch (error) {
       return {
         success: false,
         orderNo: '',
-        amount: 0,
-        errorMessage: error instanceof Error ? error.message : 'Failed to create order'
+        paymentMethod: paymentMethod,
+        errorMessage: error instanceof Error ? error.message : 'Payment initiation failed',
+        errorCode: 'NETWORK_ERROR'
       };
     }
   }
 
   /**
-   * Step 2: Initiate Alipay Payment with Order Details
-   * Uses order details from Step 1 to get payment URL
+   * Check payment status for an order
+   * Replaces: /alipay/api/check-payment-status
    */
-  async initiateAlipayPaymentForOrder(orderNo: string, amount: number, planId: string): Promise<PaymentResponse> {
-    return this.initiateAliPayPayment({
-      out_trade_no: orderNo,
-      total_amount: amount,
-      subject: `VIP ${planId} Subscription`
-    });
-  }
-
-  /**
-   * Step 4: Check Payment Status (for polling)
-   * Verify payment completion status
-   */
-  async checkPaymentStatusForOrder(orderNo: string): Promise<{
+  async checkPaymentStatus(orderNo: string): Promise<{
     success: boolean;
     isPaid: boolean;
-    status: number;
-    errorMessage?: string;
+    status: string;
+    orderNo: string;
+    message?: string;
   }> {
     try {
-      const response = await this.checkPaymentStatus(orderNo);
-      
-      return {
-        success: true,
-        isPaid: response.success && response.status === 1,
-        status: response.status || 0,
-        errorMessage: undefined
-      };
+      const response = await this.get<{
+        success: boolean;
+        isPaid: boolean;
+        status: string;
+        orderNo: string;
+        message?: string;
+      }>(`/api/v1/payments/status/${orderNo}`);
+
+      return response;
     } catch (error) {
       return {
         success: false,
         isPaid: false,
-        status: -1,
-        errorMessage: error instanceof Error ? error.message : 'Failed to check payment status'
+        status: 'unknown',
+        orderNo,
+        message: error instanceof Error ? error.message : 'Failed to check payment status'
       };
     }
   }
 
   /**
-   * Get plan price based on planId
+   * Get current subscription information
+   * Replaces: subscriptionService.getUserSubscription logic
    */
-  private getPlanPrice(planId: string): number {
-    const pricing: Record<string, number> = {
-      'week': 9.99,
-      'month': 29.99,
-      'year': 299.99
-    };
-    return pricing[planId] || 29.99;
+  async getSubscription(): Promise<{
+    success: boolean;
+    status?: 'active' | 'expired';
+    planId?: string;
+    vipTypeId?: string;
+    expiresAt?: string;
+    autoRenew?: boolean;
+    message?: string;
+  }> {
+    try {
+      const response = await this.get<{
+        success: boolean;
+        status?: 'active' | 'expired';
+        planId?: string;
+        vipTypeId?: string;
+        expiresAt?: string;
+        autoRenew?: boolean;
+        message?: string;
+      }>('/api/v1/payments/subscription');
+
+      return response;
+    } catch (error) {
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to get subscription info'
+      };
+    }
   }
 
   /**
-   * Map frontend planId to backend VIP type enum
+   * Activate free trial
+   * Replaces: existing trial activation logic
    */
-  private mapPlanIdToVipTypeEnum(planId: string): string {
-    const mapping: Record<string, string> = {
+  async activateFreeTrial(): Promise<{
+    success: boolean;
+    message?: string;
+    errorMessage?: string;
+  }> {
+    try {
+      const response = await this.post<{
+        success: boolean;
+        message?: string;
+        errorMessage?: string;
+      }>('/api/v1/payments/trial');
+
+      return response;
+    } catch (error) {
+      return {
+        success: false,
+        errorMessage: error instanceof Error ? error.message : 'Failed to activate free trial'
+      };
+    }
+  }
+
+  /**
+   * Get order history
+   * Replaces: /api/v1/vip/orders
+   */
+  async getOrders(currentPage: number = 1, pageSize: number = 10): Promise<{
+    success: boolean;
+    data?: {
+      records: VipOrder[];
+      total: number;
+      size: number;
+      current: number;
+      pages: number;
+    };
+    message?: string;
+  }> {
+    try {
+      const response = await this.get<{
+        success: boolean;
+        data: {
+          records: VipOrder[];
+          total: number;
+          size: number;
+          current: number;
+          pages: number;
+        };
+        message?: string;
+      }>(`/api/v1/payments/orders?current=${currentPage}&size=${pageSize}`);
+
+      return response;
+    } catch (error) {
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to get order history'
+      };
+    }
+  }
+
+  /**
+   * Delete/cancel an unpaid order
+   * Replaces: /api/v1/vip/orders/{orderNo}
+   */
+  async deleteOrder(orderNo: string): Promise<{
+    success: boolean;
+    message?: string;
+  }> {
+    try {
+      const response = await this.delete<{
+        success: boolean;
+        message?: string;
+      }>(`/api/v1/payments/orders/${orderNo}`);
+
+      return response;
+    } catch (error) {
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to delete order'
+      };
+    }
+  }
+
+  /**
+   * Helper method to map frontend plan IDs to backend VIP types
+   */
+  mapPlanIdToVipType(planId: string): 'VIP_WEEK' | 'VIP_MONTH' | 'VIP_QUARTER' | 'VIP_YEAR' {
+    const mapping: Record<string, 'VIP_WEEK' | 'VIP_MONTH' | 'VIP_QUARTER' | 'VIP_YEAR'> = {
       'week': 'VIP_WEEK',
-      'month': 'VIP_MONTH',
+      'month': 'VIP_MONTH', 
       'quarter': 'VIP_QUARTER',
       'year': 'VIP_YEAR'
     };
@@ -117,129 +213,9 @@ export class PaymentService extends HttpClient {
   }
 
   /**
-   * Step 2: Initiate Alipay Payment
-   * Endpoint: POST /alipay/api/initiate-payment
+   * Helper method to map frontend payment methods to backend format
    */
-  async initiateAliPayPayment(paymentData: AliPayDto): Promise<PaymentResponse> {
-    // This returns the success status and the paymentUrl (form/link from Alipay)
-    return this.post<PaymentResponse>('/alipay/api/initiate-payment', paymentData);
-  }
-
-  /**
-   * Step 4: Create Stripe Order
-   * Endpoint: POST /api/v1/vip/orders/stripe
-   */
-  async createStripeOrder(planId: string): Promise<PaymentResponse> {
-    const vipTypeEnum = this.mapPlanIdToVipTypeEnum(planId);
-    const response = await this.post<{
-      code: number;
-      message: string;
-      data: Record<string, unknown>;
-    }>(`/api/v1/vip/orders/stripe?vipTypeEnum=${vipTypeEnum}`);
-    
-    // For now, return a mock response until Stripe integration is properly implemented
-    return {
-      success: response.code === 200,
-      paymentUrl: response.code === 200 ? '/api/stripe-payment-page' : undefined,
-      orderNo: `STRIPE_${Date.now()}`,
-      errorMessage: response.code !== 200 ? response.message : undefined,
-      errorCode: response.code !== 200 ? 'STRIPE_ERROR' : undefined
-    };
-  }
-
-  /**
-   * Step 3: Check Payment Status
-   * Endpoint: GET /alipay/api/check-payment-status
-   */
-  async checkPaymentStatus(orderNo: string): Promise<PaymentStatusResponse> {
-    return this.get<PaymentStatusResponse>(`/alipay/api/check-payment-status?orderNo=${orderNo}`);
-  }
-
-  /**
-   * Get VIP types
-   */
-  async getVipTypes(): Promise<VipType[]> {
-    const response = await this.get<ResultListVipType>('/admin/vipType/getVipType');
-    return response.data;
-  }
-
-  /**
-   * Get VIP order history
-   */
-  async getVipOrders(page: number = 1, size: number = 10): Promise<{
-    records: VipOrder[];
-    total: number;
-    size: number;
-    current: number;
-    pages: number;
-  }> {
-    const response = await this.get<ResultIPageVipOrder>(
-      `/api/v1/vip/orders?current=${page}&size=${size}`
-    );
-    return response.data;
-  }
-
-  /**
-   * Cancel VIP order
-   */
-  async cancelVipOrder(orderNo: string): Promise<boolean> {
-    const response = await this.delete<{
-      code: number;
-      message: string;
-      data: boolean;
-      timestamp?: number;
-    }>(`/api/v1/vip/orders/${orderNo}`);
-    return response.data;
-  }
-
-  /**
-   * Get Subscription Status (Legacy/Supplemental check)
-   * Note: The primary source of truth is now /subscriptions/me via SubscriptionService
-   */
-  async getSubscriptionStatus(): Promise<{
-    isSubscribed: boolean;
-    vipType?: VipType;
-    endTime?: string;
-    remainingDays?: number;
-  }> {
-    const response = await this.get<{
-      code: number;
-      message: string;
-      data: string;
-      timestamp?: number;
-    }>('/api/v1/vip/expiration');
-    
-    const endTime = response.data;
-    const isSubscribed = endTime && new Date(endTime) > new Date();
-    const remainingDays = isSubscribed ? Math.ceil((new Date(endTime).getTime() - Date.now()) / 86400000) : undefined;
-    return {
-      isSubscribed: !!isSubscribed,
-      endTime,
-      remainingDays
-    };
-  }
-
-  // --- Deprecated / Legacy Methods ---
-  
-  /**
-   * @deprecated Use generateAliPayUrl is replaced by the new initiateAliPayPayment flow
-   */
-  async generateAliPayUrl(params: {
-    orderNo: string;
-    amount: number;
-    subject: string;
-  }): Promise<ApiResponse<{
-    success: boolean;
-    paymentUrl: string;
-    orderNo: string;
-    errorMessage?: string;
-    errorCode?: string;
-  }>> {
-    const queryParams = new URLSearchParams({
-      orderNo: params.orderNo,
-      amount: params.amount.toString(),
-      subject: params.subject,
-    });
-    return this.get(`/alipay/api/payment-url?${queryParams}`, { requiresAuth: false });
+  mapPaymentMethodToBackend(paymentMethod: 'alipay' | 'stripe'): 'ALIPAY' | 'STRIPE' {
+    return paymentMethod === 'alipay' ? 'ALIPAY' : 'STRIPE';
   }
 }

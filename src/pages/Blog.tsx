@@ -5,10 +5,12 @@ import Footer from '../components/Footer';
 import GalleryCard from '../components/GalleryCard';
 import { useTranslation } from 'react-i18next';
 import { useBlog } from '../contexts/BlogContext';
+import { useSnackbar } from '../contexts/SnackbarContext';
 import { NewsletterService } from '../services/api/newsletterService';
 import { CategoryService } from '../services/api/categoryService';
 import { newsletterSchema, sanitizeText } from '../utils/validationSchemas';
 import { useDebounce } from '../hooks/useDebounce';
+import { i18nErrorHandler } from '../utils/i18nErrorHandler';
 import type { BlogPost } from '../types/blog';
 import type { Category } from '../services/api/categoryService';
 
@@ -19,22 +21,7 @@ const LoadingSpinner: React.FC = () => (
   </div>
 );
 
-const ErrorMessage: React.FC<{ message: string; onRetry?: () => void }> = ({ message, onRetry }) => {
-  const { t } = useTranslation();
-  return <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg my-8 max-w-2xl mx-auto">
-    <div className="flex items-center">
-      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-      </svg>
-      <span>{message}</span>
-      {onRetry && (
-        <button onClick={onRetry} className="ml-auto underline font-medium">
-          {t('common.retry')}
-        </button>
-      )}
-    </div>
-  </div>
-;}
+
 
 const EmptyState: React.FC = () => {
   const { t } = useTranslation();
@@ -52,8 +39,8 @@ const EmptyState: React.FC = () => {
 const Blog: React.FC = () => {
   const { t } = useTranslation();
   const { getBlogPostsPaginated } = useBlog();
+  const { showSuccess } = useSnackbar();
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
   const [totalPosts, setTotalPosts] = useState(0);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -67,17 +54,17 @@ const Blog: React.FC = () => {
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [email, setEmail] = useState('');
   const [isSubscribed, setIsSubscribed] = useState(false);
-  const [newsletterError, setNewsletterError] = useState<string | null>(null);
+
   const [newsletterLoading, setNewsletterLoading] = useState(false);
   const postsRef = useRef<HTMLDivElement>(null);
   const newsletterService = new NewsletterService(import.meta.env.VITE_API_BASE_URL || '');
-  const categoryService = new CategoryService(import.meta.env.VITE_API_BASE_URL || '');
 
   // Debounce search term
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
   // Fetch categories
   useEffect(() => {
+    const categoryService = new CategoryService(import.meta.env.VITE_API_BASE_URL || '');
     const fetchCategories = async () => {
       try {
         const fetchedCategories = await categoryService.getCategories();
@@ -99,20 +86,20 @@ const Blog: React.FC = () => {
     };
 
     fetchCategories();
-  }, [categoryService]);
+  }, []);
 
   // Fetch blog posts with pagination
   useEffect(() => {
     const fetchBlogPosts = async () => {
       try {
         setLoading(true);
-        setError(null);
         const { posts, total } = await getBlogPostsPaginated(currentPage, postsPerPage);
         setBlogPosts(posts);
         setTotalPosts(total);
       } catch (err) {
         console.error('Error fetching blog posts:', err);
-        setError(t('blog.errorLoadingPosts'));
+        // Since the context now handles errors gracefully, we just log them
+        // The UI will show empty state if no posts are available
       } finally {
         setLoading(false);
       }
@@ -193,7 +180,6 @@ const Blog: React.FC = () => {
   // Handle newsletter subscription
   const handleNewsletterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setNewsletterError(null);
 
     try {
       const sanitizedEmail = sanitizeText(email);
@@ -203,15 +189,17 @@ const Blog: React.FC = () => {
       await newsletterService.subscribe(validatedData.email);
       setIsSubscribed(true);
       setEmail('');
-      // Keep success message for 3 seconds
+      showSuccess(t('blog.subscriptionSuccess', 'Successfully subscribed to newsletter!'));
+      // Keep success state for 3 seconds
       setTimeout(() => setIsSubscribed(false), 3000);
     } catch (err) {
       console.error('Newsletter subscription error:', err);
-      if (err instanceof Error) {
-        setNewsletterError(err.message);
-      } else {
-        setNewsletterError(t('blog.subscriptionFailed', 'Failed to subscribe. Please try again.'));
-      }
+      i18nErrorHandler.showErrorToUser(
+        err,
+        { component: 'Blog', action: 'newsletterSubscription' },
+        [],
+        t.bind(t)
+      );
     } finally {
       setNewsletterLoading(false);
     }
@@ -223,18 +211,6 @@ const Blog: React.FC = () => {
       top: 0,
       behavior: 'smooth'
     });
-  };
-
-  // Retry fetching posts
-  const handleRetry = () => {
-    window.location.reload();
-  };
-
-  // Translate category
-  const translateCategory = (category: string) => {
-    // For now, return the category name as is, or use translation keys if available
-    // In a real app, you might have translation keys for each category
-    return category;
   };
 
   return (
@@ -292,7 +268,7 @@ const Blog: React.FC = () => {
                     : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
               >
-                {translateCategory(category.name)}
+                {category.name}
               </button>
             ))}
           </div>
@@ -317,8 +293,6 @@ const Blog: React.FC = () => {
           
           {loading ? (
             <LoadingSpinner />
-          ) : error ? (
-            <ErrorMessage message={error} onRetry={handleRetry} />
           ) : filteredPosts.length === 0 ? (
             <EmptyState />
           ) : (
@@ -419,10 +393,6 @@ const Blog: React.FC = () => {
                 {newsletterLoading ? t('blog.subscribing', 'Subscribing...') : t('blog.subscribe')}
               </button>
             </form>
-            
-            {newsletterError && (
-              <p className="text-red-500 text-sm mt-2">{newsletterError}</p>
-            )}
             
             {isSubscribed && (
               <p className="text-green-600 mt-2">{t('blog.subscriptionSuccess')}</p>

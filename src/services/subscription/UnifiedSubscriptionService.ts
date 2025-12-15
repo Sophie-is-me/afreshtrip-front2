@@ -50,59 +50,55 @@ export class UnifiedSubscriptionService {
    * Get user's current subscription status
    */
   async getUserSubscription(userId: string): Promise<UserSubscription | null> {
-    try {
-      const response = await this.httpClient.get<{
-        code: number;
-        message: string;
-        data: {
-          success: boolean;
-          status?: 'active' | 'expired';
-          planId?: string;
-          vipTypeId?: string;
-          expiresAt?: string;
-          autoRenew?: boolean;
-        };
-      }>('/api/v1/payments/subscription');
-
-      if (!response.data.success || response.data.status !== 'active') {
-        return null;
-      }
-
-      // Map backend response to frontend UserSubscription model
-      const subscription: UserSubscription = {
-        id: `sub_${userId}_${response.data.vipTypeId || 'unknown'}`,
-        userId,
-        planId: response.data.planId || 'month',
-        status: response.data.status,
-        startDate: new Date(),
-        endDate: response.data.expiresAt ? new Date(response.data.expiresAt) : new Date(),
-        autoRenew: response.data.autoRenew || false,
-        paymentMethodId: 'unified'
+    const response = await this.httpClient.get<{
+      code: number;
+      message: string;
+      data: {
+        success: boolean;
+        status?: 'active' | 'expired';
+        planId?: string;
+        vipTypeId?: string;
+        expiresAt?: string;
+        autoRenew?: boolean;
       };
+    }>('/api/v1/payments/subscription');
 
-      return subscription;
-    } catch (error) {
-      console.error('Error fetching subscription:', error);
+    // Safety check for response structure
+    if (!response || !response.data || !response.data.success || response.data.status !== 'active') {
       return null;
     }
+
+    // Map backend response to frontend UserSubscription model
+    const subscription: UserSubscription = {
+      id: `sub_${userId}_${response.data.vipTypeId || 'unknown'}`,
+      userId,
+      planId: response.data.planId || 'month',
+      status: response.data.status,
+      startDate: new Date(),
+      endDate: response.data.expiresAt ? new Date(response.data.expiresAt) : new Date(),
+      autoRenew: response.data.autoRenew || false,
+      paymentMethodId: 'unified'
+    };
+
+    return subscription;
   }
 
   /**
-   * Get available subscription plans
-   */
-  async getSubscriptionPlans(): Promise<SubscriptionPlan[]> {
-    try {
-      const response = await this.httpClient.get<{
-        code: number;
-        message: string;
-        data: SubscriptionPlanResponse[];
-      }>('/api/v1/features/subscription-plans');
+    * Get available subscription plans
+    */
+   async getSubscriptionPlans(): Promise<SubscriptionPlan[]> {
+     const response = await this.httpClient.get<{
+       code: number;
+       message: string;
+       data: SubscriptionPlanResponse[];
+     }>('/api/v1/features/subscription-plans', { requiresAuth: false });
 
-      return response.data.map(plan => this.transformBackendPlanToFrontend(plan));
-    } catch (error) {
-      console.error('Error loading subscription plans:', error);
+    // Safety check for response structure
+    if (!response || !response.data || !Array.isArray(response.data)) {
       return [];
     }
+
+    return response.data.map(plan => this.transformBackendPlanToFrontend(plan));
   }
 
   /**
@@ -135,11 +131,15 @@ export class UnifiedSubscriptionService {
     paymentMethod: 'alipay' | 'stripe' = 'alipay'
   ): Promise<PaymentInitiationResult> {
     try {
+      console.log('user id', userId);
       // Map frontend plan ID to backend VIP type
       const vipType = this.mapPlanIdToVipType(planId);
       const backendPaymentMethod = paymentMethod === 'stripe' ? 'STRIPE' : 'ALIPAY';
-
+      
+      console.log('Initiating payment with:', { vipType, paymentMethod: backendPaymentMethod });
+      
       // Use unified payment initiation
+      
       const response = await this.httpClient.post<{
         code: number;
         message: string;
@@ -156,28 +156,31 @@ export class UnifiedSubscriptionService {
         paymentMethod: backendPaymentMethod
       });
 
-      if (!response.data.success) {
+      const data = response.data || response;
+
+      console.log('Payment initiation data:', data);
+
+      if (!data?.success) {
         return {
           success: false,
-          error: response.data.errorMessage || 'Payment initiation failed'
+          error: data?.errorMessage || 'Payment initiation failed'
         };
       }
 
       // Return appropriate response based on payment method
-      if (response.data.paymentMethod === 'ALIPAY') {
+      if (data?.paymentMethod === 'ALIPAY') {
         return {
           success: true,
-          paymentHtml: response.data.paymentHtml,
-          orderNo: response.data.orderNo
+          paymentHtml: data.paymentHtml,
+          orderNo: data.orderNo
         };
-      } else if (response.data.paymentMethod === 'STRIPE') {
+      } else if (data?.paymentMethod === 'STRIPE') {
         return {
           success: true,
-          clientSecret: response.data.clientSecret,
-          orderNo: response.data.orderNo
+          clientSecret: data.clientSecret,
+          orderNo: data.orderNo
         };
       }
-
       return {
         success: false,
         error: 'Unsupported payment method'
@@ -207,17 +210,17 @@ export class UnifiedSubscriptionService {
         };
       }>(`/api/v1/payments/status/${orderNo}`);
 
-      if (!response.data.success) {
+      if (!response.data?.success) {
         return {
           success: false,
           isPaid: false,
-          error: response.data.message || 'Failed to check payment status'
+          error: response.data?.message || 'Failed to check payment status'
         };
       }
 
       return {
         success: true,
-        isPaid: response.data.isPaid
+        isPaid: response.data?.isPaid || false
       };
 
     } catch (error) {
@@ -283,58 +286,48 @@ export class UnifiedSubscriptionService {
    * Get VIP orders history
    */
   async getVipOrders(params?: { current?: number; size?: number }) {
-    try {
-      // Build query parameters
-      const queryParams = new URLSearchParams();
-      if (params?.current) queryParams.set('current', params.current.toString());
-      if (params?.size) queryParams.set('size', params.size.toString());
-      
-      const endpoint = `/api/v1/payments/orders${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
-      
-      const response = await this.httpClient.get<{
-        code: number;
-        message: string;
-        data: {
-          success: boolean;
-          data?: {
-            records: ApiVipOrder[];
-            total: number;
-            current: number;
-            size: number;
-          };
+    // Build query parameters
+    const queryParams = new URLSearchParams();
+    if (params?.current) queryParams.set('current', params.current.toString());
+    if (params?.size) queryParams.set('size', params.size.toString());
+    
+    const endpoint = `/api/v1/payments/orders${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+    
+    const response = await this.httpClient.get<{
+      code: number;
+      message: string;
+      data: {
+        success: boolean;
+        data?: {
+          records: ApiVipOrder[];
+          total: number;
+          current: number;
+          size: number;
         };
-      }>(endpoint);
+      };
+    }>(endpoint);
 
-      if (response.data.success && response.data.data) {
-        return {
-          orders: response.data.data.records,
-          total: response.data.data.total,
-          hasMore: response.data.data.current * response.data.data.size < response.data.data.total,
-        };
-      }
-      
-      return { orders: [], total: 0, hasMore: false };
-    } catch (error) {
-      console.error('Failed to get VIP orders:', error);
-      return { orders: [], total: 0, hasMore: false };
+    if (response.data?.success && response.data?.data) {
+      return {
+        orders: response.data.data.records || [],
+        total: response.data.data.total || 0,
+        hasMore: (response.data.data.current || 0) * (response.data.data.size || 10) < (response.data.data.total || 0),
+      };
     }
+    
+    return { orders: [], total: 0, hasMore: false };
   }
 
   /**
    * Cancel VIP order
    */
   async cancelVipOrder(orderNo: string): Promise<boolean> {
-    try {
-      const response = await this.httpClient.delete<{
-        code: number;
-        message: string;
-        data: boolean;
-      }>(`/api/v1/payments/orders/${orderNo}`);
-      return response.code === 200;
-    } catch (error) {
-      console.error('Failed to cancel VIP order:', error);
-      return false;
-    }
+    const response = await this.httpClient.delete<{
+      code: number;
+      message: string;
+      data: boolean;
+    }>(`/api/v1/payments/orders/${orderNo}`);
+    return response.code === 200;
   }
 
   /**
@@ -357,9 +350,9 @@ export class UnifiedSubscriptionService {
       }>('/api/v1/payments/free-trial');
 
       return {
-        success: response.data.success,
-        message: response.data.message,
-        error: response.data.errorMessage
+        success: response.data?.success || false,
+        message: response.data?.message,
+        error: response.data?.errorMessage
       };
     } catch (error) {
       return {

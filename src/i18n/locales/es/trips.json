@@ -49,5 +49,14 @@
   "ecoFriendlyRouteSelected": "Ruta ecológica seleccionada",
   "startNavigation": "Iniciar navegación",
   "travelers": "Viajeros",
-  "travelTime": "Tiempo de viaje"
+  "travelTime": "Tiempo de viaje",
+  "noTripsDescription": "¡Comienza a planificar tu primera aventura! Crea viajes para seguir tus destinos y paradas.",
+  "planFirstTrip": "Planificar Primer Viaje",
+  "status": "Estado",
+  "statuses": {
+    "planned": "Planificado",
+    "active": "Activo",
+    "completed": "Completado",
+    "cancelled": "Cancelado"
+  }
 }

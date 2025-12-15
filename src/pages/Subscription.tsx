@@ -7,6 +7,7 @@ import Footer from '../components/Footer';
 import Breadcrumb from '../components/Breadcrumb';
 import SubscriptionCard from '../components/SubscriptionCard';
 import PaymentMethodSelection from '../components/PaymentMethodSelection';
+import SubscriptionSummary from '../components/profile/SubscriptionSummary';
 import { useSubscription } from '../hooks/useSubscription';
 
 
@@ -53,7 +54,7 @@ const Subscription: React.FC = () => {
             className="mb-6"
           />
 
-
+          <SubscriptionSummary hideButton={true} />
 
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-gray-900 mb-4">{t('subscription.title')}</h1>

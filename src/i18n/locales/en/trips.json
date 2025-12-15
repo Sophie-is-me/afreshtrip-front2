@@ -49,5 +49,15 @@
   "ecoFriendlyRouteSelected": "Eco-friendly route selected",
   "startNavigation": "Start Navigation",
   "travelers": "Travelers",
-  "travelTime": "Travel Time"
+  "travelTime": "Travel Time",
+  "noTripsDescription": "Start planning your first adventure! Use the trip planner on the home page to create your first trip.",
+  "planFirstTrip": "Go to Trip Planner",
+  "viewTripsOnHome": "Trips are created using the trip planner on our home page",
+  "status": "Status",
+  "statuses": {
+    "planned": "Planned",
+    "active": "Active",
+    "completed": "Completed",
+    "cancelled": "Cancelled"
+  }
 }

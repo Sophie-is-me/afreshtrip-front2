@@ -442,3 +442,6 @@ export type {
   NationInfo,
   UserInfo
 } from '../types/api';
+
+// Export trip API service
+export { tripApiService } from './api/tripApiService';

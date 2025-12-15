@@ -282,7 +282,7 @@ export class I18nErrorHandler {
     return {
       label: t?.('common.dismiss') || 'Error: Translation missing',
       onClick: () => console.log('Error dismissed'),
-      style: 'secondary'
+      style: 'default'
     };
   }
 
@@ -293,7 +293,7 @@ export class I18nErrorHandler {
         // This would typically open a support contact form or email
         window.open('mailto:support@example.com', '_blank');
       },
-      style: 'secondary'
+      style: 'default'
     };
   }
 }

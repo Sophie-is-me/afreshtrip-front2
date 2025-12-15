@@ -70,5 +70,9 @@
     "upgradeTo": "Upgrade to",
     "viewAllPlans": "View All Plans",
     "viewPlans": "View Subscription Plans"
-  }
+  },
+  "showing": "Showing",
+  "of": "of",
+  "previous": "Previous",
+  "next": "Next"
 }

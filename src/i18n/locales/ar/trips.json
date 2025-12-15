@@ -49,5 +49,14 @@
   "ecoFriendlyRouteSelected": "تم اختيار طريق صديق للبيئة",
   "startNavigation": "ابدأ التنقل",
   "travelers": "المسافرون",
-  "travelTime": "وقت السفر"
+  "travelTime": "وقت السفر",
+  "noTripsDescription": "ابدأ في تخطيط مغامرتك الأولى! أنشئ رحلات لتتبع وجهاتك وتوقفاتك.",
+  "planFirstTrip": "خطط للرحلة الأولى",
+  "status": "الحالة",
+  "statuses": {
+    "planned": "مخطط له",
+    "active": "نشط",
+    "completed": "مكتمل",
+    "cancelled": "ملغى"
+  }
 }

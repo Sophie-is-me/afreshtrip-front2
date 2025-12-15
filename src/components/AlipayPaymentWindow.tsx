@@ -39,56 +39,158 @@ const AlipayPaymentWindow: React.FC<AlipayPaymentWindowProps> = ({
   useEffect(() => {
     if (!paymentHtml) return;
 
-    // Open Alipay payment in a new window
-    const openPaymentWindow = () => {
-      const newWindow = window.open('', '_blank', 'width=800,height=600,scrollbars=yes,resizable=yes');
-      
-      if (newWindow) {
-        // Wrap the HTML content in a proper document structure
-        const fullHtml = `
+    // Create secure payment page using blob URL (avoids popup blockers and cookie issues)
+    const createPaymentPage = () => {
+      try {
+        // Create a complete HTML document with the payment form
+        const paymentPageHtml = `
           <!DOCTYPE html>
           <html>
             <head>
               <meta charset="UTF-8">
               <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <title>Alipay Payment</title>
+              <title>Alipay Payment - ${orderNo || 'Unknown'}</title>
               <style>
-                body { margin: 0; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-                .loading { text-align: center; padding: 50px; color: #666; }
+                body {
+                  margin: 0;
+                  padding: 20px;
+                  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                  background: #f5f5f5;
+                }
+                .container {
+                  max-width: 800px;
+                  margin: 0 auto;
+                  background: white;
+                  border-radius: 8px;
+                  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                  overflow: hidden;
+                }
+                .header {
+                  background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
+                  color: white;
+                  padding: 20px;
+                  text-align: center;
+                }
+                .content {
+                  padding: 20px;
+                }
+                .loading {
+                  text-align: center;
+                  padding: 40px;
+                  color: #666;
+                }
+                .spinner {
+                  border: 4px solid #f3f3f3;
+                  border-top: 4px solid #1677ff;
+                  border-radius: 50%;
+                  width: 40px;
+                  height: 40px;
+                  animation: spin 1s linear infinite;
+                  margin: 0 auto 20px;
+                }
+                @keyframes spin {
+                  0% { transform: rotate(0deg); }
+                  100% { transform: rotate(360deg); }
+                }
+                .instructions {
+                  background: #f0f8ff;
+                  border: 1px solid #b3d9ff;
+                  border-radius: 4px;
+                  padding: 15px;
+                  margin-bottom: 20px;
+                }
+                .order-info {
+                  background: #f6ffed;
+                  border: 1px solid #b7eb8f;
+                  border-radius: 4px;
+                  padding: 15px;
+                  margin-bottom: 20px;
+                }
               </style>
+              <script>
+                // Auto-submit the payment form when page loads
+                window.addEventListener('DOMContentLoaded', function() {
+                  const forms = document.querySelectorAll('form');
+                  if (forms.length > 0) {
+                    // Add loading indicator
+                    const loadingDiv = document.querySelector('.loading');
+                    if (loadingDiv) {
+                      loadingDiv.innerHTML = '<div class="spinner"></div><h3>Redirecting to Alipay...</h3><p>Please wait while we securely redirect you to complete your payment.</p>';
+                    }
+                    // Auto-submit the first form after a short delay
+                    setTimeout(() => {
+                      forms[0].submit();
+                    }, 1000);
+                  }
+                });
+              </script>
             </head>
             <body>
-              <div class="loading">Processing payment...</div>
-              ${paymentHtml}
+              <div class="container">
+                <div class="header">
+                  <h1>Secure Payment</h1>
+                  <p>Processing your Alipay payment...</p>
+                </div>
+                <div class="content">
+                  <div class="order-info">
+                    <strong>Order Number:</strong> ${orderNo || 'Unknown'}
+                  </div>
+                  <div class="instructions">
+                    <strong>Instructions:</strong>
+                    <ul>
+                      <li>You will be automatically redirected to Alipay's secure payment page</li>
+                      <li>Complete your payment on Alipay</li>
+                      <li>Return to this tab after payment completion</li>
+                      <li>The payment status will be verified automatically</li>
+                    </ul>
+                  </div>
+                  <div class="loading">
+                    <div class="spinner"></div>
+                    <h3>Preparing Payment...</h3>
+                    <p>Please wait while we connect you to Alipay securely.</p>
+                  </div>
+                  <!-- Payment HTML from backend -->
+                  ${paymentHtml}
+                </div>
+              </div>
             </body>
           </html>
         `;
-        
-        // Write the wrapped HTML content to the new window
-        newWindow.document.write(fullHtml);
-        newWindow.document.close();
-        
-        setPaymentWindow(newWindow);
-        setIsLoading(false);
 
-        // Monitor window close and check payment status
-        const interval = setInterval(() => {
-          if (newWindow.closed) {
-            clearInterval(interval);
-            setCheckInterval(null);
-            handlePaymentReturn();
-          }
-        }, 1000);
+        // Create blob URL for the payment page
+        const blob = new Blob([paymentPageHtml], { type: 'text/html' });
+        const paymentUrl = URL.createObjectURL(blob);
 
-        setCheckInterval(interval);
-      } else {
-        // Popup blocked - use iframe fallback
+        // Open in new tab (not popup) - this avoids popup blockers
+        const paymentTab = window.open(paymentUrl, '_blank');
+
+        if (paymentTab) {
+          setPaymentWindow(paymentTab);
+          setIsLoading(false);
+
+          // Monitor tab close and check payment status
+          const interval = setInterval(() => {
+            if (paymentTab.closed) {
+              clearInterval(interval);
+              setCheckInterval(null);
+              URL.revokeObjectURL(paymentUrl); // Clean up blob URL
+              handlePaymentReturn();
+            }
+          }, 1000);
+
+          setCheckInterval(interval);
+        } else {
+          // If tab opening fails, use iframe fallback
+          setIsLoading(false);
+          console.warn('Tab opening failed, using iframe fallback');
+        }
+      } catch (error) {
+        console.error('Error creating payment page:', error);
         setIsLoading(false);
-        console.warn('Popup blocked, using iframe fallback');
       }
     };
 
-    openPaymentWindow();
+    createPaymentPage();
 
     // Cleanup function
     return () => {
@@ -99,7 +201,7 @@ const AlipayPaymentWindow: React.FC<AlipayPaymentWindowProps> = ({
         paymentWindow.close();
       }
     };
-  }, [paymentHtml]);
+  }, [paymentHtml, orderNo]);
 
   const handlePaymentReturn = async () => {
     const orderNoToUse = orderNo || paymentResponse?.orderNo || 'unknown';
@@ -150,10 +252,10 @@ const AlipayPaymentWindow: React.FC<AlipayPaymentWindowProps> = ({
 
           <div className="text-center mb-4">
             <p className="text-gray-600">
-              {t('subscription.paymentWindowBlocked')}
+              {t('subscription.paymentTabOpened')}
             </p>
             <p className="text-sm text-gray-500 mt-2">
-              {t('subscription.iframeFallbackNotice')}
+              {t('subscription.tabFallbackNotice')}
             </p>
           </div>
 
@@ -212,9 +314,9 @@ const AlipayPaymentWindow: React.FC<AlipayPaymentWindowProps> = ({
           <h2 className="text-xl font-bold text-gray-900 mb-2">
             {t('subscription.alipayPayment')}
           </h2>
-          
+
           <p className="text-gray-600 mb-4">
-            {t('subscription.completePaymentInNewWindow')}
+            {t('subscription.completePaymentInNewTab')}
           </p>
           
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
@@ -227,7 +329,7 @@ const AlipayPaymentWindow: React.FC<AlipayPaymentWindowProps> = ({
             onClick={handleClose}
             className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 transition-colors"
           >
-            {t('subscription.iveCompletedPayment')}
+            {t('subscription.checkPaymentStatus')}
           </button>
         </div>
       </div>

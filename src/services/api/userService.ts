@@ -20,17 +20,34 @@ export class UserService extends HttpClient {
   }
 
   /**
-   * Get current user info
-   */
+   * Get current user info (regular user endpoint)
+    */
   async getUserInfo(): Promise<User> {
+    const response = await this.get<ResultUsers>('/api/v1/users/profile');
+    return response.data;
+  }
+
+  /**
+    * Update user profile (regular user endpoint)
+    */
+  async updateUserProfile(userData: UserDto): Promise<boolean> {
+    const response = await this.put<ResultBoolean>('/api/v1/users/profile', userData);
+    console.log('Update profile response:', response);
+    return response.data;
+  }
+
+  /**
+   * Get current user profile (admin endpoint - for backward compatibility)
+   */
+  async getUserProfileAdmin(): Promise<User> {
     const response = await this.get<ResultUsers>('/api/v1/admin/users/profile');
     return response.data;
   }
 
   /**
-   * Update user profile
+   * Update user profile (admin endpoint - for backward compatibility)
    */
-  async updateUserProfile(userData: UserDto): Promise<boolean> {
+  async updateUserProfileAdmin(userData: UserDto): Promise<boolean> {
     const response = await this.put<ResultBoolean>('/api/v1/admin/users/profile', userData);
     return response.data;
   }

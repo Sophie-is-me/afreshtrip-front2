@@ -49,5 +49,14 @@
   "ecoFriendlyRouteSelected": "已选择环保路线",
   "startNavigation": "开始导航",
   "travelers": "旅行者",
-  "travelTime": "旅行时间"
+  "travelTime": "旅行时间",
+  "noTripsDescription": "开始计划您的第一次冒险！创建旅行以跟踪您的目的地和停靠点。",
+  "planFirstTrip": "计划第一次旅行",
+  "status": "状态",
+  "statuses": {
+    "planned": "已计划",
+    "active": "进行中",
+    "completed": "已完成",
+    "cancelled": "已取消"
+  }
 }

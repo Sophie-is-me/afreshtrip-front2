@@ -1,6 +1,7 @@
 // src/services/api/httpClient.ts
 
 import { auth } from '../../../lib/firebase/client';
+import i18n from '../../i18n';
 import {
   AuthenticationError,
   NetworkError,
@@ -36,7 +37,8 @@ export class HttpClient {
     try {
       const user = auth.currentUser;
       if (!user) return null;
-      return await user.getIdToken();
+      const token = await user.getIdToken();
+      return token;
     } catch (error) {
       console.error('Failed to get auth token:', error);
       return null;
@@ -56,6 +58,13 @@ export class HttpClient {
       headers = {},
       ...restConfig
     } = config;
+
+    // Add language parameter to URL if not already present
+    const url = new URL(endpoint, this.baseUrl);
+    if (!url.searchParams.has('lang')) {
+      url.searchParams.set('lang', i18n.language || 'en');
+    }
+    const fullEndpoint = `${url.pathname}${url.search}`;
 
     // Build headers
     const requestHeaders: Record<string, string> = {
@@ -88,7 +97,7 @@ export class HttpClient {
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
     try {
-      const response = await fetch(`${this.baseUrl}${endpoint}`, {
+      const response = await fetch(`${this.baseUrl}${fullEndpoint}`, {
         ...restConfig,
         headers: requestHeaders,
         signal: controller.signal,

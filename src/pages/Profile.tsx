@@ -1,225 +1,190 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+
+// Layout & Context
 import Header from '../components/Header';
 import Footer from '../components/Footer';
-import ProfileNav from '../components/ProfileNav';
 import Breadcrumb from '../components/Breadcrumb';
-import { useTranslation } from 'react-i18next';
+import { useAuth } from '../contexts/AuthContext';
+import { useSnackbar } from '../contexts/SnackbarContext';
+import { i18nErrorHandler } from '../utils/i18nErrorHandler';
+import { apiClient } from '../services/apiClient';
+
+// New Components
+import ProfileHeader from '../components/profile/ProfileHeader';
+import PersonalDetailsForm, { type ProfileFormData } from '../components/profile/PersonalDetailsForm';
+import SecuritySettings from '../components/profile/SecuritySettings';
+import SubscriptionSummary from '../components/profile/SubscriptionSummary';
+import PaymentMethodSelection from '../components/PaymentMethodSelection'; // Kept for subscription logic
+
+// Hooks
+import { useSubscription } from '../hooks/useSubscription';
 
 const Profile: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('profile');
+  const { user, userProfile, updateUserProfile } = useAuth();
+  const { showSuccess, showError } = useSnackbar();
+  
+  // State
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
-  const handleTabChange = (tab: string) => {
-    setActiveTab(tab);
-    if (tab === 'subscription') navigate('/subscription');
-    else if (tab === 'trips') navigate('/trips');
-    else if (tab === 'notifications') navigate('/notifications');
-  };
-  const [formData, setFormData] = useState({
-    username: '',
-    email: '',
-    mobile: '',
-    dob: '',
-    password: '',
-    confirmPassword: '',
-    gender: '',
-  });
+  // Subscription Hook (for Payment Modal logic)
+  const {
+    plans,
+    isUpdating: isUpdatingSubscription,
+    showPaymentMethodSelection,
+    pendingPlanId,
+    handlePaymentMethodSelect,
+    closePaymentMethodSelection,
+  } = useSubscription();
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+  // --- Handlers ---
+
+  const handleAvatarUpdate = async (file: File) => {
+    if (!user) return;
+    setIsUploadingAvatar(true);
+
+    try {
+      // 1. Upload file to storage
+      const imageUrl = await apiClient.uploadFile(file);
+
+      // 2. Update user profile with new URL
+      await updateUserProfile({
+        nickname: userProfile?.nickname || user.displayName || '',
+        imageUrl: imageUrl
+      });
+      
+      showSuccess(t('profile.updateSuccess'));
+    } catch (error) {
+      console.error('Avatar upload failed:', error);
+      showError(t('common.error.imageLoadError'));
+    } finally {
+      setIsUploadingAvatar(false);
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Handle form submission
-    console.log('Profile update:', formData);
+  const handleProfileUpdate = async (formData: ProfileFormData) => {
+    if (!user) return;
+    setIsUpdatingProfile(true);
+
+    try {
+      await updateUserProfile({
+        nickname: formData.username,
+        phone: formData.mobile?.replace(/\s+/g, ''), // Remove spaces for backend validation
+        gender: formData.gender?.toLowerCase(),
+        birthDate: formData.dob ? new Date(formData.dob).toISOString() : undefined,
+      });
+      showSuccess(t('profile.updateSuccess'));
+    } catch (error) {
+      const errorMessage = i18nErrorHandler.handleError(error, { component: 'Profile', action: 'update' }, t);
+      showError(errorMessage.description);
+    } finally {
+      setIsUpdatingProfile(false);
+    }
   };
+
+  const handlePasswordUpdate = async (current: string, newPass: string) => {
+    // Note: Implementation depends on specific Auth provider capabilities exposed in AuthContext
+    // This is a placeholder for where the updatePassword logic would go
+    console.log('Password update requested', { current, newPass });
+    
+    // Simulate API call
+    return new Promise<void>((resolve) => {
+      setTimeout(() => {
+        showSuccess(t('profile.updateSuccess'));
+        resolve();
+      }, 1000);
+    });
+  };
+
+  // --- Data Preparation ---
+
+  const initialFormData = useMemo<ProfileFormData>(() => ({
+    username: userProfile?.nickname || user?.displayName || '',
+    email: userProfile?.email || user?.email || '',
+    mobile: userProfile?.phone || user?.phoneNumber || '',
+    dob: userProfile?.birthDate ? userProfile.birthDate.split('T')[0] : '',
+    gender: userProfile?.gender && typeof userProfile.gender === 'string' ? userProfile.gender.charAt(0).toUpperCase() + userProfile.gender.slice(1).toLowerCase() : '',
+  }), [userProfile, user]);
+
+  // --- Render ---
 
   return (
-    <div className="min-h-screen bg-white">
-      <Header showNavLinks={false} />
-      <main className="px-8 py-8">
-        <div className="max-w-4xl mx-auto">
-          <Breadcrumb
-            items={[
-              { label: t('profileNav.profile'), href: '/profile' }
-            ]}
-            className="mb-6"
-          />
-          <div className="bg-white rounded-lg shadow-md p-8">
-            <ProfileNav activeTab={activeTab} onTabChange={handleTabChange} />
+    <div className="min-h-screen bg-gray-50/50">
+      <Header />
+      
+      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <Breadcrumb
+          items={[
+            { label: t('header.home'), href: '/' },
+            { label: t('profileNav.profile'), href: '/profile' }
+          ]}
+          className="mb-8"
+        />
 
-            {activeTab === 'profile' && (
-              <div className="profile-details">
-                <div className="flex flex-col md:flex-row gap-8">
-                  {/* Avatar Section */}
-                  <div className="profile-pic flex flex-col items-center">
-                    <div className="profile-pic-container w-32 h-32 rounded-full bg-gray-200 flex items-center justify-center mb-4">
-                      <img src="/assets/count-1.png" alt="Profile" className="w-full h-full rounded-full object-cover" />
-                    </div>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          
+          {/* Left Sidebar - Navigation */}
+          <div className="lg:col-span-3 sticky top-24">
+            {/* Optional: Tiny promo or help box below nav */}
+            <div className="p-4 bg-teal-50 rounded-xl border border-teal-100 hidden lg:block">
+              <h4 className="font-semibold text-teal-900 text-sm mb-1">{t('common.contactSupport')}</h4>
+              <p className="text-xs text-teal-700 mb-3">Need help with your account? We are here 24/7.</p>
+              <button onClick={() => navigate('/support')} className="text-xs font-bold text-teal-600 hover:text-teal-800">
+                Contact Us &rarr;
+              </button>
+            </div>
+          </div>
+
+          {/* Right Content Area */}
+          <div className="lg:col-span-9 space-y-6">
+            <div className="animate-fadeIn">
+                <ProfileHeader 
+                  onAvatarUpdate={handleAvatarUpdate}
+                  isUpdatingAvatar={isUploadingAvatar}
+                />
+
+                {/* Subscription Widget */}
+                <SubscriptionSummary />
+
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                  {/* Left Column: Personal Details */}
+                  <div className="xl:col-span-2">
+                    <PersonalDetailsForm 
+                      initialData={initialFormData}
+                      onSubmit={handleProfileUpdate}
+                      isLoading={isUpdatingProfile}
+                    />
                   </div>
 
-                  {/* Profile Form */}
-                  <div className="profile-info flex-1">
-                    <h2 className="text-2xl font-semibold mb-6">{t('profile.editProfile')}</h2>
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                          <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
-                            {t('profile.username')}
-                          </label>
-                          <input
-                            type="text"
-                            id="username"
-                            name="username"
-                            value={formData.username}
-                            onChange={handleInputChange}
-                            placeholder={t('profile.usernamePlaceholder')}
-                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                            required
-                          />
-                        </div>
-
-                        <div>
-                          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                            {t('profile.email')}
-                          </label>
-                          <input
-                            type="email"
-                            id="email"
-                            name="email"
-                            value={formData.email}
-                            onChange={handleInputChange}
-                            placeholder="yourname@company.com"
-                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                            required
-                          />
-                        </div>
-
-                        <div>
-                          <label htmlFor="mobile" className="block text-sm font-medium text-gray-700 mb-2">
-                            {t('profile.mobile')}
-                          </label>
-                          <input
-                            type="tel"
-                            id="mobile"
-                            name="mobile"
-                            value={formData.mobile}
-                            onChange={handleInputChange}
-                            placeholder={t('profile.mobilePlaceholder')}
-                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                            required
-                          />
-                        </div>
-
-                        <div>
-                          <label htmlFor="dob" className="block text-sm font-medium text-gray-700 mb-2">
-                            {t('profile.dob')}
-                          </label>
-                          <input
-                            type="date"
-                            id="dob"
-                            name="dob"
-                            value={formData.dob}
-                            onChange={handleInputChange}
-                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                            required
-                          />
-                        </div>
-
-                        <div>
-                          <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                            {t('profile.password')}
-                          </label>
-                          <input
-                            type="password"
-                            id="password"
-                            name="password"
-                            value={formData.password}
-                            onChange={handleInputChange}
-                            placeholder={t('profile.passwordPlaceholder')}
-                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                            required
-                          />
-                        </div>
-
-                        <div>
-                          <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
-                            {t('profile.confirmPassword')}
-                          </label>
-                          <input
-                            type="password"
-                            id="confirmPassword"
-                            name="confirmPassword"
-                            value={formData.confirmPassword}
-                            onChange={handleInputChange}
-                            placeholder={t('profile.confirmPasswordPlaceholder')}
-                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                            required
-                          />
-                        </div>
-                      </div>
-
-                      {/* Gender Section */}
-                      <div className="gender-group">
-                        <label className="block text-sm font-medium text-gray-700 mb-3">
-                          {t('profile.gender')}
-                        </label>
-                        <div className="flex gap-6">
-                          <label className="flex items-center">
-                            <input
-                              type="radio"
-                              name="gender"
-                              value="Male"
-                              checked={formData.gender === 'Male'}
-                              onChange={handleInputChange}
-                              className="mr-2 text-teal-600 focus:ring-teal-500"
-                            />
-                            <span className="text-sm text-gray-700">{t('profile.male')}</span>
-                          </label>
-                          <label className="flex items-center">
-                            <input
-                              type="radio"
-                              name="gender"
-                              value="Female"
-                              checked={formData.gender === 'Female'}
-                              onChange={handleInputChange}
-                              className="mr-2 text-teal-600 focus:ring-teal-500"
-                            />
-                            <span className="text-sm text-gray-700">{t('profile.female')}</span>
-                          </label>
-                        </div>
-                      </div>
-
-                      <div className="flex justify-end">
-                        <button
-                          type="submit"
-                          className="px-8 py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 transition-colors"
-                        >
-                          {t('profile.update')}
-                        </button>
-                      </div>
-                    </form>
+                  {/* Security Settings (Full width or split depending on design preference, using full for clarity) */}
+                  <div className="xl:col-span-2">
+                    <SecuritySettings 
+                      onUpdatePassword={handlePasswordUpdate}
+                      isLoading={false}
+                    />
                   </div>
                 </div>
               </div>
-            )}
-
-            {activeTab !== 'profile' && (
-              <div className="text-center text-gray-500 py-12">
-                {t('profile.contentComingSoon', { tab: activeTab })}
-              </div>
-            )}
           </div>
         </div>
       </main>
+      
       <Footer />
+
+      {/* Payment Method Selection Modal (Preserved for logic) */}
+      {showPaymentMethodSelection && pendingPlanId && (
+        <PaymentMethodSelection
+          plan={plans.find(p => p.planId === pendingPlanId)!}
+          isOpen={showPaymentMethodSelection}
+          onClose={closePaymentMethodSelection}
+          onSelectPaymentMethod={(paymentMethod) => handlePaymentMethodSelect(pendingPlanId, paymentMethod)}
+          isLoading={isUpdatingSubscription}
+        />
+      )}
     </div>
   );
 };

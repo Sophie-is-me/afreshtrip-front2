@@ -278,7 +278,7 @@ const BlogEditor: React.FC = () => {
           {
             label: t('common.contactSupport'),
             onClick: () => navigate('/subscription'),
-            style: 'secondary'
+            style: 'default'
           }
         ] : [],
         t.bind(t)
@@ -311,7 +311,7 @@ const BlogEditor: React.FC = () => {
               {
                 label: t('common.contactSupport'),
                 onClick: () => navigate('/subscription'),
-                style: 'secondary'
+                style: 'default'
               }
             ],
             t.bind(t)

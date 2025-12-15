@@ -70,5 +70,9 @@
     "upgradeTo": "Actualizar a",
     "viewAllPlans": "Ver Todos los Planes",
     "viewPlans": "Ver Planes de Suscripción"
-  }
+  },
+  "showing": "Mostrando",
+  "of": "de",
+  "previous": "Anterior",
+  "next": "Siguiente"
 }

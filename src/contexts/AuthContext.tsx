@@ -2,6 +2,8 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { type User, onAuthStateChanged, signInWithEmailAndPassword, signInWithPopup, signOut, createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth, googleProvider } from '../../lib/firebase/client';
 import { apiClient, type UserInfo } from '../services/apiClient';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { QUERY_KEYS } from '../lib/react-query/queryKeys';
 
 interface AuthContextType {
   user: User | null;
@@ -16,6 +18,7 @@ interface AuthContextType {
     gender?: string;
     phone?: string;
     imageUrl?: string;
+    birthDate?: string;
   }) => Promise<void>;
   refreshUserProfile: () => Promise<void>;
 }
@@ -32,40 +35,42 @@ export const useAuth = () => {
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [userProfile, setUserProfile] = useState<UserInfo | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const queryClient = useQueryClient();
+
+  // React Query for User Profile
+  const { data: userProfileData, isLoading: isProfileLoading } = useQuery<UserInfo>({
+    queryKey: QUERY_KEYS.user.profile(firebaseUser?.uid || ''),
+    queryFn: async () => {
+      if (!firebaseUser) throw new Error('No user');
+      try {
+        // Try to get ID token to ensure user is fully authenticated
+        await firebaseUser.getIdToken(false);
+        return await apiClient.getUserInfo();
+      } catch (error) {
+        console.error('Failed to fetch user profile:', error);
+        // Return basic profile from Firebase user as fallback
+        return {
+          userId: parseInt(firebaseUser.uid, 10), // Convert uid to number for backend compatibility
+          email: firebaseUser.email || undefined,
+          nickname: firebaseUser.displayName || undefined,
+          imageurl: firebaseUser.photoURL || undefined, // Note: backend uses 'imageurl'
+        };
+      }
+    },
+    enabled: !!firebaseUser, // Only fetch if firebase user exists
+    retry: false, // Don't retry on profile fetch failure
+  });
+
+  // Ensure userProfile is never undefined
+  const userProfile = userProfileData || null;
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       console.log('Auth state changed:', user ? 'authenticated' : 'not authenticated');
-      setUser(user);
-
-      if (user) {
-        // Wait a moment for Firebase to fully initialize
-        try {
-          // Try to get ID token to ensure user is fully authenticated
-          await user.getIdToken(false);
-          
-          // Fetch user profile from backend when user is authenticated
-          const response = await apiClient.getUserInfo();
-          
-          setUserProfile(response);
-        } catch (error) {
-          console.error('Failed to fetch user profile:', error);
-          // Set basic profile from Firebase user as fallback
-          setUserProfile({
-            userId: parseInt(user.uid, 10), // Convert uid to number for backend compatibility
-            email: user.email || undefined,
-            nickname: user.displayName || undefined,
-            imageurl: user.photoURL || undefined, // Note: backend uses 'imageurl'
-          });
-        }
-      } else {
-        setUserProfile(null);
-      }
-
-      setLoading(false);
+      setFirebaseUser(user);
+      setAuthLoading(false);
     });
 
     return unsubscribe;
@@ -87,11 +92,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await signOut(auth);
   };
 
+
+
+  const refreshUserProfile = async () => {
+    if (!firebaseUser) return;
+
+    // Use React Query to invalidate and refetch
+    await queryClient.invalidateQueries({ 
+      queryKey: QUERY_KEYS.user.profile(firebaseUser.uid) 
+    });
+  };
+
   const updateUserProfile = async (profileData: {
     nickname?: string;
     gender?: string;
     phone?: string;
     imageUrl?: string;
+    birthDate?: string;
   }) => {
     try {
       // Transform the data to match UserDto interface (nickname is required)
@@ -100,11 +117,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         gender: profileData.gender,
         phone: profileData.phone,
         imageurl: profileData.imageUrl, // Note: backend expects 'imageurl'
+        birthDate: profileData.birthDate,
       };
-      
+
+      console.log('Updating user profile with:', userDto);
+
       const response = await apiClient.updateUserProfile(userDto);
       if (response) {
-        // Refresh user profile after successful update
+        // Refresh user profile after successful update using React Query
         await refreshUserProfile();
       } else {
         throw new Error('Failed to update profile');
@@ -115,16 +135,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const refreshUserProfile = async () => {
-    if (!user) return;
+  // Combined loading state
+  const loading = authLoading || (!!firebaseUser && isProfileLoading);
 
-    try {
-      const response = await apiClient.getUserInfo();
-      setUserProfile(response);
-    } catch (error) {
-      console.error('Failed to refresh user profile:', error);
-    }
-  };
+  // Transform firebaseUser to user for compatibility
+  const user = firebaseUser;
 
   const value = {
     user,

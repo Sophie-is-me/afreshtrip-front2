@@ -70,5 +70,9 @@
     "upgradeTo": "ترقية إلى",
     "viewAllPlans": "عرض جميع الخطط",
     "viewPlans": "عرض خطط الاشتراك"
-  }
+  },
+  "showing": "عرض",
+  "of": "من",
+  "previous": "السابق",
+  "next": "التالي"
 }

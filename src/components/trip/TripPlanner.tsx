@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
+import { ChevronUpIcon, ChevronDownIcon, MapIcon } from '@heroicons/react/24/outline';
 import TripSettingsPanel from './TripSettingsPanel';
 import TripMap from './TripMap';
 import WeatherSummary from './WeatherSummary';
@@ -11,7 +12,7 @@ import type { TripSettings } from '../../types/trip';
 import { tripApiService, type CreateTripRequest } from '../../services/api/tripApiService';
 
 const TripPlanner = () => {
-  // --- STATE MANAGEMENT ---
+  // --- LOCAL STATE ---
   const [transport, setTransport] = useState<'car' | 'bike'>('car');
   const [tripType, setTripType] = useState<'one' | 'return'>('return');
   const [departureCity, setDepartureCity] = useState('Copenhagen');
@@ -21,25 +22,27 @@ const TripPlanner = () => {
   const [duration, setDuration] = useState(1);
   const [interests, setInterests] = useState<string[]>(['outdoorsSport']);
 
-  // Use Zustand store for trip data
+  // --- STORE STATE ---
   const {
     currentTrip,
     setTrip,
     setGeneratedStops,
     setTripDetails,
     setIsGenerating,
-    resetGenerationState
+    resetGenerationState,
+    // Mobile Sheet Controls
+    isMobilePanelOpen,
+    setMobilePanelOpen
   } = useTripStore();
 
   const location = useLocation();
   const refreshTripsMutation = useRefreshTrips();
 
+  // --- MUTATIONS ---
   const generateTripMutation = useMutation({
     mutationFn: async (tripSettings: TripSettings) => {
-      // Generate the trip locally first
       const localTrip = await tripService.generateTrip(tripSettings);
       
-      // Convert to API format and save to backend
       const apiTripData: CreateTripRequest = {
         name: `${destinationCity} Trip`,
         destination: destinationCity,
@@ -55,23 +58,19 @@ const TripPlanner = () => {
       };
       
       const savedTrip = await tripApiService.createTrip(apiTripData);
-      
       return { localTrip, savedTrip };
     },
     onSuccess: (result) => {
       const { localTrip } = result;
-      
-      // Use the actual places from the generated trip
       const stops = localTrip.places.map(place => place.name);
 
       setGeneratedStops(stops);
       setTrip(localTrip);
 
-      // Use actual trip route data
       const distance = localTrip.route.distance;
-      const duration = localTrip.route.duration;
-      const timeHours = Math.floor(duration / 60);
-      const timeMinutes = duration % 60;
+      const durationVal = localTrip.route.duration;
+      const timeHours = Math.floor(durationVal / 60);
+      const timeMinutes = durationVal % 60;
 
       setTripDetails({
           time: timeHours > 0 ? `${timeHours}h ${timeMinutes}min` : `${timeMinutes}min`,
@@ -79,10 +78,13 @@ const TripPlanner = () => {
           co2: `${Math.round(distance * 0.12)}g`
       });
 
-      // Refresh trips data so the new trip appears in the trips page
       refreshTripsMutation.mutate();
-
       setIsGenerating(false);
+      
+      // On mobile, collapse the panel slightly to show the route on map
+      if (window.innerWidth < 768) {
+        setMobilePanelOpen(false);
+      }
     },
     onError: (error: Error) => {
       console.error('Trip generation failed:', error);
@@ -103,8 +105,8 @@ const TripPlanner = () => {
     const settings: TripSettings = {
       destination: destinationCity,
       duration,
-      budget: 1000, // Mock value
-      travelers: 1, // Mock value
+      budget: 1000,
+      travelers: 1,
       preferences: interests,
       vehicle: transport,
     };
@@ -112,55 +114,105 @@ const TripPlanner = () => {
   };
 
   const handleStartNavigation = () => {
-    // TODO: Implement navigation start logic
     console.log('Starting navigation...');
   };
 
   return (
-    <div className="w-full flex flex-col bg-linear-to-br from-slate-50 via-blue-50 to-teal-50 relative">
-      {/* Decorative background elements */}
-      <div className="absolute top-0 left-0 w-96 h-96 bg-teal-400/10 rounded-full blur-3xl animate-pulse" />
-      <div className="absolute bottom-0 right-0 w-96 h-96 bg-blue-400/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
-
-      {/* Desktop: Two-panel layout */}
-      <div className="hidden md:flex md:gap-4 md:ps-8 md:pb-4 md:min-h-[calc(100vh-64px)] relative z-10">
-        {/* Focus trip planner if navigated from trips page */}
-        {location.state?.focusTripPlanner && (
-          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-30 bg-teal-600 text-white px-4 py-2 rounded-lg shadow-lg">
-            Ready to plan your trip! Fill in the details below.
-          </div>
-        )}
-        {/* Left Panel - Trip Planning Components */}
-        <div className="flex-[0_0_35%] flex flex-col gap-6 bg-transparent scrollbar-thin">
-          <TripSettingsPanel
-            transport={transport}
-            setTransport={setTransport}
-            tripType={tripType}
-            setTripType={setTripType}
-            departureCity={departureCity}
-            setDepartureCity={setDepartureCity}
-            destinationCity={destinationCity}
-            setDestinationCity={setDestinationCity}
-            useCurrentLocation={useCurrentLocation}
-            setUseCurrentLocation={setUseCurrentLocation}
-            stations={stations}
-            setStations={setStations}
-            duration={duration}
-            setDuration={setDuration}
-            interests={interests}
-            onToggleInterest={handleToggleInterest}
-            onGenerateTrip={handleGenerateTrip}
-            onStartNavigation={handleStartNavigation}
-          />
+    <div className="relative w-full h-[calc(100vh-64px)] bg-gray-50 overflow-hidden">
+      
+      {/* 
+        1. MAP LAYER 
+        Occupies full background on both mobile and desktop.
+      */}
+      <div className="absolute inset-0 z-0">
+        <TripMap trip={currentTrip} />
+        
+        {/* Desktop Weather Widget */}
+        <div className="hidden md:block absolute top-6 right-6 z-20 w-80">
+          <WeatherSummary onClick={() => {}} />
         </div>
 
-        {/* Center Panel - Map with Weather Overlay */}
-        <div className="flex-1 sticky top-20 md:h-[calc(100vh-64px)] shadow-2xs border-4 border-white/50">
-          <TripMap trip={currentTrip} />
+        {/* Mobile Map Controls (Visible when panel is collapsed) */}
+        {!isMobilePanelOpen && (
+          <button 
+            onClick={() => setMobilePanelOpen(true)}
+            className="md:hidden absolute bottom-24 right-4 z-10 bg-white p-3 rounded-full shadow-lg text-teal-700 animate-bounce"
+          >
+            <ChevronUpIcon className="w-6 h-6" />
+          </button>
+        )}
+      </div>
 
-          {/* Weather Widget Overlay - Top Right */}
-          <div className="absolute top-4 right-4 z-20 w-80">
-            <WeatherSummary onClick={() => {}} />
+      {/* 
+        2. INTERACTIVE PANEL LAYER 
+        Desktop: Floating Sidebar
+        Mobile: Bottom Sheet
+      */}
+      <div 
+        className={`
+          absolute z-30 transition-all duration-500 ease-in-out
+          
+          /* Desktop Styles */
+          md:top-6 md:left-6 md:bottom-6 md:w-[480px] md:translate-y-0
+
+          /* Mobile Styles */
+          inset-x-0 bottom-0 
+          ${isMobilePanelOpen ? 'top-16 rounded-t-3xl' : 'top-[85%] rounded-t-3xl'}
+        `}
+      >
+        <div className="h-full w-full bg-white md:bg-white/90 md:backdrop-blur-xl shadow-2xl md:rounded-2xl border border-white/50 flex flex-col overflow-hidden">
+          
+          {/* Mobile Handle / Toggle Area */}
+          <div 
+            className="md:hidden w-full bg-white border-b border-gray-100 flex flex-col items-center pt-2 pb-3 cursor-pointer shrink-0"
+            onClick={() => setMobilePanelOpen(!isMobilePanelOpen)}
+          >
+            <div className="w-12 h-1.5 bg-gray-300 rounded-full mb-2" />
+            <div className="flex items-center gap-2 text-sm font-semibold text-gray-500">
+              {isMobilePanelOpen ? (
+                <>
+                  <ChevronDownIcon className="w-4 h-4" />
+                  <span>View Map</span>
+                </>
+              ) : (
+                <>
+                  <ChevronUpIcon className="w-4 h-4" />
+                  <span>Plan Trip</span>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Toast Notification (Desktop Only) */}
+          {location.state?.focusTripPlanner && (
+            <div className="hidden md:flex mb-0 mx-4 mt-4 bg-teal-600 text-white px-4 py-3 rounded-lg shadow-lg items-center">
+               <MapIcon className="w-5 h-5 mr-2" />
+               <span className="text-sm font-medium">Ready to plan!</span>
+            </div>
+          )}
+
+          {/* Scrollable Content */}
+          <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-teal-200/50 scrollbar-track-transparent">
+            <TripSettingsPanel
+              transport={transport}
+              setTransport={setTransport}
+              tripType={tripType}
+              setTripType={setTripType}
+              departureCity={departureCity}
+              setDepartureCity={setDepartureCity}
+              destinationCity={destinationCity}
+              setDestinationCity={setDestinationCity}
+              useCurrentLocation={useCurrentLocation}
+              setUseCurrentLocation={setUseCurrentLocation}
+              stations={stations}
+              setStations={setStations}
+              duration={duration}
+              setDuration={setDuration}
+              interests={interests}
+              onToggleInterest={handleToggleInterest}
+              onGenerateTrip={handleGenerateTrip}
+              onStartNavigation={handleStartNavigation}
+            />
           </div>
         </div>
       </div>

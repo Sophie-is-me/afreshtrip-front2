@@ -63,7 +63,7 @@ export interface TripListResponse {
 }
 
 export class TripApiService {
-  private baseUrl = '/api/v1/trips';
+//   private baseUrl = '/api/v1/trips';
 
   /**
    * Get all trips for the current user

@@ -1,336 +1,31 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { MapPinIcon, PlayIcon } from '@heroicons/react/24/outline';
+import { 
+  MapPinIcon, 
+  PlayIcon, 
+  PlusIcon, 
+  MinusIcon,
+  SparklesIcon,
+  GlobeEuropeAfricaIcon,
+  BuildingLibraryIcon,
+  CameraIcon,
+  KeyIcon,
+  TruckIcon,
+  TrophyIcon,
+  BoltIcon
+} from '@heroicons/react/24/outline';
 import { FaCar, FaBicycle } from 'react-icons/fa';
 import TripGenerationCard from './TripGenerationCard';
 import { useTripStore } from '../../stores/tripStore';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
-// --- Helper Components for better structure ---
+// --- Types ---
 
-interface TripCustomizationProps {
-  transport: 'car' | 'bike';
-  setTransport: (transport: 'car' | 'bike') => void;
-  tripType: 'one' | 'return';
-  setTripType: (tripType: 'one' | 'return') => void;
-  t: (key: string) => string;
+export interface RentalPreferences {
+  enabled: boolean;
+  type: 'economy' | 'suv' | 'luxury';
+  transmission: 'auto' | 'manual';
 }
-
-interface RoutePlannerProps {
-  departureCity: string;
-  setDepartureCity: (city: string) => void;
-  destinationCity: string;
-  setDestinationCity: (city: string) => void;
-  useCurrentLocation: boolean;
-  setUseCurrentLocation: (use: boolean) => void;
-  stations: number;
-  setStations: (stations: number) => void;
-  duration: number;
-  setDuration: (duration: number) => void;
-  t: (key: string) => string;
-}
-
-// Custom Radio Button for Trip Type and Transport (matching design)
-const DesignRadio = ({ id, name, value, checked, onChange, children, icon }: {
-  id: string,
-  name: string,
-  value: string,
-  checked: boolean,
-  onChange: () => void,
-  children: React.ReactNode,
-  icon?: React.ReactNode
-}) => (
-  <div className="flex items-center">
-    <input
-      type="radio"
-      id={id}
-      name={name}
-      value={value}
-      checked={checked}
-      onChange={() => onChange()}
-      className="hidden"
-    />
-    <label
-      htmlFor={id}
-      className={`flex items-center cursor-pointer transition-all duration-300 text-xs md:text-sm ${
-        checked ? 'text-teal-600' : 'text-gray-600'
-      }`}
-    >
-      <div className={`w-5 h-5 rounded-full border-2 mr-2 flex items-center justify-center ${
-        checked ? 'border-teal-600 bg-teal-600' : 'border-gray-400'
-      }`}>
-        {checked && <div className="w-2 h-2 bg-white rounded-full"></div>}
-      </div>
-      {icon && <span className="mr-2">{icon}</span>}
-      {children}
-    </label>
-  </div>
-);
-
-// Custom Checkbox for Interests (matching design)
-const DesignCheckbox = ({ id, label, checked, onChange }: {
-  id: string,
-  label: string,
-  checked: boolean,
-  onChange: () => void
-}) => (
-  <div className="flex items-center">
-    <input
-      type="checkbox"
-      id={id}
-      checked={checked}
-      onChange={() => onChange()}
-      className="hidden"
-    />
-    <label
-      htmlFor={id}
-      className={`flex items-center cursor-pointer transition-all duration-300 text-xs md:text-sm ${
-        checked ? 'text-teal-600' : 'text-gray-600'
-      }`}
-    >
-      <div className={`w-5 h-5 rounded border-2 mr-2 flex items-center justify-center ${
-        checked ? 'border-teal-600 bg-teal-600' : 'border-gray-400'
-      }`}>
-        {checked && <div className="w-2 h-2 bg-white rounded-full"></div>}
-      </div>
-      {label}
-    </label>
-  </div>
-);
-
-
-// Styled button component matching the design
-const DesignButton = ({ 
-  children, 
-  onClick, 
-  disabled = false, 
-  variant = 'primary', 
-  className = '' 
-}: { 
-  children: React.ReactNode, 
-  onClick?: () => void, 
-  disabled?: boolean, 
-  variant?: 'primary' | 'secondary' | 'success' | 'outline',
-  className?: string
-}) => {
-  const [isHovered, setIsHovered] = useState(false);
-  
-  const variants = {
-    primary: {
-      bg: 'bg-teal-700',
-      text: 'text-white',
-      slideBg: 'bg-teal-800',
-      focus: 'focus:ring-2 focus:ring-teal-500'
-    },
-    secondary: {
-      bg: 'bg-gray-200',
-      text: 'text-gray-800',
-      slideBg: 'bg-gray-300',
-      focus: 'focus:ring-2 focus:ring-gray-400'
-    },
-    success: {
-      bg: 'bg-green-500',
-      text: 'text-white',
-      slideBg: 'bg-green-600',
-      focus: 'focus:ring-2 focus:ring-green-400'
-    },
-    outline: {
-      bg: 'bg-transparent',
-      text: 'text-teal-700',
-      slideBg: 'bg-teal-50',
-      focus: 'focus:ring-2 focus:ring-teal-500'
-    }
-  };
-  
-  return (
-    <motion.button
-      onClick={onClick}
-      disabled={disabled}
-      className={`py-3 px-4 font-semibold flex items-center justify-center relative overflow-hidden border-2 ${variant === 'outline' ? 'border-teal-700' : 'border-transparent'} ${variants[variant].text} ${variants[variant].bg} ${variants[variant].focus} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
-      onHoverStart={() => setIsHovered(true)}
-      onHoverEnd={() => setIsHovered(false)}
-      whileTap={{ scale: 0.98 }}
-    >
-      <motion.div
-        className="absolute top-0 left-0 w-full h-full"
-        initial={{ x: '-100%' }}
-        animate={{ x: isHovered ? '0%' : '-100%' }}
-        transition={{ duration: 0.3 }}
-      >
-        <div className={`w-full h-full ${variants[variant].slideBg}`}></div>
-      </motion.div>
-      <span className="relative z-10">{children}</span>
-    </motion.button>
-  );
-};
-
-// Input field component matching the design
-const DesignInput = ({
-  value,
-  onChange,
-  placeholder,
-  type = 'text',
-  disabled = false,
-  className = ''
-}: {
-  value: string,
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void,
-  placeholder?: string,
-  type?: string,
-  disabled?: boolean,
-  className?: string
-}) => (
-  <input
-    type={type}
-    value={value}
-    onChange={onChange}
-    placeholder={placeholder}
-    disabled={disabled}
-    className={`w-full p-2 md:p-3 border-b-2 border-gray-200 focus:outline-none focus:border-teal-500 transition ${className}`}
-  />
-);
-
-const TripCustomization: React.FC<TripCustomizationProps> = ({ transport, setTransport, tripType, setTripType, t }) => (
-    <div className="mb-6 p-4 border border-gray-200">
-      {/* <h3 className="text-lg font-bold text-teal-900 mb-2">Customize Your Journey</h3>
-      <p className="text-sm text-gray-600 mb-4">
-        Select your preferred mode of transport and trip type to tailor the perfect journey.
-      </p> */}
-      <div className="flex flex-col sm:flex-row gap-4 md:gap-6">
-        {/* --- Transportation Section --- */}
-        <div className="flex-1">
-          <label className="block text-xs md:text-sm text-gray-500 mb-2 font-semibold">{t('trips.transportation')}</label>
-          <div className="flex space-x-4 bg-gray-50 p-3">
-            <DesignRadio
-              id="car"
-              name="transport"
-              value="car"
-              checked={transport === 'car'}
-              onChange={() => setTransport('car')}
-              icon={<FaCar />}
-            >
-              {t('trips.carTrip')}
-            </DesignRadio>
-            <DesignRadio
-              id="bike"
-              name="transport"
-              value="bike"
-              checked={transport === 'bike'}
-              onChange={() => setTransport('bike')}
-              icon={<FaBicycle />}
-            >
-              {t('trips.bikeTrip')}
-            </DesignRadio>
-          </div>
-        </div>
-  
-        {/* --- Trip Type Section --- */}
-        <div className="flex-1">
-          <label className="block text-xs md:text-sm text-gray-500 mb-2 font-semibold">{t('trips.tripType')}</label>
-          <div className="flex space-x-4 bg-gray-50 p-3">
-            <DesignRadio
-              id="one-way"
-              name="tripType"
-              value="one"
-              checked={tripType === 'one'}
-              onChange={() => setTripType('one')}
-            >
-              {t('trips.oneWay')}
-            </DesignRadio>
-            <DesignRadio
-              id="return"
-              name="tripType"
-              value="return"
-              checked={tripType === 'return'}
-              onChange={() => setTripType('return')}
-            >
-              {t('trips.returnWay')}
-            </DesignRadio>
-          </div>
-        </div>
-      </div>
-    </div>
-);
-
-const RoutePlanner: React.FC<RoutePlannerProps> = ({
-    departureCity,
-    setDepartureCity,
-    destinationCity,
-    setDestinationCity,
-    useCurrentLocation,
-    setUseCurrentLocation,
-    stations,
-    setStations,
-    duration,
-    setDuration,
-    t,
-  }) => (
-    <div className="mb-6 p-4 border border-gray-200">
-      {/* <h3 className="text-lg font-bold text-teal-900 mb-2">Define Your Route</h3>
-      <p className="text-sm text-gray-600 mb-4">
-        Tell us where you're starting, where you're going, and for how long.
-      </p> */}
-      
-      {/* --- Cities --- */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-4">
-        <div>
-          <label className="block text-xs md:text-sm text-gray-500 mb-1 font-semibold">{t('trips.departureCity')}</label>
-          <div className="flex items-center">
-            <DesignInput
-              value={departureCity}
-              onChange={(e) => setDepartureCity(e.target.value)}
-              disabled={useCurrentLocation}
-            />
-            <button
-              type="button"
-              onClick={() => setUseCurrentLocation(!useCurrentLocation)}
-              className={`ml-2 p-2 rounded-lg transition-colors ${
-                useCurrentLocation ? 'bg-teal-100 text-teal-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-              aria-label="Use current location"
-            >
-              <MapPinIcon className="w-5 h-5" />
-            </button>
-          </div>
-          {useCurrentLocation && (
-            <p className="text-xs text-teal-600 mt-1">{t('trips.usingCurrentLocation')}</p>
-          )}
-        </div>
-        <div>
-          <label className="block text-xs md:text-sm text-gray-500 mb-1 font-semibold">{t('trips.destinationCity')}</label>
-          <DesignInput
-            value={destinationCity}
-            onChange={(e) => setDestinationCity(e.target.value)}
-          />
-        </div>
-      </div>
-  
-      {/* --- Stops and Duration --- */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-        <div className="bg-gray-50 p-3">
-          <label className="block text-xs md:text-sm text-gray-500 mb-1 font-semibold">{t('trips.stations')}</label>
-          <DesignInput
-            type="number"
-            value={stations.toString()}
-            onChange={(e) => setStations(parseInt(e.target.value, 10))}
-            className="bg-transparent"
-          />
-        </div>
-        <div className="bg-gray-50 p-3">
-          <label className="block text-xs md:text-sm text-gray-500 mb-1 font-semibold">{t('trips.duration')}</label>
-          <div className="flex items-baseline">
-            <DesignInput
-              type="number"
-              value={duration.toString()}
-              onChange={(e) => setDuration(parseInt(e.target.value, 10))}
-              className="bg-transparent"
-            />
-            <span className="ml-2 text-gray-600">{t('trips.days')}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-);
 
 interface TripSettingsPanelProps {
   transport: 'car' | 'bike';
@@ -352,6 +47,174 @@ interface TripSettingsPanelProps {
   onGenerateTrip: () => void;
   onStartNavigation: () => void;
 }
+
+// --- Helper Components ---
+
+interface SegmentedControlProps<T extends string> {
+  options: { value: T; label: string; icon?: React.ReactNode }[];
+  value: T;
+  onChange: (value: T) => void;
+  label: string;
+}
+
+const SegmentedControl = <T extends string>({ options, value, onChange, label }: SegmentedControlProps<T>) => (
+  <div className="flex flex-col gap-2">
+    <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">{label}</span>
+    <div className="flex bg-gray-100/80 p-1 rounded-xl relative">
+      {options.map((option) => {
+        const isActive = value === option.value;
+        return (
+          <button
+            key={option.value}
+            onClick={() => onChange(option.value)}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+              isActive 
+                ? 'bg-white text-teal-700 shadow-sm ring-1 ring-black/5' 
+                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'
+            }`}
+          >
+            {option.icon && <span className={isActive ? 'text-teal-600' : 'text-gray-400'}>{option.icon}</span>}
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  </div>
+);
+
+interface CounterProps {
+  value: number;
+  onChange: (val: number) => void;
+  label: string;
+  unit?: string;
+  min?: number;
+  max?: number;
+}
+
+const Counter: React.FC<CounterProps> = ({ value, onChange, label, unit, min = 1, max = 30 }) => (
+  <div className="flex flex-col gap-2">
+    <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">{label}</span>
+    <div className="flex items-center justify-between bg-white border border-gray-200 rounded-xl p-2 px-3">
+      <button
+        onClick={() => onChange(Math.max(min, value - 1))}
+        className="p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-teal-600 transition-colors"
+        disabled={value <= min}
+      >
+        <MinusIcon className="w-5 h-5" />
+      </button>
+      
+      <span className="font-semibold text-gray-800 tabular-nums">
+        {value} <span className="text-gray-400 text-sm font-normal">{unit}</span>
+      </span>
+      
+      <button
+        onClick={() => onChange(Math.min(max, value + 1))}
+        className="p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-teal-600 transition-colors"
+        disabled={value >= max}
+      >
+        <PlusIcon className="w-5 h-5" />
+      </button>
+    </div>
+  </div>
+);
+
+interface InterestCardProps {
+  id: string;
+  label: string;
+  selected: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+}
+
+const InterestCard: React.FC<InterestCardProps> = ({ label, selected, onClick, icon }) => (
+  <motion.button
+    whileTap={{ scale: 0.95 }}
+    onClick={onClick}
+    className={`relative flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all duration-200 h-24 ${
+      selected 
+        ? 'border-teal-500 bg-teal-50 text-teal-800 shadow-sm' 
+        : 'border-gray-100 bg-white text-gray-500 hover:border-gray-200 hover:bg-gray-50'
+    }`}
+  >
+    <div className={`mb-2 ${selected ? 'text-teal-600' : 'text-gray-400'}`}>
+      {icon}
+    </div>
+    <span className="text-xs font-medium text-center leading-tight">{label}</span>
+    {selected && (
+      <div className="absolute top-2 right-2 w-2 h-2 bg-teal-500 rounded-full" />
+    )}
+  </motion.button>
+);
+
+const HeroInput = ({ 
+  value, 
+  onChange, 
+  placeholder, 
+  label, 
+  icon,
+  large = false 
+}: { 
+  value: string; 
+  onChange: (val: string) => void; 
+  placeholder: string; 
+  label?: string; 
+  icon?: React.ReactNode;
+  large?: boolean;
+}) => (
+  <div className="relative group">
+    {label && <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">{label}</label>}
+    <div className={`relative flex items-center transition-all duration-300 ${large ? 'transform group-focus-within:scale-[1.01]' : ''}`}>
+      <div className={`absolute left-3 md:left-4 text-gray-400 pointer-events-none ${large ? 'w-6 h-6' : 'w-5 h-5'}`}>
+        {icon}
+      </div>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className={`w-full bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all outline-none text-gray-800 placeholder-gray-400 ${
+          large 
+            ? 'pl-12 py-4 text-lg md:text-xl font-bold shadow-sm' 
+            : 'pl-10 py-2.5 text-sm font-medium'
+        }`}
+      />
+    </div>
+  </div>
+);
+
+// --- NEW COMPONENT: Vehicle Selector ---
+const VehicleSelectionCard = ({ 
+  // type, 
+  label, 
+  selected, 
+  onClick, 
+  icon, 
+  price 
+}: { 
+  // type: string, 
+  label: string, 
+  selected: boolean, 
+  onClick: () => void, 
+  icon: React.ReactNode,
+  price: string
+}) => (
+  <button
+    onClick={onClick}
+    className={`flex flex-col items-center p-3 rounded-xl border transition-all duration-200 ${
+      selected 
+        ? 'border-teal-500 bg-teal-50 text-teal-800 ring-1 ring-teal-500' 
+        : 'border-gray-200 bg-white hover:border-teal-200 hover:bg-gray-50'
+    }`}
+  >
+    <div className={`mb-2 ${selected ? 'text-teal-600' : 'text-gray-400'}`}>
+      {icon}
+    </div>
+    <div className="text-sm font-bold">{label}</div>
+    <div className="text-xs text-gray-500 font-medium">{price}/day</div>
+  </button>
+);
+
+// --- Main Component ---
 
 const TripSettingsPanel: React.FC<TripSettingsPanelProps> = ({
   transport,
@@ -375,122 +238,261 @@ const TripSettingsPanel: React.FC<TripSettingsPanelProps> = ({
 }) => {
   const { t } = useTranslation();
   const { generatedStops, isGenerating } = useTripStore();
+  
+  // Local state for Rental (can be lifted to parent if needed later)
+  const [rentalPrefs, setRentalPrefs] = useState<RentalPreferences>({
+    enabled: false,
+    type: 'economy',
+    transmission: 'auto'
+  });
 
-  const interestOptions = ['outdoorsSport', 'cultureMuseum', 'fjordsMountains'];
-
-  const testimonials = [
-    {
-      name: 'Sarah Johnson',
-      image: '/assets/g-1.png',
-      quote: 'AfreshTrip made planning my Denmark adventure effortless. The personalized recommendations were spot on!'
-    },
-    {
-      name: 'Mike Chen',
-      image: '/assets/g-2.png',
-      quote: 'Incredible app! Saved me hours of research and helped me discover hidden gems I never knew existed.'
-    },
-    {
-      name: 'Emma Larsen',
-      image: '/assets/g-3.png',
-      quote: 'The best travel planning experience ever. Highly recommend to anyone visiting Scandinavia!'
-    },
-    {
-      name: 'David Nielsen',
-      image: '/assets/g-4.png',
-      quote: 'From route planning to local insights, AfreshTrip has everything you need for the perfect trip.'
-    }
+  const interestConfig = [
+    { id: 'outdoorsSport', icon: <CameraIcon className="w-6 h-6" /> },
+    { id: 'cultureMuseum', icon: <BuildingLibraryIcon className="w-6 h-6" /> },
+    { id: 'fjordsMountains', icon: <GlobeEuropeAfricaIcon className="w-6 h-6" /> },
   ];
 
+  const hasTrip = generatedStops.length > 0;
 
+  const toggleRental = () => {
+    setRentalPrefs(prev => ({ ...prev, enabled: !prev.enabled }));
+  };
 
   return (
-    <div className="h-full flex flex-col py-6 bg-transparent">
-      <h2 className="text-xl font-bold text-teal-900 mb-6 text-center">{t('trips.planYourTrip')}</h2>
+    <div className="h-full flex flex-col relative">
       
-      <TripCustomization
-        transport={transport}
-        setTransport={setTransport}
-        tripType={tripType}
-        setTripType={setTripType}
-        t={t}
-      />
-      
-      <RoutePlanner
-        departureCity={departureCity}
-        setDepartureCity={setDepartureCity}
-        destinationCity={destinationCity}
-        setDestinationCity={setDestinationCity}
-        useCurrentLocation={useCurrentLocation}
-        setUseCurrentLocation={setUseCurrentLocation}
-        stations={stations}
-        setStations={setStations}
-        duration={duration}
-        setDuration={setDuration}
-        t={t}
-    />
-      
-      {/* --- Interests Section --- */}
-      <div className="mb-6 p-4 border border-gray-200">
-        <label className="block text-xs md:text-sm text-gray-500 mb-2 font-semibold">{t('trips.interests')}</label>
-        <div className="bg-gray-50 p-3">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {interestOptions.map(interest => (
-              <DesignCheckbox
-                key={interest}
-                id={interest}
-                label={t(`trips.${interest}`)}
-                checked={interests.includes(interest)}
-                onChange={() => onToggleInterest(interest)}
+      {/* 1. Header Section */}
+      <div className="px-5 pt-6 pb-2">
+        <h2 className="text-2xl font-extrabold text-transparent bg-clip-text bg-linear-to-r from-teal-800 to-teal-600">
+          {t('trips.planYourTrip')}
+        </h2>
+        <p className="text-sm text-gray-500 mt-1">Design your perfect Nordic adventure</p>
+      </div>
+
+      {/* 2. Form Content */}
+      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-6">
+        
+        {/* --- Locations --- */}
+        <div className="space-y-4">
+          <HeroInput
+            label={t('trips.destinationCity')}
+            value={destinationCity}
+            onChange={setDestinationCity}
+            placeholder="Where to?"
+            icon={<SparklesIcon />}
+            large={true}
+          />
+
+          <div className="flex gap-2 items-end">
+            <div className="flex-1">
+              <HeroInput
+                label={t('trips.departureCity')}
+                value={departureCity}
+                onChange={setDepartureCity}
+                placeholder="Starting from..."
+                icon={<MapPinIcon />}
+              />
+            </div>
+            <button
+              onClick={() => setUseCurrentLocation(!useCurrentLocation)}
+              className={`p-2.5 rounded-xl border transition-all ${
+                useCurrentLocation 
+                  ? 'bg-teal-50 border-teal-200 text-teal-600' 
+                  : 'bg-white border-gray-200 text-gray-400 hover:border-gray-300'
+              }`}
+              title={t('trips.usingCurrentLocation')}
+            >
+              <MapPinIcon className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* --- Journey Details Grid --- */}
+        <div className="grid grid-cols-2 gap-4">
+          <SegmentedControl
+            label={t('trips.tripType')}
+            value={tripType}
+            onChange={setTripType}
+            options={[
+              { value: 'one', label: t('trips.oneWay') },
+              { value: 'return', label: t('trips.returnWay') }
+            ]}
+          />
+          
+          <SegmentedControl
+            label={t('trips.transportation')}
+            value={transport}
+            onChange={setTransport}
+            options={[
+              { value: 'car', label: 'Car', icon: <FaCar /> },
+              { value: 'bike', label: 'Bike', icon: <FaBicycle /> }
+            ]}
+          />
+        </div>
+
+        {/* --- CAR RENTAL SECTION (Conditional) --- */}
+        <AnimatePresence>
+          {transport === 'car' && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="bg-teal-50/50 border border-teal-100 rounded-2xl p-4 space-y-4">
+                {/* Header / Toggle */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <KeyIcon className="w-5 h-5 text-teal-700" />
+                    <span className="text-sm font-bold text-teal-900">Need a rental vehicle?</span>
+                  </div>
+                  <button
+                    onClick={toggleRental}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                      rentalPrefs.enabled ? 'bg-teal-600' : 'bg-gray-300'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        rentalPrefs.enabled ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Rental Options Grid */}
+                {rentalPrefs.enabled && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="space-y-3 pt-2"
+                  >
+                    <div className="grid grid-cols-3 gap-2">
+                      <VehicleSelectionCard
+                        // type="economy"
+                        label="Economy"
+                        price="$45"
+                        selected={rentalPrefs.type === 'economy'}
+                        onClick={() => setRentalPrefs(p => ({...p, type: 'economy'}))}
+                        icon={<BoltIcon className="w-6 h-6" />}
+                      />
+                      <VehicleSelectionCard
+                        // type="suv"
+                        label="SUV"
+                        price="$75"
+                        selected={rentalPrefs.type === 'suv'}
+                        onClick={() => setRentalPrefs(p => ({...p, type: 'suv'}))}
+                        icon={<TruckIcon className="w-6 h-6" />}
+                      />
+                      <VehicleSelectionCard
+                        // type="luxury"
+                        label="Luxury"
+                        price="$120"
+                        selected={rentalPrefs.type === 'luxury'}
+                        onClick={() => setRentalPrefs(p => ({...p, type: 'luxury'}))}
+                        icon={<TrophyIcon className="w-6 h-6" />}
+                      />
+                    </div>
+                    
+                    <div className="flex justify-center bg-white rounded-lg p-1 border border-gray-200">
+                      {(['auto', 'manual'] as const).map((trans) => (
+                        <button
+                          key={trans}
+                          onClick={() => setRentalPrefs(p => ({...p, transmission: trans}))}
+                          className={`flex-1 text-xs font-semibold py-1.5 rounded-md transition-colors ${
+                            rentalPrefs.transmission === trans 
+                              ? 'bg-gray-100 text-teal-800' 
+                              : 'text-gray-400 hover:text-gray-600'
+                          }`}
+                        >
+                          {trans === 'auto' ? 'Automatic' : 'Manual'}
+                        </button>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* --- Counters --- */}
+        <div className="grid grid-cols-2 gap-4">
+          <Counter
+            label={t('trips.duration')}
+            value={duration}
+            onChange={setDuration}
+            unit={t('trips.days')}
+            min={1}
+            max={14}
+          />
+          <Counter
+            label={t('trips.stations')}
+            value={stations}
+            onChange={setStations}
+            unit="stops"
+            min={1}
+            max={8}
+          />
+        </div>
+
+        {/* --- Interests --- */}
+        <div className="space-y-2">
+          <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">{t('trips.interests')}</span>
+          <div className="grid grid-cols-3 gap-3">
+            {interestConfig.map((config) => (
+              <InterestCard
+                key={config.id}
+                id={config.id}
+                label={t(`trips.${config.id}`)}
+                selected={interests.includes(config.id)}
+                onClick={() => onToggleInterest(config.id)}
+                icon={config.icon}
               />
             ))}
           </div>
         </div>
+
       </div>
 
-      {/* --- Generate Trip Section --- */}
-      <div className="mb-6">
-        {!isGenerating && generatedStops.length === 0 && (
-          <DesignButton
+      {/* 3. Action Footer */}
+      <div className="p-5 pt-2 bg-linear-to-t from-white via-white to-transparent">
+        {!hasTrip && (
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             onClick={onGenerateTrip}
-            disabled={!destinationCity}
-            variant="primary"
-            className="w-[50%] mx-auto"
+            disabled={!destinationCity || isGenerating}
+            className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg shadow-teal-900/10 flex items-center justify-center gap-2 transition-all ${
+              !destinationCity || isGenerating
+                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                : 'bg-linear-to-r from-teal-600 to-teal-800 text-white hover:shadow-teal-900/20'
+            }`}
           >
-            <div className="flex items-center">
-              <PlayIcon className="w-5 h-5 mr-2" />
-              {t('trips.generateTrip')}
-            </div>
-          </DesignButton>
+            {isGenerating ? (
+              <>
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span>Generating...</span>
+              </>
+            ) : (
+              <>
+                <PlayIcon className="w-6 h-6" />
+                <span>{t('trips.generateTrip')}</span>
+              </>
+            )}
+          </motion.button>
         )}
-      </div>
 
-      {/* --- Testimonials Section --- */}
-      {generatedStops.length === 0 && !isGenerating && (
-        <div className="mb-6">
-          <h3 className="text-lg font-bold text-teal-900 mb-4">{t('trips.testimonials')}</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {testimonials.map((testimonial, index) => (
-              <div key={index} className="bg-gray-50 border border-gray-200 p-4">
-                <div className="flex items-center mb-2">
-                  <img src={testimonial.image} alt={testimonial.name} className="w-12 h-12 rounded-full mr-3" />
-                  <h4 className="font-semibold text-gray-800">{testimonial.name}</h4>
-                </div>
-                <p className="text-gray-600 text-sm italic">"{testimonial.quote}"</p>
-              </div>
-            ))}
+        {(hasTrip || isGenerating) && (
+          <div className="mt-2">
+             <TripGenerationCard
+              onGenerateTrip={onGenerateTrip}
+              onStartNavigation={onStartNavigation}
+            />
           </div>
-        </div>
-      )}
-
-      {/* --- Trip Generation Section --- */}
-      <div className="grow overflow-y-auto">
-        {(isGenerating || generatedStops.length > 0) && (
-          <TripGenerationCard
-            onGenerateTrip={onGenerateTrip}
-            onStartNavigation={onStartNavigation}
-          />
         )}
       </div>
+
     </div>
   );
 };

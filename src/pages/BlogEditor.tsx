@@ -8,7 +8,8 @@ import { FiSettings, FiArrowLeft, FiImage, FiX, FiCheck, FiGlobe, FiLock, FiAler
 import { useBlog } from '../contexts/BlogContext';
 import { useSnackbar } from '../contexts/SnackbarContext';
 import { useDebounce } from '../hooks/useDebounce';
-import FeatureGate from '../components/FeatureGate';
+import { useFeatureAccess } from '../hooks/useFeatureAccess';
+import FeatureAccessModal from '../components/FeatureAccessModal';
 import { FeatureId } from '../types/features';
 import PhotoLibrary from '../components/PhotoLibrary';
 import { CategoryService } from '../services/api/categoryService';
@@ -41,6 +42,7 @@ const BlogEditor: React.FC = () => {
   // const { user } = useAuth();
   const { createBlogPost, updateBlogPost, getBlogPostById } = useBlog();
   const { showError, showSuccess } = useSnackbar();
+  const { checkFeatureAccess } = useFeatureAccess();
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isPhotoLibraryOpen, setIsPhotoLibraryOpen] = useState(false);
@@ -51,6 +53,8 @@ const BlogEditor: React.FC = () => {
   const [readingTime, setReadingTime] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
   const [isPreview, setIsPreview] = useState(false);
+  const [hasFeatureAccess, setHasFeatureAccess] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   
   const {
     register,
@@ -75,6 +79,20 @@ const BlogEditor: React.FC = () => {
 
   const watchedValues = watch();
   const debouncedValues = useDebounce(watchedValues, 2000);
+
+  // Check feature access on mount
+  useEffect(() => {
+    const checkAccess = async () => {
+      try {
+        const access = await checkFeatureAccess(FeatureId.BLOG_PUBLISHING);
+        setHasFeatureAccess(access.hasAccess);
+      } catch (error) {
+        console.error('Error checking feature access:', error);
+        setHasFeatureAccess(false);
+      }
+    };
+    checkAccess();
+  }, [checkFeatureAccess]);
 
   // --- TIPTAP CONFIGURATION ---
   const editor = useEditor({
@@ -350,33 +368,14 @@ const BlogEditor: React.FC = () => {
     }
   };
 
+
+
+
+
   return (
-    <FeatureGate
-      feature={FeatureId.BLOG_PUBLISHING}
-      fallback={
-        <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-8">
-          <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-6 text-center">
-            <div className="mb-4">
-              <svg className="h-16 w-16 text-gray-400 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-            </div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Blog Publishing</h2>
-            <p className="text-gray-600 mb-4">Create and publish amazing blog posts about your travel experiences.</p>
-            <p className="text-sm text-gray-500">This feature requires a subscription. Upgrade your account to start blogging!</p>
-            <a
-              href="/subscription"
-              className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              Upgrade to Blog
-            </a>
-          </div>
-        </div>
-      }
-    >
-      <div className="min-h-screen bg-white flex flex-col">
+    <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50 to-teal-50 flex flex-col">
         {/* HEADER */}
-        <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-sm border-b border-gray-100 px-4 h-16 flex items-center justify-between">
+        <header className="sticky top-0 z-30 glass-effect border-b border-teal-200/30 px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button onClick={() => navigate(-1)} className="p-2 hover:bg-gray-100 rounded-full text-gray-600 transition-colors">
               <FiArrowLeft className="w-5 h-5" />
@@ -386,7 +385,7 @@ const BlogEditor: React.FC = () => {
                 {watch('title') || t('blog.untitled')}
               </span>
               <div className="flex items-center gap-2 text-xs">
-                {saveStatus === 'saving' && <span className="text-blue-600 animate-pulse">{t('blog.saving')}...</span>}
+                {saveStatus === 'saving' && <span className="text-teal-600 animate-pulse">{t('blog.saving')}...</span>}
                 {saveStatus === 'saved' && <span className="text-green-600 flex items-center gap-1"><FiCheck /> {t('blog.saved')}</span>}
                 {saveStatus === 'error' && <span className="text-red-600">{t('blog.errorSaving')}</span>}
                 {saveStatus === 'forbidden' && (
@@ -404,11 +403,17 @@ const BlogEditor: React.FC = () => {
 
           <div className="flex items-center gap-3">
              <button
-              onClick={handlePublishToggle}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+              onClick={() => {
+                if (!hasFeatureAccess) {
+                  setShowUpgradeModal(true);
+                  return;
+                }
+                handlePublishToggle();
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
                 watch('isPublished') 
-                  ? 'bg-green-100 text-green-700 hover:bg-green-200' 
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  ? 'bg-linear-to-r from-emerald-100 to-teal-100 text-emerald-700 hover:from-emerald-200 hover:to-teal-200 shadow-md' 
+                  : 'bg-linear-to-r from-slate-100 to-blue-100 text-slate-600 hover:from-slate-200 hover:to-blue-200'
               }`}
             >
               {watch('isPublished') ? <FiGlobe /> : <FiLock />}
@@ -416,22 +421,28 @@ const BlogEditor: React.FC = () => {
             </button>
 
             <button
-              onClick={handleSubmit(onSubmit)}
-              className="bg-black text-white px-6 py-2 rounded-full text-sm font-medium hover:bg-gray-800 transition-transform active:scale-95"
+              onClick={handleSubmit((data) => {
+                if (!hasFeatureAccess) {
+                  setShowUpgradeModal(true);
+                  return;
+                }
+                onSubmit(data);
+              })}
+              className="bg-linear-to-r from-teal-500 to-cyan-500 text-white px-6 py-2 rounded-full text-sm font-medium hover:from-teal-600 hover:to-cyan-600 transition-all duration-200 transform hover:scale-105 shadow-lg"
             >
               {saveStatus === 'saving' ? t('blog.saving') : t('blog.save')}
             </button>
             
             <button
               onClick={() => setIsPreview(!isPreview)}
-              className={`p-2 rounded-full transition-colors ${isPreview ? 'bg-gray-100 text-black' : 'text-gray-500 hover:bg-gray-50'}`}
+              className={`p-2 rounded-full transition-all duration-200 ${isPreview ? 'bg-linear-to-r from-teal-100 to-cyan-100 text-teal-700 shadow-md' : 'text-slate-500 hover:bg-linear-to-r hover:from-slate-100 hover:to-blue-100'}`}
             >
               <FiGlobe className="w-6 h-6" />
             </button>
 
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className={`p-2 rounded-full transition-colors ${isSidebarOpen ? 'bg-gray-100 text-black' : 'text-gray-500 hover:bg-gray-50'}`}
+              className={`p-2 rounded-full transition-all duration-200 ${isSidebarOpen ? 'bg-linear-to-r from-teal-100 to-cyan-100 text-teal-700 shadow-md' : 'text-slate-500 hover:bg-linear-to-r hover:from-slate-100 hover:to-blue-100'}`}
             >
               <FiSettings className="w-6 h-6" />
             </button>
@@ -440,7 +451,7 @@ const BlogEditor: React.FC = () => {
 
         {/* EDITOR / PREVIEW */}
         <main className="flex-1 max-w-4xl mx-auto w-full px-4 py-12 flex relative">
-          <div className="w-full">
+          <div className="w-full bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 p-8">
             {isPreview ? (
               <div className="prose prose-lg max-w-none">
                 <h1 className="text-4xl md:text-5xl font-bold mb-8">
@@ -485,14 +496,14 @@ const BlogEditor: React.FC = () => {
                 {editor && (
                   <BubbleMenu
                     editor={editor}
-                    className="bg-white shadow-xl border border-gray-100 rounded-lg overflow-hidden flex flex-wrap divide-x divide-gray-100 max-w-sm"
+                    className="bg-white/95 backdrop-blur-sm shadow-xl border border-teal-200/30 rounded-lg overflow-hidden flex flex-wrap divide-x divide-teal-200/30 max-w-sm"
                     role="toolbar"
                     aria-label={t('blog.formattingToolbar', 'Text formatting toolbar')}
                   >
                     <button
                       type="button"
                       onClick={() => editor.chain().focus().toggleBold().run()}
-                      className={`p-3 md:p-2 hover:bg-gray-50 ${editor.isActive('bold') ? 'text-blue-600' : 'text-gray-600'}`}
+                      className={`p-3 md:p-2 hover:bg-linear-to-r hover:from-slate-100 hover:to-blue-100 transition-all duration-200 ${editor.isActive('bold') ? 'text-teal-600 bg-linear-to-r from-teal-50 to-cyan-50' : 'text-slate-600'}`}
                       aria-label={t('blog.toggleBold', 'Toggle bold')}
                       aria-pressed={editor.isActive('bold')}
                     >
@@ -501,7 +512,7 @@ const BlogEditor: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => editor.chain().focus().toggleItalic().run()}
-                      className={`p-3 md:p-2 hover:bg-gray-50 ${editor.isActive('italic') ? 'text-blue-600' : 'text-gray-600'}`}
+                      className={`p-3 md:p-2 hover:bg-linear-to-r hover:from-slate-100 hover:to-blue-100 transition-all duration-200 ${editor.isActive('italic') ? 'text-teal-600 bg-linear-to-r from-teal-50 to-cyan-50' : 'text-slate-600'}`}
                       aria-label={t('blog.toggleItalic', 'Toggle italic')}
                       aria-pressed={editor.isActive('italic')}
                     >
@@ -510,7 +521,7 @@ const BlogEditor: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-                      className={`p-3 md:p-2 hover:bg-gray-50 ${editor.isActive('heading', { level: 1 }) ? 'text-blue-600' : 'text-gray-600'}`}
+                      className={`p-3 md:p-2 hover:bg-linear-to-r hover:from-slate-100 hover:to-blue-100 transition-all duration-200 ${editor.isActive('heading', { level: 1 }) ? 'text-teal-600 bg-linear-to-r from-teal-50 to-cyan-50' : 'text-slate-600'}`}
                       aria-label={t('blog.toggleHeading1', 'Toggle heading level 1')}
                       aria-pressed={editor.isActive('heading', { level: 1 })}
                     >
@@ -519,7 +530,7 @@ const BlogEditor: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-                      className={`p-3 md:p-2 hover:bg-gray-50 ${editor.isActive('heading', { level: 2 }) ? 'text-blue-600' : 'text-gray-600'}`}
+                      className={`p-3 md:p-2 hover:bg-linear-to-r hover:from-slate-100 hover:to-blue-100 transition-all duration-200 ${editor.isActive('heading', { level: 2 }) ? 'text-teal-600 bg-linear-to-r from-teal-50 to-cyan-50' : 'text-slate-600'}`}
                       aria-label={t('blog.toggleHeading2', 'Toggle heading level 2')}
                       aria-pressed={editor.isActive('heading', { level: 2 })}
                     >
@@ -528,7 +539,7 @@ const BlogEditor: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-                      className={`p-3 md:p-2 hover:bg-gray-50 ${editor.isActive('heading', { level: 3 }) ? 'text-blue-600' : 'text-gray-600'}`}
+                      className={`p-3 md:p-2 hover:bg-linear-to-r hover:from-slate-100 hover:to-blue-100 transition-all duration-200 ${editor.isActive('heading', { level: 3 }) ? 'text-teal-600 bg-linear-to-r from-teal-50 to-cyan-50' : 'text-slate-600'}`}
                       aria-label={t('blog.toggleHeading3', 'Toggle heading level 3')}
                       aria-pressed={editor.isActive('heading', { level: 3 })}
                     >
@@ -537,7 +548,7 @@ const BlogEditor: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => editor.chain().focus().toggleBulletList().run()}
-                      className={`p-3 md:p-2 hover:bg-gray-50 ${editor.isActive('bulletList') ? 'text-blue-600' : 'text-gray-600'}`}
+                      className={`p-3 md:p-2 hover:bg-linear-to-r hover:from-slate-100 hover:to-blue-100 transition-all duration-200 ${editor.isActive('bulletList') ? 'text-teal-600 bg-linear-to-r from-teal-50 to-cyan-50' : 'text-slate-600'}`}
                       aria-label={t('blog.toggleBulletList', 'Toggle bullet list')}
                       aria-pressed={editor.isActive('bulletList')}
                     >
@@ -546,7 +557,7 @@ const BlogEditor: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => editor.chain().focus().toggleOrderedList().run()}
-                      className={`p-3 md:p-2 hover:bg-gray-50 ${editor.isActive('orderedList') ? 'text-blue-600' : 'text-gray-600'}`}
+                      className={`p-3 md:p-2 hover:bg-linear-to-r hover:from-slate-100 hover:to-blue-100 transition-all duration-200 ${editor.isActive('orderedList') ? 'text-teal-600 bg-linear-to-r from-teal-50 to-cyan-50' : 'text-slate-600'}`}
                       aria-label={t('blog.toggleOrderedList', 'Toggle ordered list')}
                       aria-pressed={editor.isActive('orderedList')}
                     >
@@ -560,7 +571,7 @@ const BlogEditor: React.FC = () => {
                           editor.chain().focus().setLink({ href: url }).run();
                         }
                       }}
-                      className={`p-3 md:p-2 hover:bg-gray-50 ${editor.isActive('link') ? 'text-blue-600' : 'text-gray-600'}`}
+                      className={`p-3 md:p-2 hover:bg-linear-to-r hover:from-slate-100 hover:to-blue-100 transition-all duration-200 ${editor.isActive('link') ? 'text-teal-600 bg-linear-to-r from-teal-50 to-cyan-50' : 'text-slate-600'}`}
                       aria-label={t('blog.insertLink', 'Insert link')}
                       aria-pressed={editor.isActive('link')}
                     >
@@ -621,17 +632,17 @@ const BlogEditor: React.FC = () => {
                 animate={{ x: 0, y: 0 }}
                 exit={isMobile ? { y: '100%' } : { x: '100%' }}
                 transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                className={`fixed bg-white shadow-2xl z-50 overflow-y-auto ${
+                className={`fixed bg-white/95 backdrop-blur-lg shadow-2xl z-50 overflow-y-auto border-t border-teal-200/30 ${
                   isMobile
-                    ? 'bottom-0 left-0 right-0 h-3/4 border-t border-gray-100'
-                    : 'right-0 top-0 bottom-0 w-96 border-l border-gray-100'
+                    ? 'bottom-0 left-0 right-0 h-3/4'
+                    : 'right-0 top-0 bottom-0 w-96 border-l border-teal-200/30'
                 }`}
               >
                 <div className="p-6">
                   <div className="flex items-center justify-between mb-8">
                     <h2 className="text-lg font-semibold">{t('blog.postSettings')}</h2>
-                    <button onClick={() => setIsSidebarOpen(false)} className="p-2 hover:bg-gray-100 rounded-full">
-                      <FiX />
+                    <button onClick={() => setIsSidebarOpen(false)} className="p-2 hover:bg-linear-to-r hover:from-slate-100 hover:to-blue-100 rounded-full transition-all duration-200">
+                      <FiX className="text-slate-600" />
                     </button>
                   </div>
 
@@ -717,7 +728,7 @@ const BlogEditor: React.FC = () => {
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">{t('blog.seoPreview', 'SEO Preview')}</label>
                       <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                        <div className="text-blue-600 text-lg font-medium hover:underline cursor-pointer">
+                        <div className="text-teal-600 text-lg font-medium hover:underline cursor-pointer">
                           {watch('title') || t('blog.untitled')}
                         </div>
                         <div className="text-green-600 text-sm">
@@ -740,9 +751,16 @@ const BlogEditor: React.FC = () => {
           onClose={() => setIsPhotoLibraryOpen(false)}
           onInsert={insertImageFromLibrary}
         />
+
+        {/* Upgrade Modal Overlay */}
+        <FeatureAccessModal
+          isOpen={showUpgradeModal}
+          onClose={() => setShowUpgradeModal(false)}
+          featureId={FeatureId.BLOG_PUBLISHING}
+          featureName={t('blog.publishing', 'Blog Publishing')}
+        />
       </div>
-    </FeatureGate>
-  );
+    );
 };
 
 export default BlogEditor;

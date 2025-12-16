@@ -1,6 +1,7 @@
-// src/components/SubscriptionCard.tsx
-import React, { useState } from 'react';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { motion, AnimatePresence } from 'framer-motion';
+import { CheckIcon, ArrowRightIcon, StarIcon } from '@heroicons/react/24/solid';
 import type { SubscriptionPlan } from '../types/subscription';
 
 interface SubscriptionCardProps {
@@ -26,7 +27,6 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
   showComparison = true,
   onCompareClick,
 }) => {
-  const [isHovered, setIsHovered] = useState(false);
   const { t } = useTranslation();
 
   const getPeriod = (durationDays: number) => {
@@ -39,248 +39,148 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
     }
   };
 
-  const handleCardClick = () => {
-    if (!plan.isDisabled && !isLoading && onClick) {
-      onClick();
-    }
-  };
-
   const handleButtonClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!plan.isDisabled && !isLoading && onButtonClick) {
-      onButtonClick();
-    }
+    if (!plan.isDisabled && !isLoading && onButtonClick) onButtonClick();
   };
 
-  const handleCompareClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (onCompareClick) {
-      onCompareClick();
-    }
-  };
-
-  const getButtonVariant = () => {
-    if (plan.isDisabled) return 'disabled';
-    if (isLoading) return 'loading';
-    if (isSelected) return 'selected';
-    return 'default';
-  };
-
-  const getButtonClass = () => {
-    const baseClass = 'w-full py-3 px-6 rounded-xl font-semibold text-base transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2';
-    
-    switch (getButtonVariant()) {
-      case 'disabled':
-        return `${baseClass} bg-gray-100 text-gray-400 cursor-not-allowed`;
-      case 'loading':
-        return `${baseClass} bg-gradient-to-r from-teal-500 to-emerald-500 text-white cursor-wait shadow-lg`;
-      case 'selected':
-        return `${baseClass} bg-gradient-to-r from-teal-500 to-emerald-500 text-white shadow-lg shadow-teal-200`;
-      default:
-        return `${baseClass} bg-gradient-to-r from-teal-500 to-emerald-500 text-white hover:from-teal-600 hover:to-emerald-600 shadow-lg shadow-teal-200 hover:shadow-xl hover:shadow-teal-300 focus:ring-teal-500`;
-    }
-  };
-
-  const getCardClass = () => {
-    const baseClass = `relative flex flex-col h-full p-8 rounded-2xl transition-all duration-300 ${className}`;
-    
-    if (plan.isDisabled) {
-      return `${baseClass} bg-gray-50 border border-gray-200 opacity-60 cursor-not-allowed`;
-    }
-    
-    if (isSelected) {
-      return `${baseClass} bg-gradient-to-br from-white to-teal-50 border-2 border-teal-500 shadow-2xl shadow-teal-100 transform scale-[1.02] cursor-pointer`;
-    }
-    
-    if (isHovered) {
-      return `${baseClass} bg-white border-2 border-teal-300 shadow-xl transform -translate-y-2 cursor-pointer`;
-    }
-    
-    return `${baseClass} bg-white border border-gray-200 shadow-lg hover:shadow-xl cursor-pointer`;
-  };
-
-  const renderBadge = () => {
-    if (!plan.badgeTextKey && !plan.isPopular && !plan.isBestValue) return null;
-
-    const badgeTextToRender = plan.badgeTextKey
-      ? t(plan.badgeTextKey)
-      : (plan.isBestValue ? t('subscriptionCard.bestValue') : t('subscriptionCard.popular'));
-    
-    const badgeStyles = plan.isBestValue
-      ? 'bg-gradient-to-r from-purple-500 to-pink-500'
-      : 'bg-gradient-to-r from-orange-400 to-red-500';
-
-    return (
-      <div className={`absolute -top-3 left-1/2 transform -translate-x-1/2 ${badgeStyles} text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-lg`}>
-        {badgeTextToRender}
-      </div>
-    );
-  };
-
-  const renderPrice = () => {
-    return (
-      <div className="text-center mb-8">
-        <div className="flex items-baseline justify-center">
-          <span className="text-2xl font-semibold text-gray-600">{currency}</span>
-          <span className="text-5xl font-bold text-gray-900 mx-1">{plan.price}</span>
-          <span className="text-gray-500 text-lg">/{getPeriod(plan.durationDays)}</span>
-        </div>
-        {plan.originalPrice && plan.discount && (
-          <div className="mt-3 flex items-center justify-center gap-3">
-            <span className="text-lg text-gray-400 line-through">{currency}{plan.originalPrice}</span>
-            <span className="inline-flex items-center bg-linear-to-r from-red-100 to-orange-100 text-red-600 text-sm font-semibold px-3 py-1 rounded-full">
-              <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M5 2a2 2 0 00-2 2v14l3.5-2 3.5 2 3.5-2 3.5 2V4a2 2 0 00-2-2H5zm2.5 3a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm6.207.293a1 1 0 00-1.414 0l-6 6a1 1 0 101.414 1.414l6-6a1 1 0 000-1.414zM12.5 10a1.5 1.5 0 100 3 1.5 1.5 0 000-3z" clipRule="evenodd" />
-              </svg>
-              {plan.discount}% {t('subscriptionCard.off')}
-            </span>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const renderFeatures = () => {
-    return (
-      <ul className="space-y-4 mb-8 grow">
-        {plan.featureNames.map((featureName, index) => (
-          <li key={index} className="flex items-start">
-            <span className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center mr-3 bg-linear-to-r from-teal-400 to-emerald-500 shadow-sm">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-            </span>
-            <span className="text-base text-gray-700 font-medium">
-              {featureName}
-            </span>
-          </li>
-        ))}
-      </ul>
-    );
-  };
-
-  const renderButton = () => {
-    const buttonLabel = isSelected
-      ? t('subscriptionCard.currentPlan')
-      : t('subscriptionCard.selectPlan');
-    
-    return (
-      <button
-        className={getButtonClass()}
-        onClick={handleButtonClick}
-        disabled={plan.isDisabled || isLoading}
-        aria-label={buttonLabel}
-      >
-        {isLoading ? (
-          <span className="flex items-center justify-center">
-            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            {t('subscriptionCard.processing')}
-          </span>
-        ) : (
-          <span className="flex items-center justify-center">
-            {buttonLabel}
-            {!isSelected && (
-              <svg className="ml-2 w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-              </svg>
-            )}
-          </span>
-        )}
-      </button>
-    );
-  };
-
+  // Skeleton State
   if (isLoading) {
     return (
-      <div className="relative flex flex-col h-full p-8 rounded-2xl bg-white border border-gray-200 shadow-lg animate-pulse">
-        {/* Badge Skeleton */}
-        <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-gray-200 text-white text-xs font-bold px-4 py-1.5 rounded-full w-20 h-6"></div>
-
-        {/* Plan Name Skeleton */}
-        <div className="text-center mb-6 pt-2">
-          <div className="h-8 bg-gray-200 rounded w-3/4 mx-auto"></div>
-        </div>
-
-        {/* Price Section Skeleton */}
-        <div className="text-center mb-8">
-          <div className="flex items-baseline justify-center mb-3">
-            <div className="h-6 bg-gray-200 rounded w-8 mr-1"></div>
-            <div className="h-12 bg-gray-200 rounded w-16 mr-1"></div>
-            <div className="h-5 bg-gray-200 rounded w-12"></div>
-          </div>
-        </div>
-
-        {/* Divider */}
-        <div className="border-t border-gray-100 mb-6"></div>
-
-        {/* Features Skeleton */}
-        <ul className="space-y-4 mb-8 flex-grow">
-          {[...Array(5)].map((_, index) => (
-            <li key={index} className="flex items-start">
-              <div className="shrink-0 w-6 h-6 rounded-full bg-gray-200 mr-3"></div>
-              <div className="h-5 bg-gray-200 rounded flex-1"></div>
-            </li>
+      <div className="relative flex flex-col h-full p-8 rounded-3xl bg-white border border-gray-100 shadow-xl animate-pulse">
+        <div className="h-4 w-24 bg-gray-200 rounded-full mx-auto mb-6" />
+        <div className="h-10 w-32 bg-gray-200 rounded-lg mx-auto mb-4" />
+        <div className="h-6 w-20 bg-gray-100 rounded-lg mx-auto mb-8" />
+        <div className="space-y-4 mb-8">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="flex items-center gap-3">
+              <div className="h-5 w-5 rounded-full bg-gray-100" />
+              <div className="h-4 flex-1 bg-gray-100 rounded" />
+            </div>
           ))}
-        </ul>
-
-        {/* CTA Button Skeleton */}
-        <div className="w-full py-3 px-6 rounded-xl bg-gray-200 h-12"></div>
-
-        {/* Compare Link Skeleton */}
-        {showComparison && (
-          <div className="mt-4 text-center">
-            <div className="h-4 bg-gray-200 rounded w-24 mx-auto"></div>
-          </div>
-        )}
+        </div>
+        <div className="mt-auto h-12 w-full bg-gray-200 rounded-xl" />
       </div>
     );
   }
 
-  return (
-    <div
-      className={getCardClass()}
-      onClick={handleCardClick}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      role="button"
-      tabIndex={plan.isDisabled ? -1 : 0}
-      onKeyDown={(e) => e.key === 'Enter' && handleCardClick()}
-      aria-label={`${plan.planName} subscription plan, ${currency}${plan.price} per ${getPeriod(plan.durationDays)}`}
-    >
-      {renderBadge()}
+  const isHighlighted = plan.isPopular || plan.isBestValue;
 
-      {/* Plan Name */}
-      <div className="text-center mb-6 pt-2">
-        <h3 className="text-2xl font-bold text-gray-900">{plan.planName}</h3>
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={!plan.isDisabled ? { y: -8, transition: { duration: 0.2 } } : {}}
+      onClick={() => !plan.isDisabled && onClick?.()}
+      className={`
+        relative flex flex-col h-full p-8 rounded-3xl transition-all duration-300
+        ${plan.isDisabled ? 'opacity-60 cursor-not-allowed bg-gray-50 border-gray-200' : 'cursor-pointer'}
+        ${isSelected 
+          ? 'ring-2 ring-teal-500 bg-teal-50/30 shadow-2xl shadow-teal-100' 
+          : 'bg-white border border-gray-100 hover:border-teal-200 shadow-xl hover:shadow-2xl hover:shadow-teal-100/50'}
+        ${className}
+      `}
+    >
+      {/* Popular/Best Value Badge */}
+      <AnimatePresence>
+        {isHighlighted && (
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className={`absolute -top-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-4 py-1.5 rounded-full text-white text-xs font-bold tracking-wide shadow-lg z-10
+              ${plan.isBestValue ? 'bg-linear-to-r from-purple-600 to-indigo-600' : 'bg-linear-to-r from-orange-500 to-pink-500'}`}
+          >
+            <StarIcon className="w-3.5 h-3.5" />
+            {plan.badgeTextKey ? t(plan.badgeTextKey) : (plan.isBestValue ? t('subscriptionCard.bestValue') : t('subscriptionCard.popular'))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Header */}
+      <div className="text-center mb-6">
+        <h3 className={`text-xl font-bold mb-4 ${isSelected ? 'text-teal-900' : 'text-gray-900'}`}>
+          {plan.planName}
+        </h3>
+        
+        <div className="flex items-baseline justify-center gap-1">
+          <span className="text-2xl font-medium text-gray-500">{currency}</span>
+          <span className="text-5xl font-extrabold tracking-tight text-gray-900">
+            {plan.price}
+          </span>
+          <span className="text-gray-500 font-medium">/{getPeriod(plan.durationDays)}</span>
+        </div>
+
+        {plan.originalPrice && (
+          <div className="mt-2 flex items-center justify-center gap-2">
+            <span className="text-gray-400 line-through text-sm">{currency}{plan.originalPrice}</span>
+            <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase">
+              {t('subscriptionCard.save')} {plan.discount}%
+            </span>
+          </div>
+        )}
       </div>
 
-      {/* Price Section */}
-      {renderPrice()}
+      <div className="h-px bg-linear-to-r from-transparent via-gray-100 to-transparent mb-8" />
 
-      {/* Divider */}
-      <div className="border-t border-gray-100 mb-6"></div>
+      {/* Features List */}
+      <ul className="space-y-4 mb-10 grow">
+        {plan.featureNames.map((feature, idx) => (
+          <li key={idx} className="flex items-start gap-3 group">
+            <div className={`mt-0.5 shrink-0 w-5 h-5 rounded-full flex items-center justify-center transition-colors
+              ${isSelected ? 'bg-teal-500' : 'bg-teal-100 group-hover:bg-teal-200'}`}>
+              <CheckIcon className={`w-3.5 h-3.5 ${isSelected ? 'text-white' : 'text-teal-600'}`} />
+            </div>
+            <span className={`text-sm font-medium leading-tight ${isSelected ? 'text-gray-800' : 'text-gray-600'}`}>
+              {feature}
+            </span>
+          </li>
+        ))}
+      </ul>
 
-      {/* Features */}
-      {renderFeatures()}
+      {/* Call to Action */}
+      <motion.button
+        whileTap={{ scale: 0.98 }}
+        onClick={handleButtonClick}
+        disabled={plan.isDisabled || isLoading}
+        className={`
+          relative w-full py-4 px-6 rounded-2xl font-bold text-sm uppercase tracking-wider transition-all duration-300 overflow-hidden
+          ${isSelected 
+            ? 'bg-gray-900 text-white shadow-xl hover:bg-gray-800' 
+            : 'bg-linear-to-r from-teal-500 to-emerald-500 text-white shadow-lg shadow-teal-200 hover:shadow-teal-300 hover:brightness-110'}
+          ${plan.isDisabled ? 'bg-gray-100 text-gray-400 shadow-none cursor-not-allowed' : ''}
+        `}
+      >
+        <span className="relative z-10 flex items-center justify-center gap-2">
+          {isLoading ? (
+            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          ) : (
+            <>
+              {isSelected ? t('subscriptionCard.currentPlan') : t('subscriptionCard.selectPlan')}
+              {!isSelected && <ArrowRightIcon className="w-4 h-4" />}
+            </>
+          )}
+        </span>
+      </motion.button>
 
-      {/* CTA Button */}
-      {renderButton()}
-
-      {/* Compare Link */}
+      {/* Comparison Link */}
       {showComparison && !plan.isDisabled && (
-        <div className="mt-4 text-center">
-          <button
-            className="text-sm text-teal-600 hover:text-teal-700 font-medium focus:outline-none transition-colors duration-200 hover:underline"
-            onClick={handleCompareClick}
-          >
-            {t('subscriptionCard.comparePlans')}
-          </button>
-        </div>
+        <button
+          onClick={(e) => { e.stopPropagation(); onCompareClick?.(); }}
+          className="mt-6 text-xs font-bold text-gray-400 hover:text-teal-600 uppercase tracking-widest transition-colors cursor-pointer"
+        >
+          {t('subscriptionCard.comparePlans')}
+        </button>
       )}
-    </div>
+
+      {/* Selection Glow Effect */}
+      {isSelected && (
+        <motion.div
+          layoutId="glow"
+          className="absolute inset-0 -z-10 bg-teal-400/5 blur-2xl rounded-3xl"
+        />
+      )}
+    </motion.div>
   );
 };
 

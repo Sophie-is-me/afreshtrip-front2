@@ -105,7 +105,7 @@ const Profile: React.FC = () => {
   const initialFormData = useMemo<ProfileFormData>(() => ({
     username: userProfile?.nickname || user?.displayName || '',
     email: userProfile?.email || user?.email || '',
-    mobile: userProfile?.phone || user?.phoneNumber || '',
+    mobile: userProfile?.phone || (user && 'phone' in user ? user.phone : '') || '',
     dob: userProfile?.birthDate ? userProfile.birthDate.split('T')[0] : '',
     gender: userProfile?.gender && typeof userProfile.gender === 'string' ? userProfile.gender.charAt(0).toUpperCase() + userProfile.gender.slice(1).toLowerCase() : '',
   }), [userProfile, user]);

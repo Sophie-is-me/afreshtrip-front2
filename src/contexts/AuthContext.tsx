@@ -5,13 +5,35 @@ import { apiClient, type UserInfo } from '../services/apiClient';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { QUERY_KEYS } from '../lib/react-query/queryKeys';
 
+// Custom user type for Chinese authentication
+interface CustomUser {
+  uid: string;
+  email?: string;
+  phone?: string;
+  displayName?: string;
+  photoURL?: string;
+  emailVerified: boolean;
+  isCustomAuth: true;
+  metadata?: {
+    creationTime: string;
+  };
+}
+
+// Union type for Firebase or Custom user
+type AuthUser = User | CustomUser;
+
 interface AuthContextType {
-  user: User | null;
+  user: AuthUser | null;
   userProfile: UserInfo | null;
   loading: boolean;
+  isCustomAuth: boolean;
   loginWithEmail: (email: string, password: string) => Promise<void>;
   registerWithEmail: (email: string, password: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
+  loginWithSms: (phone: string, code: string) => Promise<void>;
+  loginWithEmailCode: (email: string, code: string) => Promise<void>;
+  loginWithAlipay: () => Promise<void>;
+  loginWithWeChat: () => Promise<void>;
   logout: () => Promise<void>;
   updateUserProfile: (profileData: {
     nickname?: string;
@@ -36,6 +58,7 @@ export const useAuth = () => {
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
+  const [customUser, setCustomUser] = useState<CustomUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const queryClient = useQueryClient();
 
@@ -88,8 +111,94 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await signInWithPopup(auth, googleProvider);
   };
 
+  const loginWithSms = async (phone: string, code: string) => {
+    try {
+      const response = await apiClient.verifySmsCode(phone, code);
+      
+      if (response.code === 200 && response.data) {
+        // Store the custom JWT token
+        localStorage.setItem('custom_auth_token', response.data.token);
+        
+        // Create a mock Firebase user for compatibility
+        const mockCustomUser: CustomUser = {
+          uid: response.data.userId.toString(),
+          phone: response.data.phone,
+          displayName: response.data.nickname,
+          emailVerified: true,
+          isCustomAuth: true
+        };
+        
+        setCustomUser(mockCustomUser);
+        
+        // Update user profile with the new user info
+        await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.user.profile(response.data.userId.toString()) });
+      } else {
+        throw new Error(response.message || 'SMS verification failed');
+      }
+    } catch (error) {
+      console.error('SMS login error:', error);
+      throw error;
+    }
+  };
+
+  const loginWithEmailCode = async (email: string, code: string) => {
+    try {
+      const response = await apiClient.verifyEmailCode(email, code);
+      
+      if (response.code === 200 && response.data) {
+        // Store the custom JWT token
+        localStorage.setItem('custom_auth_token', response.data.token);
+        
+        // Create a mock Firebase user for compatibility
+        const mockCustomUser: CustomUser = {
+          uid: response.data.userId.toString(),
+          email: response.data.email,
+          displayName: response.data.nickname,
+          emailVerified: true,
+          isCustomAuth: true
+        };
+        
+        setCustomUser(mockCustomUser);
+        
+        // Update user profile with the new user info
+        await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.user.profile(response.data.userId.toString()) });
+      } else {
+        throw new Error(response.message || 'Email verification failed');
+      }
+    } catch (error) {
+      console.error('Email login error:', error);
+      throw error;
+    }
+  };
+
+  const loginWithAlipay = async () => {
+    // Placeholder for Alipay login - will call backend API later
+    console.log('Alipay login initiated');
+    throw new Error('Alipay login not yet implemented');
+  };
+
+  const loginWithWeChat = async () => {
+    // Placeholder for WeChat login - will call backend API later
+    console.log('WeChat login initiated');
+    throw new Error('WeChat login not yet implemented');
+  };
+
   const logout = async () => {
-    await signOut(auth);
+    // Clear both Firebase and custom auth
+    try {
+      if (firebaseUser) {
+        await signOut(auth);
+      }
+    } catch (error) {
+      console.error('Firebase logout error:', error);
+    }
+    
+    // Clear custom auth
+    localStorage.removeItem('custom_auth_token');
+    setCustomUser(null);
+    
+    // Clear user profile cache
+    queryClient.clear();
   };
 
 
@@ -138,16 +247,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Combined loading state
   const loading = authLoading || (!!firebaseUser && isProfileLoading);
 
-  // Transform firebaseUser to user for compatibility
-  const user = firebaseUser;
+  // Determine current user - prioritize custom auth for Chinese users
+  const user = customUser || firebaseUser;
+  const isCustomAuth = !!customUser;
 
   const value = {
     user,
     userProfile,
     loading,
+    isCustomAuth,
     loginWithEmail,
     registerWithEmail,
     loginWithGoogle,
+    loginWithSms,
+    loginWithEmailCode,
+    loginWithAlipay,
+    loginWithWeChat,
     logout,
     updateUserProfile,
     refreshUserProfile,

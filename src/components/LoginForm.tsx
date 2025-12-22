@@ -142,9 +142,6 @@ const LoginForm: React.FC<LoginFormProps> = ({
           </div>
         )}
 
-
-
-
         {/* Toggle Button */}
         <div className="mb-4 text-center">
           <button

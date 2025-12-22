@@ -24,7 +24,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
     : t('profile.header.freeAccount');
 
   // Format join date (fallback to current year if missing)
-  const joinYear = user?.metadata.creationTime 
+  const joinYear = user?.metadata?.creationTime 
     ? new Date(user.metadata.creationTime).getFullYear() 
     : new Date().getFullYear();
 
@@ -44,7 +44,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-6">
       {/* Banner Section */}
-      <div className="h-32 bg-gradient-to-r from-teal-600 to-emerald-500 relative">
+      <div className="h-32 bg-linear-to-r from-teal-600 to-emerald-500 relative">
         <div className="absolute inset-0 opacity-20 bg-[url('/assets/pattern.svg')]"></div>
       </div>
 

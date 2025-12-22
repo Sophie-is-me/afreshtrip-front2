@@ -33,10 +33,25 @@ import type { SubscriptionPlanResponse } from '../types/api';
 import { HttpClient } from './api/httpClient';
 
 /**
- * Base URL from backend documentation
- * the backend docs is accessible at /v3/api-docs
+ * API Base URLs for different deployment environments
+ * 
+ * International (GCP): Used for global users, Firebase auth
+ * Chinese (Aliyun): Used for Chinese users, SMS/Email auth
  */
-const API_BASE_URL = import.meta.env.DEV ? 'http://localhost:8080' : 'https://afreshtrip-backend-550030138351.europe-west1.run.app';
+const getApiBaseUrl = () => {
+  if (import.meta.env.DEV) {
+    return import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+  }
+  
+  const isChineseVersion = import.meta.env.VITE_IS_CHINESE_VERSION === 'true';
+  
+  // Use different backends based on version
+  return isChineseVersion 
+    ? import.meta.env.VITE_ALIYUN_BACKEND_URL  // Chinese backend
+    : import.meta.env.VITE_GCP_BACKEND_URL; // International backend
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 /**
  * Main API Client that composes all service modules
@@ -78,6 +93,60 @@ export class ApiClient {
 
   isAuthenticated(): Promise<boolean> {
     return this.auth.isAuthenticated();
+  }
+
+  // ============================================================================
+  // SMS AUTHENTICATION (CHINESE MARKET)
+  // ============================================================================
+
+  sendSmsCode(phone: string): Promise<{
+    code: number;
+    message: string;
+    data: null;
+    timestamp?: number;
+  }> {
+    return this.auth.sendSmsCode(phone);
+  }
+
+  verifySmsCode(phone: string, code: string): Promise<{
+    code: number;
+    message: string;
+    data: {
+      token: string;
+      userId: number;
+      nickname: string;
+      phone: string;
+    };
+    timestamp?: number;
+  }> {
+    return this.auth.verifySmsCode(phone, code);
+  }
+
+  // ============================================================================
+  // EMAIL AUTHENTICATION (CHINESE MARKET)
+  // ============================================================================
+
+  sendEmailCode(email: string): Promise<{
+    code: number;
+    message: string;
+    data: null;
+    timestamp?: number;
+  }> {
+    return this.auth.sendEmailCode(email);
+  }
+
+  verifyEmailCode(email: string, code: string): Promise<{
+    code: number;
+    message: string;
+    data: {
+      token: string;
+      userId: number;
+      nickname: string;
+      email: string;
+    };
+    timestamp?: number;
+  }> {
+    return this.auth.verifyEmailCode(email, code);
   }
 
   // ============================================================================

@@ -13,6 +13,7 @@ import subscription from './subscription.json';
 import trips from './trips.json';
 import notifications from './notifications.json';
 import common from './common.json';
+import auth from './auth.json'; // Import the new file
 
 const zh = {
   header,
@@ -30,6 +31,7 @@ const zh = {
   trips,
   notifications,
   common,
+  auth, // Export it
 };
 
 export default zh;

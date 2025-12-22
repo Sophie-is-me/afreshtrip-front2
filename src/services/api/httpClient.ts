@@ -31,14 +31,22 @@ export class HttpClient {
   }
 
   /**
-   * Get Firebase ID token for authenticated requests
+   * Get authentication token for requests
+   * Prioritizes custom auth token over Firebase token
    */
   private async getAuthToken(): Promise<string | null> {
     try {
+      // Check for custom auth token first (for Chinese users)
+      const customToken = localStorage.getItem('custom_auth_token');
+      if (customToken) {
+        return `Bearer ${customToken}`;
+      }
+
+      // Fallback to Firebase token
       const user = auth.currentUser;
       if (!user) return null;
       const token = await user.getIdToken();
-      return token;
+      return `Bearer ${token}`;
     } catch (error) {
       console.error('Failed to get auth token:', error);
       return null;
@@ -86,7 +94,7 @@ export class HttpClient {
     if (requiresAuth) {
       const token = await this.getAuthToken();
       if (token) {
-        requestHeaders['Authorization'] = `Bearer ${token}`;
+        requestHeaders['Authorization'] = token;
       } else if (requiresAuth) {
         throw new AuthenticationError();
       }

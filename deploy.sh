@@ -54,6 +54,14 @@ check_command node
 # ==========================================
 # 1. Firebase Deployment (International)
 # ==========================================
+echo -e "${YELLOW}⚠️  Before deploying to Firebase:${NC}"
+echo "If you are in China, please activate your VPN."
+echo "If not, you can continue without issue."
+read -p "Are you ready to start the Firebase deployment? (y/n): " answer
+if [[ $answer != "y" && $answer != "Y" ]]; then
+    echo "Deployment cancelled."
+    exit 0
+fi
 log_step "Starting International Deployment (Firebase)..."
 
 log_info "Building International Version..."
@@ -69,6 +77,13 @@ log_success "Firebase deployment complete."
 # ==========================================
 # 2. Aliyun Deployment (Chinese)
 # ==========================================
+echo -e "${YELLOW}⚠️  Before deploying to OSS:${NC}"
+echo "If you are in China, please deactivate your VPN to avoid issues."
+read -p "Are you ready to start the OSS deployment? (y/n): " answer
+if [[ $answer != "y" && $answer != "Y" ]]; then
+    echo "Deployment cancelled."
+    exit 0
+fi
 log_step "Starting China Deployment (Aliyun)..."
 
 log_info "Building Chinese Version..."

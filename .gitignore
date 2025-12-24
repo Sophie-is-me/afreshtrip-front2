@@ -33,3 +33,5 @@ afreshtrip-frontend-prototype
 *.sw?
 .DS_Store
 .firebase
+
+*.local.md

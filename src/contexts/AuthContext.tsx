@@ -64,25 +64,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // React Query for User Profile
   const { data: userProfileData, isLoading: isProfileLoading } = useQuery<UserInfo>({
-    queryKey: QUERY_KEYS.user.profile(firebaseUser?.uid || ''),
+    queryKey: QUERY_KEYS.user.profile((firebaseUser?.uid || customUser?.uid) || ''),
     queryFn: async () => {
-      if (!firebaseUser) throw new Error('No user');
+      if (!firebaseUser && !customUser) throw new Error('No user');
       try {
-        // Try to get ID token to ensure user is fully authenticated
-        await firebaseUser.getIdToken(false);
+        if (firebaseUser) {
+          // Try to get ID token to ensure user is fully authenticated
+          await firebaseUser.getIdToken(false);
+        }
+        // For both Firebase and custom auth, fetch from backend
         return await apiClient.getUserInfo();
       } catch (error) {
         console.error('Failed to fetch user profile:', error);
-        // Return basic profile from Firebase user as fallback
-        return {
-          userId: parseInt(firebaseUser.uid, 10), // Convert uid to number for backend compatibility
-          email: firebaseUser.email || undefined,
-          nickname: firebaseUser.displayName || undefined,
-          imageurl: firebaseUser.photoURL || undefined, // Note: backend uses 'imageurl'
-        };
+        // Return basic profile from user as fallback
+        const user = firebaseUser || customUser;
+        if (user) {
+          return {
+            userId: parseInt(user.uid, 10), // Convert uid to number for backend compatibility
+            email: user.email || undefined,
+            nickname: user.displayName || undefined,
+            imageurl: firebaseUser?.photoURL || undefined, // Note: backend uses 'imageurl'
+          };
+        }
+        throw error;
       }
     },
-    enabled: !!firebaseUser, // Only fetch if firebase user exists
+    enabled: !!(firebaseUser || customUser), // Fetch if either user exists
     retry: false, // Don't retry on profile fetch failure
   });
 
@@ -90,13 +97,73 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const userProfile = userProfileData || null;
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      console.log('Auth state changed:', user ? 'authenticated' : 'not authenticated');
-      setFirebaseUser(user);
-      setAuthLoading(false);
-    });
+    // Only initialize Firebase auth for non-Chinese versions
+    const isChineseVersion = import.meta.env.VITE_IS_CHINESE_VERSION === 'true';
 
-    return unsubscribe;
+    if (!isChineseVersion) {
+      const unsubscribe = onAuthStateChanged(auth, async (user) => {
+        console.log('Auth state changed:', user ? 'authenticated' : 'not authenticated');
+        setFirebaseUser(user);
+        setAuthLoading(false);
+      });
+
+      return unsubscribe;
+    } else {
+      // For Chinese version, skip Firebase and set loading to false
+      setAuthLoading(false);
+    }
+  }, []);
+
+  // Restore custom auth state on app initialization
+  useEffect(() => {
+    const isChineseVersion = import.meta.env.VITE_IS_CHINESE_VERSION === 'true';
+
+    if (isChineseVersion) {
+      const customToken = localStorage.getItem('custom_auth_token');
+      const customUserData = localStorage.getItem('custom_user_data');
+
+      if (customToken) {
+        if (customUserData) {
+          try {
+            const parsedUser: CustomUser = JSON.parse(customUserData);
+            setCustomUser(parsedUser);
+            console.log('Restored custom auth state for Chinese user:', parsedUser.displayName || parsedUser.phone || parsedUser.email);
+          } catch (error) {
+            console.error('Failed to parse stored custom user data:', error);
+            // Clear invalid data
+            localStorage.removeItem('custom_auth_token');
+            localStorage.removeItem('custom_user_data');
+          }
+        } else {
+          // No stored user data, fetch from backend
+          (async () => {
+            try {
+              const userInfo = await apiClient.getUserInfo();
+              if (userInfo.userId) {
+                const mockCustomUser: CustomUser = {
+                  uid: userInfo.userId.toString(),
+                  email: userInfo.email || undefined,
+                  phone: userInfo.phone || undefined,
+                  displayName: userInfo.nickname || undefined,
+                  emailVerified: true,
+                  isCustomAuth: true
+                };
+                setCustomUser(mockCustomUser);
+                // Store for future use
+                localStorage.setItem('custom_user_data', JSON.stringify(mockCustomUser));
+                console.log('Fetched and restored custom auth state for Chinese user:', mockCustomUser.displayName || mockCustomUser.phone || mockCustomUser.email);
+              } else {
+                throw new Error('Invalid user info');
+              }
+            } catch (error) {
+              console.error('Failed to fetch user info for restoration:', error);
+              // Clear invalid token
+              localStorage.removeItem('custom_auth_token');
+            }
+          })();
+        }
+      }
+    }
   }, []);
 
   const loginWithEmail = async (email: string, password: string) => {
@@ -114,11 +181,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginWithSms = async (phone: string, code: string) => {
     try {
       const response = await apiClient.verifySmsCode(phone, code);
-      
+
       if (response.code === 200 && response.data) {
         // Store the custom JWT token
         localStorage.setItem('custom_auth_token', response.data.token);
-        
+
         // Create a mock Firebase user for compatibility
         const mockCustomUser: CustomUser = {
           uid: response.data.userId.toString(),
@@ -127,9 +194,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           emailVerified: true,
           isCustomAuth: true
         };
-        
+
+        // Store user data for persistence
+        localStorage.setItem('custom_user_data', JSON.stringify(mockCustomUser));
+
         setCustomUser(mockCustomUser);
-        
+
         // Update user profile with the new user info
         await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.user.profile(response.data.userId.toString()) });
       } else {
@@ -144,11 +214,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginWithEmailCode = async (email: string, code: string) => {
     try {
       const response = await apiClient.verifyEmailCode(email, code);
-      
+
       if (response.code === 200 && response.data) {
         // Store the custom JWT token
         localStorage.setItem('custom_auth_token', response.data.token);
-        
+
         // Create a mock Firebase user for compatibility
         const mockCustomUser: CustomUser = {
           uid: response.data.userId.toString(),
@@ -157,9 +227,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           emailVerified: true,
           isCustomAuth: true
         };
-        
+
+        // Store user data for persistence
+        localStorage.setItem('custom_user_data', JSON.stringify(mockCustomUser));
+
         setCustomUser(mockCustomUser);
-        
+
         // Update user profile with the new user info
         await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.user.profile(response.data.userId.toString()) });
       } else {
@@ -192,11 +265,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error) {
       console.error('Firebase logout error:', error);
     }
-    
+
     // Clear custom auth
     localStorage.removeItem('custom_auth_token');
+    localStorage.removeItem('custom_user_data');
     setCustomUser(null);
-    
+
     // Clear user profile cache
     queryClient.clear();
   };
@@ -204,11 +278,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 
   const refreshUserProfile = async () => {
-    if (!firebaseUser) return;
+    const user = firebaseUser || customUser;
+    if (!user) return;
 
     // Use React Query to invalidate and refetch
-    await queryClient.invalidateQueries({ 
-      queryKey: QUERY_KEYS.user.profile(firebaseUser.uid) 
+    await queryClient.invalidateQueries({
+      queryKey: QUERY_KEYS.user.profile(user.uid)
     });
   };
 

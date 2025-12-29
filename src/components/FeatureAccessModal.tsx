@@ -76,7 +76,7 @@ const FeatureAccessModal: React.FC<FeatureAccessModalProps> = ({
           {/* Content */}
           <div className="p-6">
             <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 bg-linear-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                 </svg>
@@ -97,7 +97,7 @@ const FeatureAccessModal: React.FC<FeatureAccessModalProps> = ({
               <div className="space-y-3">
                 <button
                   onClick={() => handleUpgrade(suggestions.recommendedPlan)}
-                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-4 rounded-xl font-medium hover:from-blue-700 hover:to-purple-700 transition-all duration-200 transform hover:scale-105"
+                  className="w-full bg-linear-to-r from-blue-600 to-purple-600 text-white py-3 px-4 rounded-xl font-medium hover:from-blue-700 hover:to-purple-700 transition-all duration-200 transform hover:scale-105"
                 >
                   {t('featureAccess.upgradeTo', 'Upgrade to')} {suggestions.recommendedPlan} - ${suggestions.price}/{suggestions.period}
                 </button>
@@ -112,7 +112,7 @@ const FeatureAccessModal: React.FC<FeatureAccessModalProps> = ({
               <div className="text-center py-8">
                 <button
                   onClick={() => window.location.href = '/subscription'}
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-6 rounded-xl font-medium hover:from-blue-700 hover:to-purple-700 transition-all duration-200"
+                  className="bg-linear-to-r from-blue-600 to-purple-600 text-white py-3 px-6 rounded-xl font-medium hover:from-blue-700 hover:to-purple-700 transition-all duration-200"
                 >
                   {t('featureAccess.viewPlans', 'View Subscription Plans')}
                 </button>

@@ -13,6 +13,7 @@ import subscription from './subscription.json';
 import trips from './trips.json';
 import notifications from './notifications.json';
 import common from './common.json';
+import featureGate from './featureGate.json';
 
 const fr = {
   header,
@@ -30,6 +31,7 @@ const fr = {
   trips,
   notifications,
   common,
+  featureGate,
 };
 
 export default fr;

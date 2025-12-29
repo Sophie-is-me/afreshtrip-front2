@@ -16,10 +16,11 @@ export const tripKeys = {
 /**
  * Hook to fetch all trips for the current user
  */
-export const useTrips = (page: number = 1, size: number = 10) => {
+export const useTrips = (page: number = 1, size: number = 10, enabled: boolean = true) => {
   return useQuery({
     queryKey: tripKeys.list(`${page}-${size}`),
     queryFn: () => tripApiService.getTrips(page, size),
+    enabled,
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
   });

@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
 import { Navigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 // Layouts & Components
 import AuthLayout from '../components/layouts/AuthLayout';
 import AuthTabs from '../components/auth/AuthTabs';
 import type { LoginMethod } from '../components/auth/AuthTabs';
-import Header from '../components/Header';
-import Footer from '../components/Footer';
 
 // Login Forms
 import LoginForm from '../components/LoginForm';
@@ -16,6 +15,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 const Login: React.FC = () => {
    const { user } = useAuth();
+   const { t } = useTranslation();
 
   // Environment Flag
   const isChineseVersion = import.meta.env.VITE_IS_CHINESE_VERSION === 'true';
@@ -48,7 +48,6 @@ const Login: React.FC = () => {
 
         {/* --- Content Area --- */}
         <div className="mt-6 min-h-[300px]">
-
           {/* 1. Phone Login (SMS) */}
           {activeMethod === 'phone' && (
             <PhoneLogin />
@@ -57,28 +56,27 @@ const Login: React.FC = () => {
           {/* 2. Email Login (Email Verification Code) */}
           {activeMethod === 'email' && (
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <ChineseLoginForm
-                redirectTo="/"
-              />
+              <ChineseLoginForm redirectTo="/" />
             </div>
           )}
-
         </div>
       </AuthLayout>
     );
   }
 
-  // --- International / Firebase Layout (Existing) ---
+  // --- International / Firebase Layout (Unified Professional Design) ---
   return (
-    <div className="min-h-screen bg-linear-to-br from-blue-100 to-blue-50 flex flex-col">
-      <Header showNavLinks={false} />
-      <main className="flex-1 flex justify-center items-center px-4 py-8 sm:px-8">
-        <div className="w-full max-w-md">
-          <LoginForm />
-        </div>
-      </main>
-      <Footer />
-    </div>
+    <AuthLayout 
+      title={t('loginForm.welcomeBack', { defaultValue: 'Welcome Back' })}
+      subtitle={t('loginForm.loginSubtitle', { defaultValue: 'Start your next journey' })}
+    >
+      <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <LoginForm 
+          variant="plain" 
+          redirectTo="/" 
+        />
+      </div>
+    </AuthLayout>
   );
 };
 

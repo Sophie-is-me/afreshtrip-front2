@@ -20,7 +20,7 @@ interface CustomUser {
 }
 
 // Union type for Firebase or Custom user
-type AuthUser = User | CustomUser;
+export type AuthUser = User | CustomUser;
 
 interface AuthContextType {
   user: AuthUser | null;

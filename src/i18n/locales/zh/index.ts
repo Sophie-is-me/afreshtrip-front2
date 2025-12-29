@@ -14,6 +14,7 @@ import trips from './trips.json';
 import notifications from './notifications.json';
 import common from './common.json';
 import auth from './auth.json'; // Import the new file
+import featureGate from './featureGate.json';
 
 const zh = {
   header,
@@ -32,6 +33,7 @@ const zh = {
   notifications,
   common,
   auth, // Export it
+  featureGate,
 };
 
 export default zh;

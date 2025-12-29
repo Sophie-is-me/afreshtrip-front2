@@ -1,4 +1,6 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 interface AuthLayoutProps {
   children: React.ReactNode;
@@ -7,6 +9,7 @@ interface AuthLayoutProps {
 }
 
 const AuthLayout: React.FC<AuthLayoutProps> = ({ children, title, subtitle }) => {
+  const { t } = useTranslation();
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -18,46 +21,56 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children, title, subtitle }) =>
           className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-overlay"
         />
         <div className="relative z-10 flex flex-col justify-between w-full p-12 text-white">
-          <div className="flex items-center gap-3">
+          <Link to="/" className="flex items-center gap-3 w-fit hover:opacity-80 transition-opacity">
              {/* Logo */}
              <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center border border-white/30">
-                <span className="font-bold text-xl">A</span>
+                <span className="font-bold text-xl font-serif">A</span>
              </div>
              <span className="text-2xl font-bold tracking-tight">Afreshtrip</span>
-          </div>
+          </Link>
 
           <div className="mb-12">
-            <blockquote className="text-3xl font-medium leading-tight mb-6">
-              "旅行不仅仅是看风景，更是发现全新的自己。"
+            <blockquote className="text-3xl font-medium leading-tight mb-6 font-serif">
+              "{t('loginForm.brandingQuote', { defaultValue: 'Travel is not just about seeing the sights, it is about discovering a new you.' })}"
             </blockquote>
-            <p className="text-teal-100 text-lg">— 您的智能旅行管家</p>
+            <p className="text-teal-100 text-lg">— {t('loginForm.brandingAuthor', { defaultValue: 'Your Smart Travel Companion' })}</p>
           </div>
 
-          <div className="text-sm text-teal-200/80">
-            © 2025 Afreshtrip. All rights reserved.
+          <div className="flex justify-between items-end text-sm text-teal-200/80">
+            <span>© {new Date().getFullYear()} Afreshtrip. All rights reserved.</span>
+            <div className="flex gap-4">
+               <Link to="/privacy" className="hover:text-white transition-colors">{t('loginForm.privacy')}</Link>
+               <Link to="/terms" className="hover:text-white transition-colors">{t('loginForm.terms')}</Link>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Right Side - Login Form Area */}
-      <div className="w-full lg:w-1/2 flex flex-col justify-center items-center p-4 sm:p-8 md:p-12 bg-white">
-        <div className="w-full max-w-md space-y-8">
+      <div className="w-full lg:w-1/2 flex flex-col justify-center items-center p-4 sm:p-8 md:p-12 bg-white relative">
+        {/* Mobile Header (Hidden on Desktop) */}
+        <div className="absolute top-6 right-6 lg:hidden">
+            <Link to="/" className="text-sm font-medium text-teal-600 hover:text-teal-800">
+                {t('common.home')} &rarr;
+            </Link>
+        </div>
 
-          {/* Mobile Header (Hidden on Desktop) */}
+        <div className="w-full max-w-md space-y-8">
+          {/* Mobile Logo */}
           <div className="lg:hidden text-center mb-8">
-             <div className="inline-flex items-center gap-2 mb-4">
+             <Link to="/" className="inline-flex items-center gap-2 mb-4">
                 <img src="/assets/tubiao.png" alt="Logo" className="w-10 h-10 rounded-full" />
                 <span className="text-2xl font-bold text-teal-900">Afreshtrip</span>
-             </div>
+             </Link>
           </div>
 
           {/* Form Header */}
           <div className="text-center lg:text-left">
             <h2 className="text-3xl font-bold tracking-tight text-gray-900">
-              {title || '欢迎回来'}
+              {title || t('loginForm.welcomeBack', { defaultValue: 'Welcome Back' })}
             </h2>
             <p className="mt-2 text-gray-500">
-              {subtitle || '开启您的下一段精彩旅程'}
+              {subtitle || t('loginForm.loginSubtitle', { defaultValue: 'Start your next journey' })}
             </p>
           </div>
 
@@ -68,7 +81,7 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children, title, subtitle }) =>
 
           {/* Mobile Footer */}
           <div className="lg:hidden mt-auto pt-8 text-center text-xs text-gray-400">
-            © 2025 Afreshtrip. All rights reserved.
+            © {new Date().getFullYear()} Afreshtrip. All rights reserved.
           </div>
         </div>
       </div>

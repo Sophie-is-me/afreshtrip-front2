@@ -4,6 +4,7 @@
   "blog": "博客",
   "payment": "支付",
   "support": "支持",
+  "subscription": "订阅",
   "add": "添加",
   "like": "喜欢",
   "save": "保存",
@@ -17,5 +18,12 @@
   "french": "法语",
   "spanish": "西班牙语",
   "chinese": "中文",
-  "arabic": "阿拉伯语"
+  "arabic": "阿拉伯语",
+  "skipToMainContent": "跳转到主要内容",
+  "afreshtripHome": "Afreshtrip 首页",
+  "userMenu": "用户菜单",
+  "traveler": "旅行者",
+  "myAccount": "我的账户",
+  "createBlogPost": "创建博客文章",
+  "close": "关闭"
 }

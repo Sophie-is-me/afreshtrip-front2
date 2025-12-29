@@ -1,157 +1,230 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
+import { 
+  MapPinIcon, 
+  CalendarIcon, 
+  EllipsisHorizontalIcon, 
+  PencilIcon, 
+  ShareIcon, 
+  TrashIcon,
+  ClockIcon
+} from '@heroicons/react/24/outline';
+import type { ViewMode } from './TripControls';
 
-// Define the interface for the trip prop
-// We extend the previous simple data structure to include an image
-export interface TripCardData {
-  id: string;
-  destination: string;
-  startDate: string;
-  endDate: string;
-  stops: number;
-  status: 'planned' | 'active' | 'completed' | 'cancelled';
-  imageUrl?: string;
-}
-
-interface TripCardProps {
-  trip: TripCardData;
+export interface TripCardProps {
+  trip: {
+    id: string;
+    date: string; // Start date
+    endDate?: string;
+    city: string;
+    stops: number;
+    status: string;
+  };
+  viewMode?: ViewMode;
+  onShare?: (id: string) => void;
+  onRename?: (id: string) => void;
   onDelete?: (id: string) => void;
 }
 
-const TripCard: React.FC<TripCardProps> = ({ trip, onDelete }) => {
+const TripCard: React.FC<TripCardProps> = ({ 
+  trip, 
+  viewMode = 'grid',
+  onShare, 
+  onRename, 
+  onDelete 
+}) => {
   const { t } = useTranslation();
+  const [imageError, setImageError] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
-  // Helper to get status colors and labels
-  const getStatusConfig = (status: string) => {
-    switch (status) {
-      case 'active':
-        return {
-          bg: 'bg-blue-100',
-          text: 'text-blue-800',
-          dot: 'bg-blue-500',
-          label: t('trips.statuses.active')
-        };
-      case 'completed':
-        return {
-          bg: 'bg-green-100',
-          text: 'text-green-800',
-          dot: 'bg-green-500',
-          label: t('trips.statuses.completed')
-        };
-      case 'cancelled':
-        return {
-          bg: 'bg-red-100',
-          text: 'text-red-800',
-          dot: 'bg-red-500',
-          label: t('trips.statuses.cancelled')
-        };
-      case 'planned':
-      default:
-        return {
-          bg: 'bg-yellow-100',
-          text: 'text-yellow-800',
-          dot: 'bg-yellow-500',
-          label: t('trips.statuses.planned')
-        };
-    }
-  };
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
-  const statusConfig = getStatusConfig(trip.status);
+  // --- Helpers ---
 
-  // Format date range nicely (e.g., "Oct 12 - 15, 2024")
-  const formatDateRange = (start: string, end: string) => {
+  const formatDate = (dateString: string) => {
     try {
-      const s = new Date(start);
-      const e = new Date(end);
-      return `${s.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} - ${e.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`;
+      return new Date(dateString).toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      });
     } catch {
-      return start;
+      return dateString;
     }
   };
 
-  return (
-    <div className="group bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all duration-300 flex flex-col h-full">
-      {/* Image Area */}
-      <div className="relative h-48 bg-gray-200 overflow-hidden">
-        {trip.imageUrl ? (
-          <img 
-            src={trip.imageUrl} 
-            alt={trip.destination} 
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-          />
-        ) : (
-          // Fallback Gradient if no image
-          <div className="w-full h-full bg-linear-to-br from-teal-500 to-teal-700 flex items-center justify-center">
-            <span className="text-white text-4xl font-bold opacity-30">
-              {trip.destination.charAt(0).toUpperCase()}
-            </span>
-          </div>
-        )}
-        
-        {/* Status Badge - Floating on top right */}
-        <div className={`absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 shadow-xs backdrop-blur-md bg-white/90 ${statusConfig.text}`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${statusConfig.dot}`}></span>
-          {statusConfig.label}
-        </div>
-      </div>
+  const getDaysUntil = (dateString: string) => {
+    const diff = new Date(dateString).getTime() - new Date().getTime();
+    const days = Math.ceil(diff / (1000 * 3600 * 24));
+    if (days < 0) return null;
+    if (days === 0) return t('trips.today', { defaultValue: 'Today' });
+    return t('trips.inDays', { count: days, defaultValue: `In ${days} days` });
+  };
 
-      {/* Content Area */}
-      <div className="p-5 flex-1 flex flex-col">
-        <div className="flex justify-between items-start mb-2">
-          <h3 className="text-lg font-bold text-gray-900 line-clamp-1" title={trip.destination}>
-            {trip.destination}
-          </h3>
-        </div>
+  const statusLabel = t(`trips.statuses.${trip.status}`) || trip.status;
+  const daysUntil = trip.status === 'planned' ? getDaysUntil(trip.date) : null;
+  
+  const imageUrl = imageError 
+    ? 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80'
+    : `https://source.unsplash.com/800x600/?${encodeURIComponent(trip.city)},travel`;
 
-        <div className="text-sm text-gray-500 mb-4 flex items-center gap-2">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-          <span>{formatDateRange(trip.startDate, trip.endDate)}</span>
-        </div>
+  // --- Components ---
 
-        {/* Trip Meta Stats */}
-        <div className="flex items-center gap-4 text-xs font-medium text-gray-600 mb-6 bg-gray-50 p-3 rounded-lg">
-          <div className="flex items-center gap-1.5">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            <span>{trip.stops} {t('trips.stops')}</span>
-          </div>
-          <div className="w-px h-4 bg-gray-300"></div>
-          <div className="flex items-center gap-1.5">
-             {/* Placeholder for "Travelers" count if available in future API */}
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-            </svg>
-            <span>1 {t('trips.travelers')}</span>
-          </div>
-        </div>
+  const StatusBadge = () => {
+    const styles = {
+      active: 'bg-emerald-100 text-emerald-700 border-emerald-200 animate-pulse',
+      completed: 'bg-slate-100 text-slate-600 border-slate-200',
+      cancelled: 'bg-red-50 text-red-600 border-red-100',
+      planned: 'bg-blue-50 text-blue-700 border-blue-100',
+    }[trip.status] || 'bg-slate-100 text-slate-600';
 
-        {/* Action Buttons */}
-        <div className="mt-auto pt-4 border-t border-gray-100 flex gap-3">
-          <Link 
-            to={`/trip-planner?tripId=${trip.id}`} 
-            className="flex-1 text-center py-2 px-3 bg-teal-50 text-teal-700 text-sm font-medium rounded-lg hover:bg-teal-100 transition-colors"
-          >
-            {t('common.featureAccess.viewPlans')}
-          </Link>
-          
+    return (
+      <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider border ${styles}`}>
+        {statusLabel}
+      </span>
+    );
+  };
+
+  const ActionsMenu = () => (
+    <div className="absolute top-3 right-3 z-20" ref={menuRef}>
+      <button 
+        onClick={(e) => { e.preventDefault(); setIsMenuOpen(!isMenuOpen); }}
+        className="p-1.5 rounded-full bg-white/90 hover:bg-white text-slate-500 hover:text-slate-900 shadow-sm backdrop-blur-sm transition-all"
+      >
+        <EllipsisHorizontalIcon className="w-6 h-6" />
+      </button>
+      
+      {isMenuOpen && (
+        <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-slate-100 py-1 overflow-hidden animate-fade-in-up origin-top-right">
+          {onRename && (
+            <button onClick={() => { setIsMenuOpen(false); onRename(trip.id); }} className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+              <PencilIcon className="w-4 h-4" /> {t('common.rename', { defaultValue: 'Rename' })}
+            </button>
+          )}
+          {onShare && (
+            <button onClick={() => { setIsMenuOpen(false); onShare(trip.id); }} className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+              <ShareIcon className="w-4 h-4" /> {t('common.share', { defaultValue: 'Share' })}
+            </button>
+          )}
+          <div className="h-px bg-slate-100 my-1" />
           {onDelete && (
-            <button 
-              onClick={() => onDelete(trip.id)}
-              className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-              title={t('common.error.delete')}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
+            <button onClick={() => { setIsMenuOpen(false); onDelete(trip.id); }} className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
+              <TrashIcon className="w-4 h-4" /> {t('common.delete', { defaultValue: 'Delete' })}
             </button>
           )}
         </div>
+      )}
+    </div>
+  );
+
+  // --- Grid Layout Render ---
+  if (viewMode === 'grid') {
+    return (
+      <div className="group relative bg-white rounded-2xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border border-slate-200/60 overflow-hidden flex flex-col h-full">
+        <Link to={`/trip-planner/${trip.id}`} className="absolute inset-0 z-0" aria-label={`View trip to ${trip.city}`} />
+        
+        {/* Actions (Above Link) */}
+        <ActionsMenu />
+
+        {/* Hero Image */}
+        <div className="relative h-48 w-full overflow-hidden bg-slate-200">
+          <img
+            src={imageUrl}
+            alt={trip.city}
+            onError={() => setImageError(true)}
+            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+          />
+          <div className="absolute inset-0 bg-linear-to-t from-slate-900/60 to-transparent opacity-60" />
+          
+          <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end">
+             <div>
+               <h3 className="text-xl font-bold text-white shadow-black drop-shadow-md truncate">{trip.city}</h3>
+               {daysUntil && (
+                 <div className="flex items-center gap-1.5 text-xs font-medium text-amber-300 mt-0.5 shadow-black drop-shadow-sm">
+                   <ClockIcon className="w-3.5 h-3.5" />
+                   <span>{daysUntil}</span>
+                 </div>
+               )}
+             </div>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="p-4 flex flex-col gap-4 grow relative z-10 pointer-events-none">
+          {/* Metadata Row */}
+          <div className="flex items-center justify-between">
+            <StatusBadge />
+            <div className="text-xs font-medium text-slate-400">
+              {formatDate(trip.date)}
+            </div>
+          </div>
+
+          {/* Visual Route Line */}
+          <div className="flex items-center gap-3">
+            <div className="flex flex-col items-center gap-0.5">
+              <div className="w-2 h-2 rounded-full bg-teal-500" />
+              <div className="w-0.5 h-6 bg-slate-200" />
+              <div className="w-2 h-2 rounded-full border-2 border-slate-300 bg-white" />
+            </div>
+            <div className="space-y-3 w-full">
+               <div className="text-sm font-medium text-slate-700">{trip.city}</div>
+               <div className="text-xs text-slate-500">{trip.stops} {t('trips.stops', { defaultValue: 'Stops' })}</div>
+            </div>
+          </div>
+        </div>
       </div>
+    );
+  }
+
+  // --- List Layout Render ---
+  return (
+    <div className="group relative bg-white rounded-xl shadow-sm border border-slate-200 hover:border-teal-200 hover:shadow-md transition-all p-4 flex items-center gap-6">
+       <Link to={`/trip-planner/${trip.id}`} className="absolute inset-0 z-0" aria-label={`View trip to ${trip.city}`} />
+       
+       {/* Small Thumbnail */}
+       <div className="w-24 h-24 shrink-0 rounded-lg overflow-hidden bg-slate-100 relative">
+          <img src={imageUrl} alt={trip.city} className="w-full h-full object-cover" onError={() => setImageError(true)} />
+          {daysUntil && (
+             <div className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[10px] text-center py-1 font-medium backdrop-blur-sm">
+               {daysUntil}
+             </div>
+          )}
+       </div>
+
+       {/* Info */}
+       <div className="grow min-w-0 pointer-events-none">
+          <div className="flex items-center gap-3 mb-1">
+            <h3 className="text-lg font-bold text-slate-900 truncate">{trip.city}</h3>
+            <StatusBadge />
+          </div>
+          
+          <div className="flex items-center gap-4 text-sm text-slate-500">
+            <div className="flex items-center gap-1.5">
+              <CalendarIcon className="w-4 h-4" />
+              <span>{formatDate(trip.date)}</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <MapPinIcon className="w-4 h-4" />
+              <span>{trip.stops} {t('trips.stops')}</span>
+            </div>
+          </div>
+       </div>
+
+       {/* Actions */}
+       <div className="relative z-10">
+         <ActionsMenu />
+       </div>
     </div>
   );
 };

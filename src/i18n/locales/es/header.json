@@ -4,6 +4,7 @@
   "blog": "Blog",
   "payment": "Pago",
   "support": "Soporte",
+  "subscription": "Suscripción",
   "add": "Agregar",
   "like": "Me gusta",
   "save": "Guardar",
@@ -17,5 +18,12 @@
   "french": "Français",
   "spanish": "Español",
   "chinese": "Chino",
-  "arabic": "Árabe"
+  "arabic": "Árabe",
+  "skipToMainContent": "Saltar al contenido principal",
+  "afreshtripHome": "Inicio de Afreshtrip",
+  "userMenu": "Menú de usuario",
+  "traveler": "Viajero",
+  "myAccount": "Mi cuenta",
+  "createBlogPost": "Crear entrada de blog",
+  "close": "Cerrar"
 }

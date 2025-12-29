@@ -4,6 +4,7 @@
   "blog": "المدونة",
   "payment": "الدفع",
   "support": "الدعم",
+  "subscription": "الاشتراك",
   "add": "إضافة",
   "like": "إعجاب",
   "save": "حفظ",
@@ -17,5 +18,12 @@
   "french": "الفرنسية",
   "spanish": "الإسبانية",
   "chinese": "الصينية",
-  "arabic": "العربية"
+  "arabic": "العربية",
+  "skipToMainContent": "تخطي إلى المحتوى الرئيسي",
+  "afreshtripHome": "الرئيسية أفريشتيرب",
+  "userMenu": "قائمة المستخدم",
+  "traveler": "مسافر",
+  "myAccount": "حسابي",
+  "createBlogPost": "إنشاء منشور مدونة",
+  "close": "إغلاق"
 }

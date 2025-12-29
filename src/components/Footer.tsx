@@ -40,7 +40,8 @@ const Footer: React.FC<FooterProps> = ({
   // Show/hide back to top button based on scroll position
   React.useEffect(() => {
     const handleScroll = () => {
-      setShowBackToTop(window.scrollY > 300);
+      // Show only if we scrolled down a bit
+      setShowBackToTop(window.scrollY > 500);
     };
 
     window.addEventListener('scroll', handleScroll);
@@ -69,215 +70,162 @@ const Footer: React.FC<FooterProps> = ({
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="bg-gray-900 text-white">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {/* Company Info */}
-          <div className="lg:col-span-1">
-            <div className="flex items-center gap-2 mb-4">
-              <img src={companyLogo} alt={`${companyName} Logo`} className="w-10 h-10 rounded-full" />
-              <span className="text-xl font-bold">{companyName}</span>
-            </div>
-            <p className="text-gray-300 mb-4">
+    <footer className="bg-slate-900 text-slate-300 border-t border-slate-800 font-sans">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-12 mb-16">
+          
+          {/* Column 1: Brand & Socials (Span 4 columns) */}
+          <div className="lg:col-span-4 flex flex-col items-start">
+            <Link to="/" className="flex items-center gap-3 mb-6 group">
+              <img 
+                src={companyLogo} 
+                alt={`${companyName} Logo`} 
+                className="w-10 h-10 rounded-full border-2 border-slate-700 group-hover:border-teal-500 transition-colors" 
+              />
+              <span className="text-2xl font-bold text-white tracking-tight font-serif group-hover:text-teal-400 transition-colors">
+                {companyName}
+              </span>
+            </Link>
+            <p className="text-slate-400 mb-8 leading-relaxed max-w-sm">
               {t('footer.companyDescription')}
             </p>
-            <div className="flex items-center gap-2 text-gray-300 mb-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
-              <a href={`mailto:${contactEmail}`} className="hover:text-teal-400 transition-colors">
-                {contactEmail}
-              </a>
-            </div>
-            <div className="flex items-center gap-2 text-gray-300 mb-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-              </svg>
-              <a href={`tel:${contactPhone}`} className="hover:text-teal-400 transition-colors">
-                {contactPhone}
-              </a>
+            
+            {/* Social Media - Modern Circles */}
+            <div className="flex gap-4">
+              {socialLinks.facebook && (
+                <a href={socialLinks.facebook} target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 hover:bg-blue-600 hover:text-white transition-all duration-300 hover:-translate-y-1" aria-label="Facebook">
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                </a>
+              )}
+              {socialLinks.twitter && (
+                <a href={socialLinks.twitter} target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 hover:bg-sky-500 hover:text-white transition-all duration-300 hover:-translate-y-1" aria-label="Twitter">
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/></svg>
+                </a>
+              )}
+              {socialLinks.instagram && (
+                <a href={socialLinks.instagram} target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 hover:bg-pink-600 hover:text-white transition-all duration-300 hover:-translate-y-1" aria-label="Instagram">
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zM5.838 12a6.162 6.162 0 1112.324 0 6.162 6.162 0 01-12.324 0zM12 16a4 4 0 110-8 4 4 0 010 8zm4.965-10.405a1.44 1.44 0 112.881.001 1.44 1.44 0 01-2.881-.001z"/></svg>
+                </a>
+              )}
             </div>
           </div>
 
-          {/* Quick Links */}
-          <div>
-            <h3 className="text-lg font-semibold mb-4">{t('footer.quickLinks')}</h3>
-            <ul className="space-y-2">
-              <li>
-                <Link to="/about" className="text-gray-300 hover:text-teal-400 transition-colors">
-                  {t('footer.aboutUs')}
-                </Link>
-              </li>
-              <li>
-                <Link to="/destinations" className="text-gray-300 hover:text-teal-400 transition-colors">
-                  {t('footer.destinations')}
-                </Link>
-              </li>
-              <li>
-                <Link to="/tours" className="text-gray-300 hover:text-teal-400 transition-colors">
-                  {t('footer.tours')}
-                </Link>
-              </li>
-              <li>
-                <Link to="/blog" className="text-gray-300 hover:text-teal-400 transition-colors">
-                  {t('footer.blog')}
-                </Link>
-              </li>
-              <li>
-                <Link to="/faq" className="text-gray-300 hover:text-teal-400 transition-colors">
-                  {t('footer.faq')}
-                </Link>
-              </li>
+          {/* Column 2: Quick Links (Span 2) */}
+          <div className="lg:col-span-2">
+            <h3 className="text-lg font-serif font-semibold text-white mb-6 tracking-wide">{t('footer.quickLinks')}</h3>
+            <ul className="space-y-4">
+              {['aboutUs', 'destinations', 'tours', 'blog', 'faq'].map((link) => (
+                <li key={link}>
+                  <Link 
+                    to={`/${link === 'aboutUs' ? 'about' : link}`} 
+                    className="text-slate-400 hover:text-teal-400 transition-colors flex items-center group"
+                  >
+                    <span className="w-0 h-0.5 bg-teal-500 mr-0 group-hover:w-3 group-hover:mr-2 transition-all duration-300"></span>
+                    {t(`footer.${link}`)}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
 
-          {/* Legal */}
-          <div>
-            <h3 className="text-lg font-semibold mb-4">{t('footer.legal')}</h3>
-            <ul className="space-y-2">
-              <li>
-                <Link to="/privacy" className="text-gray-300 hover:text-teal-400 transition-colors">
-                  {t('footer.privacyPolicy')}
-                </Link>
-              </li>
-              <li>
-                <Link to="/terms" className="text-gray-300 hover:text-teal-400 transition-colors">
-                  {t('footer.termsOfUse')}
-                </Link>
-              </li>
-              <li>
-                <Link to="/cookies" className="text-gray-300 hover:text-teal-400 transition-colors">
-                  {t('footer.cookiePolicy')}
-                </Link>
-              </li>
-              <li>
-                <Link to="/accessibility" className="text-gray-300 hover:text-teal-400 transition-colors">
-                  {t('footer.accessibility')}
-                </Link>
-              </li>
+          {/* Column 3: Legal & Support (Span 2) */}
+          <div className="lg:col-span-2">
+            <h3 className="text-lg font-serif font-semibold text-white mb-6 tracking-wide">{t('footer.legal')}</h3>
+            <ul className="space-y-4">
+              {['privacyPolicy', 'termsOfUse', 'cookiePolicy', 'accessibility'].map((link) => (
+                <li key={link}>
+                  <Link 
+                    to={`/${link.replace('Policy', '').replace('OfUse', '')}`} 
+                    className="text-slate-400 hover:text-teal-400 transition-colors"
+                  >
+                    {t(`footer.${link}`)}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
 
-          {/* Newsletter */}
-          {showNewsletter && (
-            <div>
-              <h3 className="text-lg font-semibold mb-4">{t('footer.newsletter')}</h3>
-              <p className="text-gray-300 mb-4">
-                {t('footer.newsletterDescription')}
-              </p>
-              <form onSubmit={handleNewsletterSubmit} className="space-y-3">
-                <div>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder={t('footer.emailPlaceholder')}
-                    className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white"
-                    required
-                  />
+          {/* Column 4: Newsletter & Contact (Span 4) */}
+          <div className="lg:col-span-4">
+            {showNewsletter && (
+              <div className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700/50">
+                <h3 className="text-lg font-serif font-semibold text-white mb-2">{t('footer.newsletter')}</h3>
+                <p className="text-slate-400 mb-4 text-sm">
+                  {t('footer.newsletterDescription')}
+                </p>
+                <form onSubmit={handleNewsletterSubmit} className="space-y-3 relative">
+                  <div className="relative">
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder={t('footer.emailPlaceholder')}
+                      className="w-full pl-4 pr-12 py-3 bg-slate-900 border border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white placeholder-slate-500 transition-all"
+                      required
+                    />
+                    <button
+                      type="submit"
+                      className="absolute right-1 top-1 bottom-1 w-10 bg-teal-600 text-white rounded-lg flex items-center justify-center hover:bg-teal-500 transition-colors"
+                      aria-label="Subscribe"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  </div>
+                  {isSubscribed && (
+                    <div className="absolute top-full left-0 mt-2 text-green-400 text-xs font-medium animate-fade-in-up">
+                      {t('footer.subscriptionSuccess')}
+                    </div>
+                  )}
+                </form>
+              </div>
+            )}
+
+            <div className="mt-8">
+              <div className="flex items-center gap-3 text-slate-400 mb-3 hover:text-white transition-colors cursor-pointer">
+                <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-teal-500">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
                 </div>
-                <button
-                  type="submit"
-                  className="w-full px-4 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 focus:ring-offset-gray-900"
-                >
-                  {t('footer.subscribe')}
-                </button>
-                {isSubscribed && (
-                  <p className="text-green-400 text-sm">{t('footer.subscriptionSuccess')}</p>
-                )}
-              </form>
-            </div>
-          )}
-        </div>
-
-        {/* Social Media */}
-        <div className="mt-8 pt-8 border-t border-gray-800">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <div className="flex items-center gap-4">
-              <span className="text-gray-400">{t('footer.followUs')}</span>
-              <div className="flex gap-3">
-                {socialLinks.facebook && (
-                  <a
-                    href={socialLinks.facebook}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-teal-600 transition-colors"
-                    aria-label="Facebook"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                    </svg>
-                  </a>
-                )}
-                {socialLinks.instagram && (
-                  <a
-                    href={socialLinks.instagram}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-teal-600 transition-colors"
-                    aria-label="Instagram"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zM5.838 12a6.162 6.162 0 1112.324 0 6.162 6.162 0 01-12.324 0zM12 16a4 4 0 110-8 4 4 0 010 8zm4.965-10.405a1.44 1.44 0 112.881.001 1.44 1.44 0 01-2.881-.001z"/>
-                    </svg>
-                  </a>
-                )}
-                {socialLinks.twitter && (
-                  <a
-                    href={socialLinks.twitter}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-teal-600 transition-colors"
-                    aria-label="Twitter"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/>
-                    </svg>
-                  </a>
-                )}
-                {socialLinks.youtube && (
-                  <a
-                    href={socialLinks.youtube}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-teal-600 transition-colors"
-                    aria-label="YouTube"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-                    </svg>
-                  </a>
-                )}
-                {socialLinks.linkedin && (
-                  <a
-                    href={socialLinks.linkedin}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-teal-600 transition-colors"
-                    aria-label="LinkedIn"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
-                    </svg>
-                  </a>
-                )}
+                <a href={`mailto:${contactEmail}`} className="text-sm">{contactEmail}</a>
+              </div>
+              <div className="flex items-center gap-3 text-slate-400 hover:text-white transition-colors cursor-pointer">
+                <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-teal-500">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                  </svg>
+                </div>
+                <a href={`tel:${contactPhone}`} className="text-sm">{contactPhone}</a>
               </div>
             </div>
-            <div className="text-gray-400 text-sm">
-              © {currentYear} {companyName}. {t('footer.allRightsReserved')}
-            </div>
+          </div>
+        </div>
+
+        {/* Bottom Bar */}
+        <div className="pt-8 border-t border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="text-slate-500 text-sm">
+            © {currentYear} {companyName}. {t('footer.allRightsReserved')}
+          </div>
+          <div className="flex items-center gap-6 text-sm text-slate-500">
+            <Link to="/privacy" className="hover:text-white transition-colors">{t('footer.privacyPolicy')}</Link>
+            <span className="w-1 h-1 bg-slate-700 rounded-full"></span>
+            <Link to="/terms" className="hover:text-white transition-colors">{t('footer.termsOfUse')}</Link>
+            <span className="w-1 h-1 bg-slate-700 rounded-full"></span>
+            <Link to="/sitemap" className="hover:text-white transition-colors">Sitemap</Link>
           </div>
         </div>
       </div>
 
-      {/* Back to Top Button */}
+      {/* Conditional Back to Top - Only shows if not handled by parent or if explicit */}
       {showBackToTop && (
         <button
           onClick={scrollToTop}
-          className="fixed bottom-8 right-8 w-12 h-12 bg-teal-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-teal-700 transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500 z-50"
+          className="fixed bottom-8 right-8 w-12 h-12 bg-teal-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-teal-500 transition-all focus:outline-none z-40 transform hover:-translate-y-1 hover:shadow-teal-500/30 md:hidden"
           aria-label="Back to top"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
           </svg>
         </button>

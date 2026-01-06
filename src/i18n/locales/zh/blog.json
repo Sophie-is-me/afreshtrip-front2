@@ -131,5 +131,9 @@
   "seoPreview": "SEO预览",
   "upgradeRequired": "需要升级",
   "draft": "草稿",
-  "published": "已发布"
+  "published": "已发布",
+  "featured": "编辑精选",
+  "latestStories": "最新故事",
+  "newsletter": "新闻通讯",
+  "subscribing": "加入中..."
 }

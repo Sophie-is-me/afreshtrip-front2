@@ -1,4 +1,40 @@
 {
+  "heroTitle": "Découvrez le Monde",
+  "heroSubtitle": "Vivez des voyages sans limites. Accédez à des guides exclusifs, des cartes hors ligne et un support concierge VIP.",
+  "choosePlan": "Choisissez Votre Voyage",
+  "choosePlanDesc": "Plans flexibles conçus pour tous types de voyageurs. Mettez à niveau, rétrogradez ou annulez à tout moment.",
+  "featuresTitle": "Avantages Premium",
+  "features": {
+    "unlimitedOfflineMaps": "Cartes Hors Ligne Illimitées",
+    "unlimitedOfflineMapsDesc": "Téléchargez des villes entières sur votre téléphone. Ne vous perdez jamais, même sans signal.",
+    "exclusiveHiddenGems": "Perles Cachées Exclusives",
+    "exclusiveHiddenGemsDesc": "Accédez à notre base de données sélectionnée de spots secrets, loin des foules touristiques.",
+    "conciergeChat": "Chat Concierge 24/7",
+    "conciergeChatDesc": "Support en temps réel d'experts locaux pour aider avec les réservations et les urgences.",
+    "exclusivePartnerDeals": "Offres Partenaires Exclusives",
+    "exclusivePartnerDealsDesc": "Économisez jusqu'à 20% sur les hôtels et expériences avec nos partenaires mondiaux."
+  },
+  "faqTitle": "Questions Fréquemment Posées",
+  "faq": {
+    "cancel": {
+      "question": "Puis-je annuler mon abonnement à tout moment ?",
+      "answer": "Oui, vous pouvez annuler votre abonnement à tout moment. Vos avantages continueront jusqu'à la fin de votre période de facturation actuelle."
+    },
+    "trial": {
+      "question": "Comment fonctionne la mise à niveau du plan ?",
+      "answer": "Lorsque vous passez à un niveau supérieur, le changement se produit immédiatement. Nous prorogerons tout temps restant sur votre plan actuel."
+    },
+    "payment": {
+      "question": "Mes informations de paiement sont-elles sécurisées ?",
+      "answer": "Absolument. Nous utilisons un cryptage standard de l'industrie (SSL) et traitons les paiements via des fournisseurs sécurisés comme Stripe et Alipay. Nous ne stockons jamais vos détails de carte."
+    },
+    "support": {
+      "question": "Que comprend le Support VIP ?",
+      "answer": "Le Support VIP vous accorde un accès prioritaire à notre équipe de conciergerie de voyage, assurant des temps de réponse plus rapides et une assistance de voyage personnalisée."
+    }
+  },
+  "travelBackground": "Arrière-plan Voyage",
+  "appExperience": "Expérience Application",
   "title": "Choisissez votre plan",
   "subtitle": "Sélectionnez le plan d'abonnement parfait pour vos besoins de voyage",
   "selectPaymentMethod": "Sélectionner le mode de paiement",
@@ -82,20 +118,5 @@
       "period": "Par mois",
       "badgeText": "Le plus populaire"
     }
-  },
-  "features": {
-    "basicTripPlanning": "Planification de voyage de base",
-    "limitedDestinations": "Destinations limitées",
-    "emailSupport": "Support par email",
-    "mobileAppAccess": "Accès à l'application mobile",
-    "advancedTripPlanning": "Planification de voyage avancée",
-    "unlimitedDestinations": "Destinations illimitées",
-    "priorityEmailSupport": "Support par email prioritaire",
-    "premiumTripPlanning": "Planification de voyage premium",
-    "vipDestinations": "Accès aux destinations VIP",
-    "phoneSupport": "Support téléphonique 24/7",
-    "ultimateTripPlanning": "Planification de voyage ultime",
-    "exclusiveDestinations": "Destinations exclusives",
-    "dedicatedConcierge": "Concierge dédié"
   }
 }

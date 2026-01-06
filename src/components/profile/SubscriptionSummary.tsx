@@ -48,7 +48,7 @@ const SubscriptionSummary: React.FC<SubscriptionSummaryProps> = ({ hideButton = 
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
+    <div className="bg-white  shadow-2xl shadow-teal-900/20 rounded-xl border border-gray-100 p-6 mb-6">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold text-gray-900">{t('profile.manageSubscription')}</h2>
         {isPremium && (

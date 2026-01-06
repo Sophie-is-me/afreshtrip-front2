@@ -70,12 +70,13 @@ export class TripApiService {
    */
   async getTrips(page: number = 1, size: number = 10): Promise<TripListResponse> {
     try {
+      console.log('TripApiService.getTrips called with page:', page, 'size:', size);
       // Since no direct trip API exists, we'll simulate this with collected addresses
       // and create a trip structure around them
       const collectedAddressesResponse = await apiClient.getCollectedAddresses(page, size);
-      
+
       const trips = this.groupAddressesIntoTrips(collectedAddressesResponse.records);
-      
+
       return {
         trips,
         total: trips.length,
@@ -84,6 +85,19 @@ export class TripApiService {
       };
     } catch (error) {
       console.error('Failed to fetch trips:', error);
+
+      // If it's a 403 Forbidden error, it likely means the user doesn't have access to collected addresses
+      // In this case, return empty trips instead of throwing, since trips are simulated from addresses
+      if (error && typeof error === 'object' && 'status' in error && error.status === 403) {
+        console.warn('User does not have access to collected addresses, returning empty trips list');
+        return {
+          trips: [],
+          total: 0,
+          page,
+          size
+        };
+      }
+
       throw error;
     }
   }

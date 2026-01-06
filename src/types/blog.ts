@@ -15,6 +15,7 @@ export interface BlogPost {
   content: string; // Full content for details view
   excerpt?: string; // Short summary for listing view
   images: string[]; // Array of image URLs
+  videos: string[]; // Array of video URLs
   author: Author;
   date: string; // Publication date (ISO string)
   views: number;
@@ -37,6 +38,7 @@ export interface CreateBlogPostInput {
   categoryId: number; // Use categoryId for API
   tags?: string[];
   images: string[];
+  videos: string[];
   isPublished: boolean;
 }
 
@@ -46,6 +48,7 @@ export interface BlogPostSummary {
   title: string;
   excerpt: string;
   images: string[]; // Usually just the first image
+  videos: string[]; // Array of video URLs
   author: Author;
   date: string;
   views: number;

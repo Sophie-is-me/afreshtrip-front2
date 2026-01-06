@@ -5,7 +5,7 @@ import TripPlanner from '../components/trip/TripPlanner';
 
 const Home: React.FC = () => {
   return (
-    <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50 to-teal-50">
+    <div className="min-h-screen bg-stone-50 selection:bg-teal-100 selection:text-teal-900">
       <Header />
       <TripPlanner />
       <Footer />

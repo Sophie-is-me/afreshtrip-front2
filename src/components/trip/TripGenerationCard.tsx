@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useTripStore } from '../../stores/tripStore';
 import {
   MapPinIcon,
-  FlagIcon,
   ClockIcon,
   MapIcon,
   FireIcon,
@@ -29,6 +28,8 @@ interface StopItemProps {
   isLast: boolean;
   isActive: boolean;
   onClick: () => void;
+  image?: string;
+  category?: string;
 }
 
 interface SummaryStatProps {
@@ -36,72 +37,85 @@ interface SummaryStatProps {
   label: string;
   value: string;
   colorClass: string;
+  bgClass: string;
 }
 
 // --- Helper Components ---
 
-const SummaryStat: React.FC<SummaryStatProps> = ({ icon, label, value, colorClass }) => (
-  <div className="flex flex-col items-center justify-center p-3 bg-gray-50 rounded-xl border border-gray-100">
-    <div className={`mb-1 ${colorClass}`}>
+const SummaryStat: React.FC<SummaryStatProps> = ({ icon, label, value, colorClass, bgClass }) => (
+  <div className="flex flex-col items-center justify-center p-3 bg-white rounded-2xl border border-gray-100 shadow-sm relative overflow-hidden group">
+    <div className={`absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity ${bgClass}`} />
+    
+    <div className={`mb-2 p-2 rounded-full ${bgClass} ${colorClass}`}>
       {icon}
     </div>
-    <span className="text-sm font-bold text-gray-800">{value}</span>
-    <span className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold">{label}</span>
+    <span className="text-lg font-bold text-gray-800 font-serif leading-none mb-1">{value}</span>
+    <span className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">{label}</span>
   </div>
 );
 
-const StopItem: React.FC<StopItemProps> = ({ name, index, isLast, isActive, onClick }) => {
+const StopItem: React.FC<StopItemProps> = ({ name, index, isLast, isActive, onClick, image, category = "Attraction" }) => {
   return (
-    <motion.button
+    <motion.div
       layout
-      initial={{ opacity: 0, x: -10 }}
+      initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
-      onClick={onClick}
-      className={`group w-full flex items-start text-left relative pl-2 py-1 ${isLast ? '' : 'pb-6'}`}
+      className="relative pl-4 group"
     >
-      {/* Connecting Line */}
+      {/* 1. Timeline Connector Line */}
       {!isLast && (
-        <div className="absolute left-[19px] top-8 bottom-0 w-0.5 bg-gray-200 group-hover:bg-gray-300 transition-colors" />
+        <div 
+          className="absolute left-[39px] top-12 bottom-0 w-0.5 border-l-2 border-dashed border-gray-200 group-hover:border-teal-200 transition-colors" 
+          aria-hidden="true"
+        />
       )}
 
-      {/* Marker Circle */}
-      <div className={`relative z-10 shrink-0 w-8 h-8 rounded-full flex items-center justify-center border-2 shadow-sm transition-all duration-300 ${
-        isActive 
-          ? 'bg-teal-600 border-teal-600 text-white scale-110' 
-          : 'bg-white border-gray-300 text-gray-500 group-hover:border-teal-400 group-hover:text-teal-600'
-      }`}>
-        {index === 0 ? (
-          <MapPinIcon className="w-4 h-4" />
-        ) : isLast ? (
-          <FlagIcon className="w-4 h-4" />
-        ) : (
-          <span className="text-xs font-bold">{index + 1}</span>
-        )}
-      </div>
+      <button
+        onClick={onClick}
+        className={`
+          w-full flex items-center gap-4 p-3 rounded-2xl border transition-all duration-300 text-left relative z-10
+          ${isActive 
+            ? 'bg-white border-teal-500 shadow-lg shadow-teal-900/10 scale-[1.02] ring-1 ring-teal-500' 
+            : 'bg-white border-gray-100 hover:border-teal-200 hover:shadow-md'
+          }
+        `}
+      >
+        {/* Thumbnail & Badge */}
+        <div className="relative shrink-0 w-12 h-12 rounded-xl overflow-hidden shadow-sm">
+          <img 
+            src={image || `https://picsum.photos/100/100?random=${index}`} 
+            alt="" 
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-black/10" />
+          <div className={`
+            absolute top-0 left-0 w-5 h-5 flex items-center justify-center rounded-br-lg text-[10px] font-bold text-white
+            ${isActive ? 'bg-teal-600' : 'bg-gray-800/80'}
+          `}>
+            {index + 1}
+          </div>
+        </div>
 
-      {/* Text Content */}
-      <div className={`ml-4 mt-1 flex-1 transition-all duration-300 ${
-        isActive 
-          ? 'bg-teal-50 -mr-2 -ml-2 pl-6 pr-3 py-2 -mt-1 rounded-lg' 
-          : ''
-      }`}>
-        <h4 className={`text-sm font-semibold transition-colors ${
-          isActive ? 'text-teal-800' : 'text-gray-700 group-hover:text-teal-700'
-        }`}>
-          {name}
-        </h4>
-        {isActive && (
-          <motion.div 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
-            className="text-xs text-teal-600 flex items-center mt-1"
-          >
-            <span>Tap to view on map</span>
-            <ChevronRightIcon className="w-3 h-3 ml-1" />
-          </motion.div>
-        )}
-      </div>
-    </motion.button>
+        {/* Text Content */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between mb-0.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{category}</span>
+            {isActive && <span className="text-[10px] font-bold text-teal-600 flex items-center gap-1">View on Map <MapPinIcon className="w-3 h-3"/></span>}
+          </div>
+          <h4 className={`text-sm font-bold truncate ${isActive ? 'text-teal-900' : 'text-gray-700'}`}>
+            {name}
+          </h4>
+        </div>
+
+        {/* Arrow Hint */}
+        <div className={`text-gray-300 transition-transform duration-300 ${isActive ? 'text-teal-500 translate-x-1' : 'group-hover:translate-x-1'}`}>
+          <ChevronRightIcon className="w-5 h-5" />
+        </div>
+      </button>
+      
+      {/* Spacer for timeline flow */}
+      {!isLast && <div className="h-3" />}
+    </motion.div>
   );
 };
 
@@ -133,7 +147,7 @@ const TripGenerationCard: React.FC<TripGenerationCardProps> = ({
         } else {
           setIsFullyRevealed(true);
         }
-      }, 300);
+      }, 400); // Slightly slower for more dramatic effect
 
       return () => clearTimeout(timer);
     }
@@ -149,34 +163,39 @@ const TripGenerationCard: React.FC<TripGenerationCardProps> = ({
   // Loading State
   if (isGenerating) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 px-4 bg-gray-50/50 rounded-2xl border border-gray-100 border-dashed">
-        <motion.div
-          animate={{ rotate: 360, scale: [1, 1.1, 1] }}
-          transition={{ rotate: { duration: 2, repeat: Infinity, ease: "linear" }, scale: { duration: 1, repeat: Infinity } }}
-          className="relative w-12 h-12 mb-4 text-teal-500"
-        >
-          <SparklesIcon className="w-12 h-12" />
-        </motion.div>
-        <p className="text-gray-600 font-medium text-sm animate-pulse">{t('trips.generatingYourTrip')}</p>
-        <div className="w-48 mt-4 bg-gray-200 rounded-full h-1 overflow-hidden">
+      <div className="flex flex-col items-center justify-center py-16 px-6 bg-white/50 rounded-3xl border border-dashed border-gray-200">
+        <div className="relative">
+          <div className="absolute inset-0 bg-teal-200 blur-xl opacity-20 rounded-full animate-pulse" />
           <motion.div
-            className="bg-teal-500 h-1 rounded-full"
+            animate={{ rotate: 360 }}
+            transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+            className="relative w-16 h-16 mb-6 text-teal-600"
+          >
+            <SparklesIcon className="w-16 h-16" />
+          </motion.div>
+        </div>
+        <h3 className="text-lg font-serif font-bold text-teal-900 mb-2">Designing Your Trip</h3>
+        <p className="text-gray-500 text-sm text-center max-w-xs mb-6">Finding the best routes, hidden gems, and local favorites...</p>
+        
+        <div className="w-full max-w-[200px] h-1.5 bg-gray-100 rounded-full overflow-hidden">
+          <motion.div
+            className="bg-gradient-to-r from-teal-400 to-teal-600 h-full rounded-full"
             initial={{ width: "0%" }}
             animate={{ width: "100%" }}
-            transition={{ duration: 2.5 }}
+            transition={{ duration: 2.5, ease: "easeInOut" }}
           />
         </div>
       </div>
     );
   }
 
-  // Empty State (Should normally be handled by parent, but safe guard here)
+  // Empty State
   if (generatedStops.length === 0) return null;
 
   return (
-    <div className="flex flex-col space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="flex flex-col space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-700">
       
-      {/* 1. Summary Stats Grid */}
+      {/* 1. Dashboard Stats */}
       {tripDetails && (
         <motion.div 
           initial={{ opacity: 0, y: 10 }}
@@ -187,34 +206,40 @@ const TripGenerationCard: React.FC<TripGenerationCardProps> = ({
             icon={<ClockIcon className="w-5 h-5" />}
             label={t('trips.drivingTime')}
             value={tripDetails.time}
-            colorClass="text-blue-500"
+            colorClass="text-blue-600"
+            bgClass="bg-blue-50"
           />
           <SummaryStat 
             icon={<MapIcon className="w-5 h-5" />}
             label={t('trips.totalDistance')}
             value={tripDetails.distance}
-            colorClass="text-indigo-500"
+            colorClass="text-indigo-600"
+            bgClass="bg-indigo-50"
           />
           <SummaryStat 
             icon={<FireIcon className="w-5 h-5" />}
-            label="Est. CO2"
+            label="Footprint"
             value={tripDetails.co2}
-            colorClass="text-green-500"
+            colorClass="text-emerald-600"
+            bgClass="bg-emerald-50"
           />
         </motion.div>
       )}
 
-      {/* 2. Itinerary List */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-xs p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Your Route</h3>
-          <span className="text-xs font-medium text-teal-600 bg-teal-50 px-2 py-1 rounded-full">
-            {generatedStops.length} stops
+      {/* 2. Visual Itinerary */}
+      <div>
+        <div className="flex items-center justify-between mb-4 px-1">
+          <h3 className="font-serif text-lg font-bold text-gray-800">Your Journey</h3>
+          <span className="text-[10px] font-bold text-teal-700 bg-teal-50 border border-teal-100 px-2.5 py-1 rounded-full uppercase tracking-wide">
+            {generatedStops.length} Stops
           </span>
         </div>
         
-        <div className="pl-2">
-          <AnimatePresence>
+        <div className="relative">
+           {/* Timeline spine background (optional, for visual guide) */}
+           <div className="absolute left-[39px] top-4 bottom-4 w-px bg-gray-100 -z-10" />
+
+           <AnimatePresence mode="popLayout">
             {visibleStops.map((stop, index) => (
               <StopItem
                 key={stop}
@@ -223,30 +248,33 @@ const TripGenerationCard: React.FC<TripGenerationCardProps> = ({
                 isLast={index === generatedStops.length - 1}
                 isActive={selectedStop === stop}
                 onClick={() => setSelectedStop(selectedStop === stop ? null : stop)}
+                // In a real app, you'd pull these from the trip object logic
+                category={index === 0 ? "Start Point" : index === generatedStops.length - 1 ? "End Point" : "Attraction"}
               />
             ))}
           </AnimatePresence>
         </div>
       </div>
 
-      {/* 3. Action Buttons */}
+      {/* 3. Action Footer */}
       {isFullyRevealed && (
         <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="flex flex-col gap-3"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col gap-3 pt-2"
         >
           <button
             onClick={onStartNavigation}
-            className="w-full py-4 bg-teal-600 text-white rounded-xl font-bold shadow-lg shadow-teal-600/20 hover:bg-teal-700 hover:shadow-teal-600/30 transition-all flex items-center justify-center gap-2 group"
+            className="w-full py-4 bg-gradient-to-r from-teal-700 to-teal-600 text-white rounded-2xl font-bold shadow-lg shadow-teal-900/20 hover:shadow-teal-900/30 hover:scale-[1.02] transition-all flex items-center justify-center gap-3 group relative overflow-hidden"
           >
-            <PlaySolidIcon className="w-5 h-5 group-hover:scale-110 transition-transform" />
-            {t('trips.startNavigation')}
+            <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
+            <PlaySolidIcon className="w-5 h-5" />
+            <span>{t('trips.startNavigation')}</span>
           </button>
           
           <button
             onClick={onGenerateTrip}
-            className="w-full py-3 text-sm font-semibold text-gray-500 hover:text-gray-700 transition-colors flex items-center justify-center gap-2"
+            className="w-full py-3 text-xs font-bold uppercase tracking-wider text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-xl transition-all flex items-center justify-center gap-2"
           >
             <ArrowPathIcon className="w-4 h-4" />
             {t('trips.regenerateTrip')}

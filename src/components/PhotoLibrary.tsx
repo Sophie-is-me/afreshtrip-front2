@@ -7,13 +7,15 @@ import { useBlog } from '../contexts/BlogContext';
 interface PhotoLibraryProps {
   isOpen: boolean;
   onClose: () => void;
-  onInsert: (imageSrc: string) => void;
+  onInsert: (imageSrc: string, file?: File) => void;
+  delayUpload?: boolean;
 }
 
 const PhotoLibrary: React.FC<PhotoLibraryProps> = ({
   isOpen,
   onClose,
   onInsert,
+  delayUpload = false,
 }) => {
   const { t } = useTranslation();
   const { uploadImage, getUserMediaLibrary } = useBlog(); 
@@ -90,23 +92,28 @@ const PhotoLibrary: React.FC<PhotoLibraryProps> = ({
       return;
     }
 
-    try {
-      setIsUploading(true);
-      setError(null);
-      
-      const imageUrl = await uploadImage(file);
-      
-      // Update library state: Prepend the new image
-      setLibraryImages(prev => [imageUrl, ...prev]);
-      
-      // Auto-insert if it's a direct upload action
-      onInsert(imageUrl);
-      
-    } catch (err) {
-      console.error(err);
-      setError(t('photoLibrary.error.uploadFailed', 'Failed to upload image. Please try again.'));
-    } finally {
-      setIsUploading(false);
+    if (delayUpload) {
+      const blobUrl = URL.createObjectURL(file);
+      onInsert(blobUrl, file);
+    } else {
+      try {
+        setIsUploading(true);
+        setError(null);
+
+        const imageUrl = await uploadImage(file);
+
+        // Update library state: Prepend the new image
+        setLibraryImages(prev => [imageUrl, ...prev]);
+
+        // Auto-insert if it's a direct upload action
+        onInsert(imageUrl);
+
+      } catch (err) {
+        console.error(err);
+        setError(t('photoLibrary.error.uploadFailed', 'Failed to upload image. Please try again.'));
+      } finally {
+        setIsUploading(false);
+      }
     }
   };
 

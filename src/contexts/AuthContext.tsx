@@ -157,8 +157,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               }
             } catch (error) {
               console.error('Failed to fetch user info for restoration:', error);
-              // Clear invalid token
-              localStorage.removeItem('custom_auth_token');
+              // Only clear token if it's clearly an authentication error
+              // Avoid logging out users due to temporary backend issues or permission problems
+              if (error instanceof Error && (error.message.includes('401') || error.message.includes('Unauthorized'))) {
+                console.warn('Clearing invalid auth token due to authentication error');
+                localStorage.removeItem('custom_auth_token');
+              } else {
+                console.warn('Keeping auth token despite restoration failure - may be temporary issue');
+              }
             }
           })();
         }

@@ -51,32 +51,28 @@ export class UnifiedSubscriptionService {
    */
   async getUserSubscription(userId: string): Promise<UserSubscription | null> {
     const response = await this.httpClient.get<{
-      code: number;
-      message: string;
-      data: {
-        success: boolean;
-        status?: 'active' | 'expired';
-        planId?: string;
-        vipTypeId?: string;
-        expiresAt?: string;
-        autoRenew?: boolean;
-      };
+      success: boolean;
+      status?: 'active' | 'expired';
+      planId?: string;
+      vipTypeId?: string;
+      expiresAt?: string;
+      autoRenew?: boolean;
     }>('/api/v1/payments/subscription');
 
     // Safety check for response structure
-    if (!response || !response.data || !response.data.success || response.data.status !== 'active') {
+    if (!response || !response.success || response.status !== 'active') {
       return null;
     }
 
     // Map backend response to frontend UserSubscription model
     const subscription: UserSubscription = {
-      id: `sub_${userId}_${response.data.vipTypeId || 'unknown'}`,
+      id: `sub_${userId}_${response.vipTypeId || 'unknown'}`,
       userId,
-      planId: response.data.planId || 'month',
-      status: response.data.status,
+      planId: this.mapBackendPlanIdToFrontend(response.planId) || 'month',
+      status: response.status,
       startDate: new Date(),
-      endDate: response.data.expiresAt ? new Date(response.data.expiresAt) : new Date(),
-      autoRenew: response.data.autoRenew || false,
+      endDate: response.expiresAt ? new Date(response.expiresAt) : new Date(),
+      autoRenew: response.autoRenew || false,
       paymentMethodId: 'unified'
     };
 
@@ -378,11 +374,24 @@ export class UnifiedSubscriptionService {
   private mapPlanIdToVipType(planId: string): 'VIP_WEEK' | 'VIP_MONTH' | 'VIP_QUARTER' | 'VIP_YEAR' {
     const mapping: Record<string, 'VIP_WEEK' | 'VIP_MONTH' | 'VIP_QUARTER' | 'VIP_YEAR'> = {
       'week': 'VIP_WEEK',
-      'month': 'VIP_MONTH', 
+      'month': 'VIP_MONTH',
       'quarter': 'VIP_QUARTER',
       'year': 'VIP_YEAR'
     };
     return mapping[planId] || 'VIP_MONTH';
+  }
+
+  /**
+   * Map backend VIP type to frontend plan ID
+   */
+  private mapBackendPlanIdToFrontend(backendPlanId?: string): string {
+    const mapping: Record<string, string> = {
+      'VIP_WEEK': 'week',
+      'VIP_MONTH': 'month',
+      'VIP_QUARTER': 'quarter',
+      'VIP_YEAR': 'year'
+    };
+    return mapping[backendPlanId || ''] || 'month';
   }
 }
 

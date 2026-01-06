@@ -49,11 +49,11 @@ export class BlogService extends HttpClient {
   /**
    * Create new blog post
    */
-  async createBlog(blogData: BlogDto): Promise<BlogVo> {
+  async createBlog(blogData: BlogDto): Promise<boolean> {
     const response = await this.post<{
       code: number;
       message: string;
-      data: BlogVo;
+      data: boolean;
       timestamp?: number;
     }>('/api/v1/blogs', blogData);
     return response.data;

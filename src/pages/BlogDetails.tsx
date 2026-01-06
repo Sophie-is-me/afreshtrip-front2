@@ -23,6 +23,12 @@ import { commentSchema, sanitizeText } from '../utils/validationSchemas';
 import { i18nErrorHandler } from '../utils/i18nErrorHandler';
 import type { BlogPost, Comment } from '../types/blog';
 
+// TipTap imports for HTML generation
+import { generateHTML } from '@tiptap/html';
+import StarterKit from '@tiptap/starter-kit';
+import ImageExtension from '@tiptap/extension-image';
+import LinkExtension from '@tiptap/extension-link';
+
 const BlogDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -43,9 +49,11 @@ const BlogDetails: React.FC = () => {
   const [showTableOfContents, setShowTableOfContents] = useState(false);
 
   // Calculate reading time
-  const calculateReadingTime = (content: string) => {
+  const calculateReadingTime = (html: string) => {
     const wordsPerMinute = 200;
-    const words = content.trim().split(/\s+/).length;
+    // Strip HTML tags and count words
+    const text = html.replace(/<[^>]*>/g, '').trim();
+    const words = text.split(/\s+/).filter(w => w.length > 0).length;
     return Math.ceil(words / wordsPerMinute);
   };
 
@@ -227,7 +235,22 @@ const BlogDetails: React.FC = () => {
   if (!post) return null; // Should not happen
 
   const currentUrl = window.location.href;
-  const readingTime = calculateReadingTime(post.content);
+
+  // Generate HTML from TipTap JSON or use existing HTML
+  const contentHtml = (() => {
+    try {
+      const json = JSON.parse(post.content);
+      return generateHTML(json, [
+        StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
+        ImageExtension,
+        LinkExtension.configure({ openOnClick: false }),
+      ]);
+    } catch {
+      return post.content;
+    }
+  })();
+
+  const readingTime = calculateReadingTime(contentHtml);
 
   return (
     <div className="min-h-screen bg-white">
@@ -273,7 +296,7 @@ const BlogDetails: React.FC = () => {
               <div
                 ref={contentRef}
                 className="prose prose-lg max-w-none mb-8"
-                dangerouslySetInnerHTML={createSanitizedHtml(post.content)}
+                dangerouslySetInnerHTML={createSanitizedHtml(contentHtml)}
               />
             </div>
 

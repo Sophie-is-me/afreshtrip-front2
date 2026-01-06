@@ -8,14 +8,16 @@ import {
 } from '../services/apiClient';
 import { useAuth } from './AuthContext';
 import { SubscriptionRequiredError } from '../services/api';
+import { generateExcerpt } from '../utils/tiptapUtils';
 
 // Helper to convert Backend VO to Frontend Model
 const convertApiBlogPost = (apiPost: BlogVo): BlogPost => ({
   id: apiPost.blId?.toString() || '',
   title: apiPost.title || 'Untitled',
   content: apiPost.content || '',
-  excerpt: apiPost.excerpt || apiPost.content?.substring(0, 150) || '',
+  excerpt: apiPost.excerpt || generateExcerpt(apiPost.content || ''),
   images: apiPost.imageUrl?.map(img => img.imgUrl) || [],
+  videos: apiPost.videoUrl?.map(vid => vid.viUrl) || [],
   author: {
     id: apiPost.userId?.toString() || 'unknown',
     name: apiPost.author?.nickname || 'Anonymous',
@@ -76,6 +78,11 @@ interface BlogContextType {
   error: string | null;
   getAllBlogPosts: () => BlogPost[];
   getBlogPostsPaginated: (page: number, size: number) => Promise<{
+    posts: BlogPost[];
+    total: number;
+    hasMore: boolean;
+  }>;
+  getUserBlogs: (page: number, size: number) => Promise<{
     posts: BlogPost[];
     total: number;
     hasMore: boolean;
@@ -159,6 +166,25 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const getUserBlogs = async (page: number, size: number) => {
+    try {
+      const response = await apiClient.getUserBlogs(page, size);
+      const posts = response.records.map(convertApiBlogPost);
+      return {
+        posts,
+        total: response.total,
+        hasMore: response.current * response.size < response.total
+      };
+    } catch (err) {
+      console.error('Error fetching user blog posts:', err);
+      return {
+        posts: [],
+        total: 0,
+        hasMore: false
+      };
+    }
+  };
+
   const getPostById = (id: string) => blogPosts.find(p => p.id === id);
   const getBlogPostById = getPostById;
   const addNewPost = (post: BlogPost) => setBlogPosts(prev => [...prev, post]);
@@ -174,13 +200,18 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
         tags: post.tags,
         categoryId: post.categoryId || 1, // Default to first category if not specified
         isPublished: post.isPublished,
-        imageUrl: post.images?.map(img => ({ imgUrl: img })) || [],
-        videoUrl: [],
+        imageUrl: post.images || [],
+        videoUrl: post.videos || [],
       };
-      const response = await apiClient.createBlog(blogData);
-      const newPost = convertApiBlogPost(response);
-      addNewPost(newPost);
-      return newPost.id;
+      await apiClient.createBlog(blogData);
+      // Since backend returns boolean, fetch the latest user blog to get the created post
+      const userBlogsResponse = await apiClient.getUserBlogs(1, 1);
+      if (userBlogsResponse.records.length > 0) {
+        const newPost = convertApiBlogPost(userBlogsResponse.records[0]);
+        addNewPost(newPost);
+        return newPost.id;
+      }
+      throw new Error('Failed to retrieve created blog post');
     } catch (err) {
       if (err instanceof SubscriptionRequiredError) {
         throw err;
@@ -219,10 +250,14 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // Special handling for images array
       if (updates.images !== undefined) {
-        payload.imageUrl = updates.images.map(url => ({ imgUrl: url }));
+        payload.imageUrl = updates.images;
+      }
+      // Special handling for videos array
+      if (updates.videos !== undefined) {
+        payload.videoUrl = updates.videos;
       }
       
-      // Note: We do NOT explicitly set videoUrl to [] here. 
+      // Note: We do NOT explicitly set videoUrl to [] here.
       // The backend PATCH endpoint will ignore fields not present in the payload,
       // preserving any existing videos on this post.
 
@@ -313,7 +348,7 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const value = {
-    blogPosts, loading, error, getAllBlogPosts, getBlogPostsPaginated, getPostById, getBlogPostById, getBlogDetails, toggleCommentLike, addComment,
+    blogPosts, loading, error, getAllBlogPosts, getBlogPostsPaginated, getUserBlogs, getPostById, getBlogPostById, getBlogDetails, toggleCommentLike, addComment,
     addNewPost, createBlogPost, updateBlogPost, updatePostStatistics,
     getRelatedPosts, uploadImage, refreshBlogPosts, getUserMediaLibrary,
   };

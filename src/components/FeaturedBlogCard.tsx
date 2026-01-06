@@ -81,6 +81,9 @@ const FeaturedBlogCard: React.FC<FeaturedBlogCardProps> = ({ post }) => {
                 src={post.author.avatar || '/assets/default-avatar.png'}
                 alt={post.author.name}
                 className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm"
+                onError={(e) => {
+                  e.currentTarget.src = '/assets/default-avatar.png';
+                }}
               />
               <div className="text-sm">
                 <p className="text-gray-900 font-medium">{post.author.name}</p>

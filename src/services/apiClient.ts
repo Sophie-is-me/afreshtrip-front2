@@ -53,6 +53,11 @@ const getApiBaseUrl = () => {
 
 const API_BASE_URL = getApiBaseUrl();
 
+console.log('Initializing API Client with base URL:', API_BASE_URL);
+console.log('Environment DEV:', import.meta.env.DEV);
+console.log('VITE_API_BASE_URL:', import.meta.env.VITE_API_BASE_URL);
+console.log('VITE_IS_CHINESE_VERSION:', import.meta.env.VITE_IS_CHINESE_VERSION);
+
 /**
  * Main API Client that composes all service modules
  */
@@ -195,7 +200,7 @@ export class ApiClient {
     return this.blog.getBlogById(blId);
   }
 
-  createBlog(blogData: BlogDto): Promise<BlogVo> {
+  createBlog(blogData: BlogDto): Promise<boolean> {
     return this.blog.createBlog(blogData);
   }
 

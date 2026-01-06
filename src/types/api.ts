@@ -328,13 +328,13 @@ export interface BlogVo {
   slug?: string;
   like?: number;
   play?: number;
-  imageUrl?: Array<{ imgUrl: string }>;
-  videoUrl?: Array<{ viUrl: string }>;
+  imageUrl?: Array<{imgUrl: string}>;
+  videoUrl?: Array<{viUrl: string}>;
   createdAt?: string;
   updatedAt?: string;
   author?: {
     nickname: string;
-    avatar: string;
+    avatar?: string;
   };
 }
 
@@ -345,8 +345,8 @@ export interface BlogDto {
   tags?: string[];
   categoryId?: number;
   isPublished?: boolean;
-  imageUrl?: Array<{ imgUrl: string }>;
-  videoUrl?: Array<{ viUrl: string }>;
+  imageUrl?: string[];
+  videoUrl?: string[];
 }
 
 export interface BlogCommentVo extends BlogVo {

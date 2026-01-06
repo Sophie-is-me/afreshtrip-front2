@@ -1,4 +1,38 @@
 {
+  "heroTitle": "Descubre el Mundo",
+  "heroSubtitle": "Vive viajes sin límites. Accede a guías exclusivas, mapas offline y soporte concierge VIP.",
+  "choosePlan": "Elige Tu Viaje",
+  "choosePlanDesc": "Planes flexibles diseñados para todo tipo de viajeros. Actualiza, degrada o cancela en cualquier momento.",
+  "featuresTitle": "Beneficios Premium",
+  "features": {
+    "unlimitedOfflineMaps": "Mapas Offline Ilimitados",
+    "unlimitedOfflineMapsDesc": "Descarga ciudades enteras a tu teléfono. Nunca te pierdas, incluso sin señal.",
+    "exclusiveHiddenGems": "Joyas Ocultas Exclusivas",
+    "exclusiveHiddenGemsDesc": "Accede a nuestra base de datos curada de lugares secretos, lejos de las multitudes turísticas.",
+    "conciergeChat": "Chat Conserje 24/7",
+    "conciergeChatDesc": "Soporte en tiempo real de expertos locales para ayudar con reservas y emergencias.",
+    "exclusivePartnerDeals": "Ofertas de Socios Exclusivas",
+    "exclusivePartnerDealsDesc": "Ahorra hasta un 20% en hoteles y experiencias con nuestros socios globales."
+  },
+  "faqTitle": "Preguntas Frecuentes",
+  "faq": {
+    "cancel": {
+      "question": "¿Puedo cancelar mi suscripción en cualquier momento?",
+      "answer": "Sí, puedes cancelar tu suscripción en cualquier momento. Tus beneficios continuarán hasta el final del período de facturación actual."
+    },
+    "trial": {
+      "question": "¿Cómo funciona la actualización del plan?",
+      "answer": "Cuando actualizas a un nivel superior, el cambio ocurre inmediatamente. Prorratearemos cualquier tiempo restante en tu plan actual."
+    },
+    "payment": {
+      "question": "¿Es segura mi información de pago?",
+      "answer": "Absolutamente. Usamos encriptación estándar de la industria (SSL) y procesamos pagos a través de proveedores seguros como Stripe y Alipay. Nunca almacenamos los detalles de tu tarjeta."
+    },
+    "support": {
+      "question": "¿Qué incluye el Soporte VIP?",
+      "answer": "El Soporte VIP te otorga acceso prioritario a nuestro equipo de conserjería de viajes, asegurando tiempos de respuesta más rápidos y asistencia de viaje personalizada."
+    }
+  },
   "title": "Elige tu plan",
   "subtitle": "Selecciona el plan de suscripción perfecto para tus necesidades de viaje",
   "selectPaymentMethod": "Seleccionar Método de Pago",
@@ -83,19 +117,6 @@
       "badgeText": "Más popular"
     }
   },
-  "features": {
-    "basicTripPlanning": "Planificación de viaje básica",
-    "limitedDestinations": "Destinos limitados",
-    "emailSupport": "Soporte por email",
-    "mobileAppAccess": "Acceso a la aplicación móvil",
-    "advancedTripPlanning": "Planificación de viaje avanzada",
-    "unlimitedDestinations": "Destinos ilimitados",
-    "priorityEmailSupport": "Soporte por email prioritario",
-    "premiumTripPlanning": "Planificación de viaje premium",
-    "vipDestinations": "Acceso a destinos VIP",
-    "phoneSupport": "Soporte telefónico 24/7",
-    "ultimateTripPlanning": "Planificación de viaje definitiva",
-    "exclusiveDestinations": "Destinos exclusivos",
-    "dedicatedConcierge": "Conserje dedicado"
-  }
+  "travelBackground": "Fondo de Viaje",
+  "appExperience": "Experiencia de la App"
 }

@@ -39,13 +39,20 @@ export class HttpClient {
       // Check for custom auth token first (for Chinese users)
       const customToken = localStorage.getItem('custom_auth_token');
       if (customToken) {
+        console.log('Using custom auth token for request (length:', customToken.length, ')');
+        console.log('Custom token starts with:', customToken.substring(0, 20) + '...');
+        console.log('Custom user data present:', !!localStorage.getItem('custom_user_data'));
         return `Bearer ${customToken}`;
       }
 
       // Fallback to Firebase token
       const user = auth.currentUser;
-      if (!user) return null;
+      if (!user) {
+        console.log('No auth token available - no custom token and no Firebase user');
+        return null;
+      }
       const token = await user.getIdToken();
+      console.log('Using Firebase auth token for request (length:', token.length, ')');
       return `Bearer ${token}`;
     } catch (error) {
       console.error('Failed to get auth token:', error);
@@ -105,6 +112,9 @@ export class HttpClient {
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
     try {
+      console.log(`Making API request to: ${this.baseUrl}${fullEndpoint}`);
+      console.log('Request headers:', requestHeaders);
+      console.log('Request method:', restConfig.method || 'GET');
       const response = await fetch(`${this.baseUrl}${fullEndpoint}`, {
         ...restConfig,
         headers: requestHeaders,
@@ -117,9 +127,30 @@ export class HttpClient {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
 
+        // Log authentication errors for debugging
+        if (response.status === 401 || response.status === 403) {
+          console.error(`Authentication failed for ${endpoint}:`, {
+            status: response.status,
+            statusText: response.statusText,
+            errorData,
+            timestamp: new Date().toISOString(),
+            endpoint,
+            hasAuthHeader: requestHeaders['Authorization'] ? 'yes' : 'no',
+            authType: localStorage.getItem('custom_auth_token') ? 'custom' : 'firebase'
+          });
+        }
+
          // Intercept Subscription Check
         if (response.status === 403 && errorData.message === 'SUBSCRIPTION_REQUIRED') {
           throw new SubscriptionRequiredError();
+        }
+
+        // Handle authentication errors - clear invalid tokens only for 401 (Unauthorized)
+        // 403 (Forbidden) may be permission-related, not token invalidation
+        if (response.status === 401) {
+          console.warn('Authentication token invalid, clearing tokens');
+          localStorage.removeItem('custom_auth_token');
+          localStorage.removeItem('custom_user_data');
         }
 
         throw createErrorFromResponse(response, errorData);

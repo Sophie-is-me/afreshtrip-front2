@@ -20,6 +20,8 @@ interface GalleryCardProps {
   onSave?: (id: string) => void;
   onShare?: (id: string) => void;
   loading?: boolean;
+  showEdit?: boolean;
+  onEdit?: () => void;
 }
 
 const GalleryCard: React.FC<GalleryCardProps> = ({
@@ -40,6 +42,8 @@ const GalleryCard: React.FC<GalleryCardProps> = ({
   onSave,
   onShare,
   loading = false,
+  showEdit,
+  onEdit,
 }) => {
   const [liked, setLiked] = useState(isLiked);
   const [saved, setSaved] = useState(isSaved);
@@ -144,7 +148,7 @@ const GalleryCard: React.FC<GalleryCardProps> = ({
   return (
     <Link
       to={readLink}
-      className="group flex flex-col h-full bg-white rounded-2xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border border-gray-100 overflow-hidden"
+      className="group flex flex-col h-full bg-white rounded-2xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border border-gray-100 overflow-hidden relative"
     >
       {/* Image Container */}
       <div className="relative aspect-4/3 overflow-hidden bg-gray-100">
@@ -218,6 +222,18 @@ const GalleryCard: React.FC<GalleryCardProps> = ({
         </div>
       </div>
 
+      {showEdit && (
+        <button
+          onClick={(e) => { e.preventDefault(); onEdit?.(); }}
+          className="absolute top-4 right-20 bg-teal-600 text-white p-3 rounded-full shadow-lg hover:bg-teal-700 hover:scale-110 active:scale-95 transition-all duration-200 z-20 animate-pulse"
+          aria-label="Edit post"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
+        </button>
+      )}
+
       {/* Content Container */}
       <div className="p-6 pt-8 flex flex-col grow relative">
         {/* Avatar - Overlapping Image and Text */}
@@ -227,6 +243,9 @@ const GalleryCard: React.FC<GalleryCardProps> = ({
               src={userAvatar || '/assets/default-avatar.png'}
               alt={userName}
               className="w-12 h-12 rounded-full object-cover border-4 border-white shadow-md bg-white"
+              onError={(e) => {
+                e.currentTarget.src = '/assets/default-avatar.png';
+              }}
             />
           </div>
         </div>

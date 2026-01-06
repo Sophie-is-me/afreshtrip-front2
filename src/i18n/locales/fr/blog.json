@@ -131,5 +131,9 @@
   "seoPreview": "Aperçu SEO",
   "upgradeRequired": "Mise à niveau requise",
   "draft": "Brouillon",
-  "published": "Publié"
+  "published": "Publié",
+  "featured": "Choix de l'Éditeur",
+  "latestStories": "Dernières Histoires",
+  "newsletter": "Newsletter",
+  "subscribing": "Inscription en cours..."
 }

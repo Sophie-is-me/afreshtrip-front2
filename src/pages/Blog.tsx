@@ -1,17 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import GalleryCard from '../components/GalleryCard';
 import FeaturedBlogCard from '../components/FeaturedBlogCard';
 import { useTranslation } from 'react-i18next';
 import { useBlog } from '../contexts/BlogContext';
+import { useAuth } from '../contexts/AuthContext';
 import { useSnackbar } from '../contexts/SnackbarContext';
 import { NewsletterService } from '../services/api/newsletterService';
 import { CategoryService } from '../services/api/categoryService';
 import { newsletterSchema, sanitizeText } from '../utils/validationSchemas';
 import { useDebounce } from '../hooks/useDebounce';
 import { i18nErrorHandler } from '../utils/i18nErrorHandler';
+import { extractTextFromTipTapJson } from '../utils/tiptapUtils';
 import type { BlogPost } from '../types/blog';
 import type { Category } from '../services/api/categoryService';
 
@@ -100,6 +102,7 @@ const EmptyState: React.FC = () => {
 const Blog: React.FC = () => {
   const { t } = useTranslation();
   const { getBlogPostsPaginated } = useBlog();
+  const { user } = useAuth();
   const { showSuccess } = useSnackbar();
   const [loading, setLoading] = useState(true);
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
@@ -117,10 +120,12 @@ const Blog: React.FC = () => {
   const [email, setEmail] = useState('');
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [heroImageLoaded, setHeroImageLoaded] = useState(false);
+  const [viewMode, setViewMode] = useState<'all' | 'myblogs'>('all');
 
   const [newsletterLoading, setNewsletterLoading] = useState(false);
   const postsRef = useRef<HTMLDivElement>(null);
   const newsletterService = new NewsletterService(import.meta.env.VITE_API_BASE_URL || '');
+  const navigate = useNavigate();
 
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
@@ -157,7 +162,7 @@ const Blog: React.FC = () => {
         // Simulate a tiny delay to show off the skeleton animation even on fast networks
         const minDelay = new Promise(resolve => setTimeout(resolve, 800));
         const dataPromise = getBlogPostsPaginated(currentPage, postsPerPage);
-        
+
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const [_, { posts, total }] = await Promise.all([minDelay, dataPromise]);
         
@@ -177,11 +182,22 @@ const Blog: React.FC = () => {
   useEffect(() => {
     let filtered = [...blogPosts];
 
+    if (viewMode === 'myblogs') {
+      filtered = filtered.filter(post => post.author.id === user?.uid);
+    }
+
     if (debouncedSearchTerm) {
-      filtered = filtered.filter(post =>
-        post.title.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
-        (post.excerpt?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) || false)
-      );
+      filtered = filtered.filter(post => {
+        // Search in title and excerpt
+        const titleMatch = post.title.toLowerCase().includes(debouncedSearchTerm.toLowerCase());
+        const excerptMatch = (post.excerpt?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) || false);
+
+        // Also search in the full content (for TipTap JSON content)
+        const contentText = extractTextFromTipTapJson(post.content).toLowerCase();
+        const contentMatch = contentText.includes(debouncedSearchTerm.toLowerCase());
+
+        return titleMatch || excerptMatch || contentMatch;
+      });
     }
 
     if (selectedCategory) {
@@ -203,7 +219,7 @@ const Blog: React.FC = () => {
     }
 
     setFilteredPosts(filtered);
-  }, [blogPosts, debouncedSearchTerm, selectedCategory, sortBy]);
+   }, [blogPosts, debouncedSearchTerm, selectedCategory, sortBy, viewMode, user]);
 
   // Update URL params
   useEffect(() => {
@@ -233,8 +249,14 @@ const Blog: React.FC = () => {
   const totalPages = Math.ceil(totalPosts / postsPerPage);
   const isFirstPage = currentPage === 1;
   const hasPosts = filteredPosts.length > 0;
+  // TODO implement real featured post
   const featuredPost = (isFirstPage && hasPosts) ? filteredPosts[0] : null;
-  const gridPosts = (isFirstPage && hasPosts) ? filteredPosts.slice(1) : filteredPosts;
+  const gridPosts = (isFirstPage && hasPosts) ? filteredPosts : filteredPosts;
+
+  useEffect(() => {
+    console.log("featuredPost: ", featuredPost);
+    console.log("userId", user?.uid);
+  })
 
   const handlePageChange = (pageNumber: number) => {
     setLoading(true); // Show skeleton on page change
@@ -322,6 +344,16 @@ const Blog: React.FC = () => {
 
           <div className="mt-8 flex flex-wrap justify-center items-center gap-3 animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
             <span className="text-white/80 text-sm font-medium uppercase tracking-wider mr-2">Trending:</span>
+            <button
+              onClick={() => { setSelectedCategory(''); setViewMode('myblogs'); }}
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 border whitespace-nowrap ${
+                viewMode === 'myblogs'
+                  ? 'bg-teal-600 text-white border-teal-600 shadow-md transform scale-105'
+                  : 'bg-transparent text-white border-transparent hover:bg-gray-100 hover:text-gray-700'
+              }`}
+            >
+              {t('blog.myBlogs', 'My Blogs')}
+            </button>
             {TRENDING_TAGS.map((tag, index) => (
               <button
                 key={index}
@@ -348,14 +380,24 @@ const Blog: React.FC = () => {
             <div className="w-full md:w-auto overflow-x-auto no-scrollbar pb-1 md:pb-0">
               <div className="flex items-center space-x-2 min-w-max">
                 <button
-                  onClick={() => setSelectedCategory('')}
+                  onClick={() => { setSelectedCategory(''); setViewMode('all'); }}
                   className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 border ${
-                    !selectedCategory
+                    !selectedCategory && viewMode === 'all'
                       ? 'bg-teal-600 text-white border-teal-600 shadow-md transform scale-105'
                       : 'bg-transparent text-gray-600 border-transparent hover:bg-gray-100'
                   }`}
                 >
-                  {t('blog.allCategories')}
+                  {t('blog.allBlogs', 'All Blogs')}
+                </button>
+                <button
+                  onClick={() => { setSelectedCategory(''); setViewMode('myblogs'); }}
+                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 border ${
+                    viewMode === 'myblogs'
+                      ? 'bg-teal-600 text-white border-teal-600 shadow-md transform scale-105'
+                      : 'bg-transparent text-gray-600 border-transparent hover:bg-gray-100'
+                  }`}
+                >
+                  {t('blog.myBlogs', 'My Blogs')}
                 </button>
                 {categories.map((category) => (
                   <button
@@ -455,6 +497,8 @@ const Blog: React.FC = () => {
                         userAvatar={post.author.avatar}
                         userName={post.author.name}
                         readLink={`/blog/${post.id}`}
+                        showEdit={post.author.id === user?.uid}
+                        onEdit={() => navigate(`/blog-editor?id=${post.id}`)}
                       />
                     </div>
                   ))}

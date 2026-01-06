@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
-import { ChevronUpIcon, ChevronDownIcon, MapIcon } from '@heroicons/react/24/outline';
+import { ChevronUpIcon, ChevronDownIcon, SparklesIcon } from '@heroicons/react/24/outline';
 import TripSettingsPanel from './TripSettingsPanel';
 import TripMap from './TripMap';
 import WeatherSummary from './WeatherSummary';
@@ -118,25 +118,28 @@ const TripPlanner = () => {
   };
 
   return (
-    <div className="relative w-full h-[calc(100vh-64px)] bg-gray-50 overflow-hidden">
+    <div className="relative w-full h-[calc(100vh-64px)] bg-gray-50/50 overflow-hidden">
       
       {/* 
         1. MAP LAYER 
-        Occupies full background on both mobile and desktop.
+        Occupies full background.
       */}
       <div className="absolute inset-0 z-0">
         <TripMap trip={currentTrip} />
         
-        {/* Desktop Weather Widget */}
-        <div className="hidden md:block absolute top-6 right-6 z-20 w-80">
-          <WeatherSummary onClick={() => {}} />
+        {/* Desktop Weather Widget - Floating nicely top right */}
+        <div className="hidden md:block absolute top-8 right-8 z-20 w-80">
+          <WeatherSummary 
+            onClick={() => {}} 
+            className="shadow-xl shadow-teal-900/5 ring-1 ring-white/50 backdrop-blur-md"
+          />
         </div>
 
         {/* Mobile Map Controls (Visible when panel is collapsed) */}
         {!isMobilePanelOpen && (
           <button 
             onClick={() => setMobilePanelOpen(true)}
-            className="md:hidden absolute bottom-24 right-4 z-10 bg-white p-3 rounded-full shadow-lg text-teal-700 animate-bounce"
+            className="md:hidden absolute bottom-24 right-4 z-10 bg-teal-600 text-white p-3 rounded-full shadow-lg shadow-teal-600/30 animate-bounce"
           >
             <ChevronUpIcon className="w-6 h-6" />
           </button>
@@ -144,55 +147,67 @@ const TripPlanner = () => {
       </div>
 
       {/* 
-        2. INTERACTIVE PANEL LAYER 
-        Desktop: Floating Sidebar
-        Mobile: Bottom Sheet
+        2. INTERACTIVE PANEL LAYER ("Floating Island")
+        Desktop: Floating Card with generous margins and glass effect
+        Mobile: Bottom Sheet with snap-point feel
       */}
       <div 
         className={`
-          absolute z-30 transition-all duration-500 ease-in-out
+          absolute z-30 transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1)
           
-          /* Desktop Styles */
+          /* Desktop: Floating Island */
           md:top-6 md:left-6 md:bottom-6 md:w-[480px] md:translate-y-0
-
-          /* Mobile Styles */
+          
+          /* Mobile: Bottom Sheet */
           inset-x-0 bottom-0 
-          ${isMobilePanelOpen ? 'top-16 rounded-t-3xl' : 'top-[85%] rounded-t-3xl'}
+          ${isMobilePanelOpen ? 'top-14' : 'top-[88%]'} 
         `}
       >
-        <div className="h-full w-full bg-white md:bg-white/90 md:backdrop-blur-xl shadow-2xl md:rounded-2xl border border-white/50 flex flex-col overflow-hidden">
+        <div className={`
+          h-full w-full flex flex-col overflow-hidden
+          bg-white/90 backdrop-blur-xl border border-white/60
+          shadow-2xl shadow-black/10
+          
+          /* Rounding */
+          rounded-t-3xl md:rounded-3xl
+        `}>
           
           {/* Mobile Handle / Toggle Area */}
           <div 
-            className="md:hidden w-full bg-white border-b border-gray-100 flex flex-col items-center pt-2 pb-3 cursor-pointer shrink-0"
+            className="md:hidden w-full bg-white/50 backdrop-blur-sm border-b border-gray-100/50 flex flex-col items-center pt-3 pb-3 cursor-pointer shrink-0 hover:bg-white/80 transition-colors"
             onClick={() => setMobilePanelOpen(!isMobilePanelOpen)}
           >
+            {/* The Grab Handle Pill */}
             <div className="w-12 h-1.5 bg-gray-300 rounded-full mb-2" />
-            <div className="flex items-center gap-2 text-sm font-semibold text-gray-500">
+            
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500">
               {isMobilePanelOpen ? (
                 <>
-                  <ChevronDownIcon className="w-4 h-4" />
+                  <ChevronDownIcon className="w-3 h-3" />
                   <span>View Map</span>
                 </>
               ) : (
                 <>
-                  <ChevronUpIcon className="w-4 h-4" />
+                  <ChevronUpIcon className="w-3 h-3" />
                   <span>Plan Trip</span>
                 </>
               )}
             </div>
           </div>
 
-          {/* Toast Notification (Desktop Only) */}
+          {/* Contextual Toast Notification (Desktop Only) */}
           {location.state?.focusTripPlanner && (
-            <div className="hidden md:flex mb-0 mx-4 mt-4 bg-teal-600 text-white px-4 py-3 rounded-lg shadow-lg items-center">
-               <MapIcon className="w-5 h-5 mr-2" />
-               <span className="text-sm font-medium">Ready to plan!</span>
+            <div className="hidden md:flex mx-6 mt-6 mb-2 bg-linear-to-r from-teal-600 to-teal-500 text-white px-4 py-3 rounded-xl shadow-lg shadow-teal-600/20 items-center justify-between animate-in fade-in slide-in-from-top-4">
+               <div className="flex items-center gap-2">
+                 <SparklesIcon className="w-5 h-5" />
+                 <span className="text-sm font-bold">Start your adventure here!</span>
+               </div>
+               <button className="opacity-80 hover:opacity-100 text-xs font-medium">Dismiss</button>
             </div>
           )}
 
           {/* Scrollable Content */}
-          <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-teal-200/50 scrollbar-track-transparent">
+          <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent p-1">
             <TripSettingsPanel
               transport={transport}
               setTransport={setTransport}

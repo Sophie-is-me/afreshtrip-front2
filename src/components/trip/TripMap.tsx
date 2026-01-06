@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Polyline, useMap, Popup } from 'react-leaflet';
-import { useTranslation } from 'react-i18next';
+// import { useTranslation } from 'react-i18next';
 import { useTripStore } from '../../stores/tripStore';
 import type { Trip } from '../../types/trip';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { FlagIcon, HomeIcon } from '@heroicons/react/24/solid';
+import { renderToStaticMarkup } from 'react-dom/server';
 
 // --- Styles Injection ---
 // Customizing Leaflet via global styles for specific marker animations and popup overrides
@@ -13,35 +15,54 @@ const mapGlobalStyles = `
   .custom-marker-icon {
     background: transparent !important;
     border: none !important;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  /* Popup Styling */
+  /* Animated Route Line */
+  .trip-route-line {
+    stroke-dasharray: 10, 10;
+    animation: dash 30s linear infinite;
+  }
+  
+  @keyframes dash {
+    to {
+      stroke-dashoffset: -1000;
+    }
+  }
+
+  /* Popup Styling - Glassmorphism & Clean Layout */
   .modern-popup .leaflet-popup-content-wrapper {
     padding: 0;
     border-radius: 16px;
     overflow: hidden;
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.5);
   }
   .modern-popup .leaflet-popup-content {
     margin: 0;
-    width: 280px !important;
+    width: 260px !important;
   }
   .modern-popup .leaflet-popup-tip {
-    background: white;
+    background: rgba(255, 255, 255, 0.95);
   }
   .modern-popup a.leaflet-popup-close-button {
     color: white;
     text-shadow: 0 1px 2px rgba(0,0,0,0.5);
-    font-size: 24px;
+    font-size: 20px;
     padding: 8px;
     z-index: 10;
+    transition: transform 0.2s;
+  }
+  .modern-popup a.leaflet-popup-close-button:hover {
+    transform: scale(1.1);
+    color: #fff;
   }
   
   /* Pulse Animation for Active Marker */
   @keyframes pulse-ring {
     0% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(13, 148, 136, 0.7); }
-    70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(13, 148, 136, 0); }
+    70% { transform: scale(1); box-shadow: 0 0 0 15px rgba(13, 148, 136, 0); }
     100% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(13, 148, 136, 0); }
   }
   .marker-active .marker-ring {
@@ -75,17 +96,23 @@ interface TripMapProps {
 // Handles programmatic map moves (Flying to active stops, fitting bounds)
 const MapController: React.FC<{ trip: Trip | null }> = ({ trip }) => {
   const map = useMap();
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { selectedStop, generatedStops } = useTripStore();
 
-  console.log(generatedStops);
   // 1. Fit bounds on trip load
   useEffect(() => {
     if (trip && trip.places.length > 0) {
       const allPoints: [number, number][] = [
         ...trip.places.map(p => [p.lat, p.lng] as [number, number]),
       ];
+      // Pad the bounds so markers aren't on the edge, especially the bottom where the panel is
       const bounds = L.latLngBounds(allPoints);
-      map.fitBounds(bounds, { padding: [50, 50], animate: true, duration: 1 });
+      map.fitBounds(bounds, { 
+        paddingTopLeft: [50, 50],
+        paddingBottomRight: [50, 100], // Extra padding bottom for mobile sheet/desktop panel
+        animate: true, 
+        duration: 1.5 
+      });
     }
   }, [trip, map]);
 
@@ -94,9 +121,10 @@ const MapController: React.FC<{ trip: Trip | null }> = ({ trip }) => {
     if (trip && selectedStop) {
       const place = trip.places.find(p => p.name === selectedStop);
       if (place) {
-        map.flyTo([place.lat, place.lng], 13, {
+        map.flyTo([place.lat, place.lng], 14, {
           animate: true,
-          duration: 1.5 // Slower, smoother animation
+          duration: 2.0, // Slow, cinematic fly
+          easeLinearity: 0.25
         });
       }
     }
@@ -105,10 +133,83 @@ const MapController: React.FC<{ trip: Trip | null }> = ({ trip }) => {
   return null;
 };
 
+// --- Helper to generate custom icons ---
+const createCustomIcon = (index: number, isSelected: boolean, type: 'start' | 'stop' | 'end') => {
+  let iconContent;
+  const size = isSelected ? 56 : 40;
+  let color = isSelected ? '#0d9488' : '#ffffff'; // Teal-600 vs White
+  let textColor = isSelected ? '#ffffff' : '#0d9488';
+  // let zIndex = isSelected ? 1000 : 100;
+
+  if (type === 'start') {
+    iconContent = renderToStaticMarkup(<HomeIcon className="w-5 h-5 text-teal-700" />);
+    color = '#fff';
+    textColor = '#0d9488';
+  } else if (type === 'end') {
+    iconContent = renderToStaticMarkup(<FlagIcon className="w-5 h-5 text-teal-700" />);
+    color = '#fff';
+    textColor = '#0d9488';
+  } else {
+    // Normal Stop Number
+    iconContent = `<span style="font-weight: 800; font-size: 14px; font-family: sans-serif;">${index + 1}</span>`;
+  }
+
+  const markerHtml = `
+    <div class="${isSelected ? 'marker-active' : ''}" style="
+      position: relative;
+      width: ${size}px;
+      height: ${size}px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    ">
+      <!-- Pulse Ring (Only visible when active via CSS) -->
+      <div class="marker-ring" style="
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background-color: rgba(13, 148, 136, 0.3);
+        z-index: 0;
+      "></div>
+      
+      <!-- Pin Body (Teardrop Shape) -->
+      <div style="
+        position: relative;
+        z-index: 1;
+        width: ${isSelected ? 48 : 36}px;
+        height: ${isSelected ? 48 : 36}px;
+        background-color: ${color};
+        border: ${isSelected ? '3px' : '2px'} solid ${isSelected ? '#ffffff' : '#0d9488'};
+        border-radius: 50% 50% 50% 0;
+        transform: rotate(-45deg);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      ">
+        <!-- Content (Un-rotated) -->
+        <div style="transform: rotate(45deg); display: flex; align-items: center; justify-content: center; color: ${textColor};">
+          ${iconContent}
+        </div>
+      </div>
+    </div>
+  `;
+
+  return L.divIcon({
+    className: 'custom-marker-icon',
+    html: markerHtml,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size], // Tip of the teardrop
+    popupAnchor: [0, -size],
+  });
+};
+
 // --- Main Component ---
 
 const TripMap: React.FC<TripMapProps> = ({ trip }) => {
-  const { t } = useTranslation();
+  // const { t } = useTranslation();
   const { selectedStop, visibleStops } = useTripStore();
   
   const defaultCenter: [number, number] = [48.8566, 2.3522]; // Paris fallback
@@ -125,70 +226,60 @@ const TripMap: React.FC<TripMapProps> = ({ trip }) => {
     return visiblePlaces.map(place => [place.lat, place.lng]);
   }, [visiblePlaces]);
 
-  // --- Render Empty State ---
+  // --- Render Empty State (The "Globe" view) ---
   if (!trip) {
     return (
-      <div className="h-full w-full relative bg-gray-100">
+      <div className="h-full w-full relative bg-gray-50">
         <MapContainer 
           center={defaultCenter} 
-          zoom={defaultZoom} 
-          className="h-full w-full opacity-60 grayscale-50" 
+          zoom={4} 
+          className="h-full w-full opacity-60 grayscale-[20%]" 
           zoomControl={false}
           scrollWheelZoom={false}
           doubleClickZoom={false}
-          dragging={false}
+          dragging={true}
         >
           <TileLayer
-            url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+            url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+            attribution='&copy; CARTO'
           />
         </MapContainer>
         
-        {/* Glass Overlay */}
-        <div className="absolute inset-0 flex items-center justify-center z-400">
-          <div className="bg-white/30 backdrop-blur-md border border-white/40 p-8 rounded-2xl shadow-xl max-w-sm text-center">
-            <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0121 18.382V7.618a1 1 0 01-1.447-.894L15 7m0 13V7m0 0L9 17" />
-              </svg>
-            </div>
-            <h3 className="text-xl font-bold text-teal-900 mb-2">{t('trips.planYourTrip')}</h3>
-            <p className="text-gray-700 text-sm font-medium">
-              {t('trips.generateTripToSeeMap')}
-            </p>
-          </div>
+        {/* Empty State Overlay */}
+        <div className="absolute inset-0 flex items-center justify-center z-[400] pointer-events-none">
+          {/* Content is mostly in the Sidebar/Panel now, so we keep this minimal */}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-full w-full relative">
+    <div className="h-full w-full relative group">
       <MapContainer 
         center={defaultCenter} 
         zoom={defaultZoom} 
         className="h-full w-full"
-        zoomControl={false} // We can add custom controls later if needed
+        zoomControl={false}
       >
         <TileLayer
-          // Using CartoDB Light for a cleaner, modern look suitable for travel apps
+          // CartoDB Voyager: Beautiful, clean, good contrast for overlays
           url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+          attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
         />
 
         <MapController trip={trip} />
 
-        {/* Route Line */}
+        {/* Animated Route Line */}
         {routePositions.length > 1 && (
           <Polyline
             positions={routePositions}
             pathOptions={{
-              color: '#0d9488', // Teal-600
+              color: '#0f766e', // Teal-700
               weight: 4,
               opacity: 0.8,
-              dashArray: '1, 8', // Dotted line style
-              dashOffset: '10',
-              lineCap: 'round'
+              className: 'trip-route-line', // Triggers CSS animation
+              lineCap: 'round',
+              lineJoin: 'round'
             }}
           />
         )}
@@ -196,58 +287,14 @@ const TripMap: React.FC<TripMapProps> = ({ trip }) => {
         {/* Markers */}
         {visiblePlaces.map((place, index) => {
           const isSelected = selectedStop === place.name;
+          const isStart = index === 0;
+          const isEnd = index === visiblePlaces.length - 1 && visiblePlaces.length > 1;
+          
+          let type: 'start' | 'stop' | 'end' = 'stop';
+          if (isStart) type = 'start';
+          if (isEnd) type = 'end';
 
-          // HTML for the Marker Icon
-          // We use separate styles for Active vs Default to make it pop
-          const markerHtml = `
-            <div class="${isSelected ? 'marker-active' : ''}" style="
-              position: relative;
-              width: ${isSelected ? '48px' : '32px'};
-              height: ${isSelected ? '48px' : '32px'};
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              transition: all 0.3s ease;
-            ">
-              <!-- Pulse Ring (Only visible when active via CSS) -->
-              <div class="marker-ring" style="
-                position: absolute;
-                width: 100%;
-                height: 100%;
-                border-radius: 50%;
-                background-color: rgba(13, 148, 136, 0.3);
-                z-index: 0;
-              "></div>
-              
-              <!-- Core Marker -->
-              <div style="
-                position: relative;
-                z-index: 1;
-                width: ${isSelected ? '40px' : '32px'};
-                height: ${isSelected ? '40px' : '32px'};
-                background-color: ${isSelected ? '#0d9488' : '#ffffff'};
-                border: 2px solid ${isSelected ? '#ffffff' : '#0d9488'};
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                color: ${isSelected ? '#ffffff' : '#0d9488'};
-                font-weight: 700;
-                font-size: ${isSelected ? '16px' : '14px'};
-                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-              ">
-                ${index + 1}
-              </div>
-            </div>
-          `;
-
-          const customIcon = L.divIcon({
-            className: 'custom-marker-icon',
-            html: markerHtml,
-            iconSize: isSelected ? [48, 48] : [32, 32],
-            iconAnchor: isSelected ? [24, 24] : [16, 16],
-            popupAnchor: [0, -20],
-          });
+          const customIcon = createCustomIcon(index, isSelected, type);
 
           return (
             <Marker
@@ -257,31 +304,36 @@ const TripMap: React.FC<TripMapProps> = ({ trip }) => {
               zIndexOffset={isSelected ? 1000 : 100}
             >
               <Popup className="modern-popup" closeButton={true} maxWidth={280}>
-                <div className="flex flex-col">
-                  {/* Image Header */}
-                  <div className="relative h-32 w-full bg-gray-100">
+                <div className="flex flex-col select-none">
+                  {/* Image Header with Category Badge */}
+                  <div className="relative h-36 w-full bg-gray-100 group">
                     <img
-                      src={place.image || `https://picsum.photos/400/200?random=${index}`}
+                      src={place.image || `https://picsum.photos/400/300?random=${index}`}
                       alt={place.name}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                       loading="lazy"
                     />
-                    <div className="absolute top-2 left-2 bg-white/90 backdrop-blur px-2 py-0.5 rounded text-xs font-bold text-teal-800 shadow-sm">
-                      Stop {index + 1}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                    
+                    <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-sm px-2.5 py-1 rounded-full text-[10px] font-bold text-teal-800 shadow-sm uppercase tracking-wide">
+                      {index + 1} • {place.category}
+                    </div>
+                    
+                    <div className="absolute bottom-3 left-3 right-3 text-white">
+                         <h3 className="text-lg font-bold leading-tight font-serif text-shadow-sm">{place.name}</h3>
                     </div>
                   </div>
                   
                   {/* Content */}
-                  <div className="p-4">
-                    <h3 className="text-lg font-bold text-gray-800 leading-tight mb-1">{place.name}</h3>
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="text-xs font-semibold px-2 py-0.5 bg-teal-50 text-teal-700 rounded-full border border-teal-100">
-                        {place.category}
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-600 line-clamp-2 leading-relaxed">
+                  <div className="p-4 pt-3">
+                    <p className="text-xs text-gray-500 line-clamp-3 leading-relaxed">
                       {place.description}
                     </p>
+                    
+                    <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
+                        <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Estimated Time</span>
+                        <span className="text-xs font-bold text-teal-700">~2.5 Hours</span>
+                    </div>
                   </div>
                 </div>
               </Popup>
@@ -289,6 +341,9 @@ const TripMap: React.FC<TripMapProps> = ({ trip }) => {
           );
         })}
       </MapContainer>
+      
+      {/* Map Attribution Fade (Cosmetic) */}
+      <div className="absolute bottom-0 inset-x-0 h-16 bg-gradient-to-t from-white/80 to-transparent pointer-events-none z-[400]" />
     </div>
   );
 };

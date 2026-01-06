@@ -1,4 +1,38 @@
 {
+  "heroTitle": "Unlock the World",
+  "heroSubtitle": "Experience travel without limits. Access exclusive guides, offline maps, and VIP concierge support.",
+  "choosePlan": "Choose Your Journey",
+  "choosePlanDesc": "Flexible plans designed for every type of traveler. Upgrade, downgrade, or cancel anytime.",
+  "featuresTitle": "Premium Benefits",
+  "features": {
+    "unlimitedOfflineMaps": "Unlimited Offline Maps",
+    "unlimitedOfflineMapsDesc": "Download entire cities to your phone. Never get lost, even without a signal.",
+    "exclusiveHiddenGems": "Exclusive Hidden Gems",
+    "exclusiveHiddenGemsDesc": "Access our curated database of secret spots, away from the tourist crowds.",
+    "conciergeChat": "24/7 Concierge Chat",
+    "conciergeChatDesc": "Real-time support from local experts to help with reservations and emergencies.",
+    "exclusivePartnerDeals": "Exclusive Partner Deals",
+    "exclusivePartnerDealsDesc": "Save up to 20% on hotels and experiences with our global partners."
+  },
+  "faqTitle": "Frequently Asked Questions",
+  "faq": {
+    "cancel": {
+      "question": "Can I cancel my subscription anytime?",
+      "answer": "Yes, you can cancel your subscription at any time. Your benefits will continue until the end of your current billing period."
+    },
+    "trial": {
+      "question": "How does the plan upgrade work?",
+      "answer": "When you upgrade to a higher tier, the change happens immediately. We will pro-rate any remaining time on your current plan."
+    },
+    "payment": {
+      "question": "Is my payment information secure?",
+      "answer": "Absolutely. We use industry-standard encryption (SSL) and process payments through secure providers like Stripe and Alipay. We never store your card details."
+    },
+    "support": {
+      "question": "What does VIP Support include?",
+      "answer": "VIP Support grants you priority access to our travel concierge team, ensuring faster response times and personalized trip assistance."
+    }
+  },
   "title": "Choose Your Plan",
   "subtitle": "Select the perfect subscription plan for your travel needs",
   "selectPaymentMethod": "Select Payment Method",
@@ -83,19 +117,24 @@
       "badgeText": "Most Popular"
     }
   },
-  "features": {
-    "basicTripPlanning": "Basic trip planning",
-    "limitedDestinations": "Limited destinations",
-    "emailSupport": "Email support",
-    "mobileAppAccess": "Mobile app access",
-    "advancedTripPlanning": "Advanced trip planning",
-    "unlimitedDestinations": "Unlimited destinations",
-    "priorityEmailSupport": "Priority email support",
-    "premiumTripPlanning": "Premium trip planning",
-    "vipDestinations": "VIP destinations access",
-    "phoneSupport": "24/7 phone support",
-    "ultimateTripPlanning": "Ultimate trip planning",
-    "exclusiveDestinations": "Exclusive destinations",
-    "dedicatedConcierge": "Dedicated concierge"
-  }
+  "faq": {
+    "cancel": {
+      "question": "Can I cancel my subscription anytime?",
+      "answer": "Yes, you can cancel your subscription at any time. Your benefits will continue until the end of your current billing period."
+    },
+    "trial": {
+      "question": "How does the plan upgrade work?",
+      "answer": "When you upgrade to a higher tier, the change happens immediately. We will pro-rate any remaining time on your current plan."
+    },
+    "payment": {
+      "question": "Is my payment information secure?",
+      "answer": "Absolutely. We use industry-standard encryption (SSL) and process payments through secure providers like Stripe and Alipay. We never store your card details."
+    },
+    "support": {
+      "question": "What does VIP Support include?",
+      "answer": "VIP Support grants you priority access to our travel concierge team, ensuring faster response times and personalized trip assistance."
+    }
+  },
+  "travelBackground": "Travel Background",
+  "appExperience": "App Experience"
 }

@@ -131,5 +131,9 @@
   "seoPreview": "معاينة محركات البحث",
   "upgradeRequired": "ترقية مطلوبة",
   "draft": "مسودة",
-  "published": "منشور"
+  "published": "منشور",
+  "featured": "اختيار المحرر",
+  "latestStories": "أحدث القصص",
+  "newsletter": "النشرة الإخبارية",
+  "subscribing": "الانضمام..."
 }

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
-import { ChevronUpIcon, ChevronDownIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { SparklesIcon } from '@heroicons/react/24/outline';
 import TripSettingsPanel from './TripSettingsPanel';
 import TripMap from './TripMap';
 import WeatherSummary from './WeatherSummary';
@@ -30,7 +30,6 @@ const TripPlanner = () => {
     setTripDetails,
     setIsGenerating,
     resetGenerationState,
-    // Mobile Sheet Controls
     isMobilePanelOpen,
     setMobilePanelOpen
   } = useTripStore();
@@ -81,7 +80,6 @@ const TripPlanner = () => {
       refreshTripsMutation.mutate();
       setIsGenerating(false);
       
-      // On mobile, collapse the panel slightly to show the route on map
       if (window.innerWidth < 768) {
         setMobilePanelOpen(false);
       }
@@ -118,86 +116,35 @@ const TripPlanner = () => {
   };
 
   return (
-    <div className="relative w-full h-[calc(100vh-64px)] bg-gray-50/50 overflow-hidden">
+    // Changed: Layout allows natural height expansion
+    <div className="flex flex-col md:flex-row w-full bg-[#F5F5F7] relative">
       
       {/* 
-        1. MAP LAYER 
-        Occupies full background.
-      */}
-      <div className="absolute inset-0 z-0">
-        <TripMap trip={currentTrip} />
-        
-        {/* Desktop Weather Widget - Floating nicely top right */}
-        <div className="hidden md:block absolute top-8 right-8 z-20 w-80">
-          <WeatherSummary 
-            onClick={() => {}} 
-            className="shadow-xl shadow-teal-900/5 ring-1 ring-white/50 backdrop-blur-md"
-          />
-        </div>
-
-        {/* Mobile Map Controls (Visible when panel is collapsed) */}
-        {!isMobilePanelOpen && (
-          <button 
-            onClick={() => setMobilePanelOpen(true)}
-            className="md:hidden absolute bottom-24 right-4 z-10 bg-teal-600 text-white p-3 rounded-full shadow-lg shadow-teal-600/30 animate-bounce"
-          >
-            <ChevronUpIcon className="w-6 h-6" />
-          </button>
-        )}
-      </div>
-
-      {/* 
-        2. INTERACTIVE PANEL LAYER ("Floating Island")
-        Desktop: Floating Card with generous margins and glass effect
-        Mobile: Bottom Sheet with snap-point feel
+        1. LEFT SIDEBAR (Standard Flow)
+        - Removed: h-full, overflow-y-auto (allows page scroll)
+        - Added: min-h details
       */}
       <div 
         className={`
-          absolute z-30 transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1)
+          flex flex-col bg-[#F5F5F7] z-30 transition-all duration-300 shadow-xl border-r border-gray-200
           
-          /* Desktop: Floating Island */
-          md:top-6 md:left-6 md:bottom-6 md:w-[480px] md:translate-y-0
+          /* Desktop: Sidebar layout */
+          md:w-[480px] lg:w-[500px] md:min-h-[calc(100vh-64px)] md:shrink-0
           
-          /* Mobile: Bottom Sheet */
-          inset-x-0 bottom-0 
-          ${isMobilePanelOpen ? 'top-14' : 'top-[88%]'} 
+          /* Mobile: Bottom Sheet positioning */
+          ${isMobilePanelOpen ? 'relative' : 'hidden md:flex'}
         `}
       >
-        <div className={`
-          h-full w-full flex flex-col overflow-hidden
-          bg-white/90 backdrop-blur-xl border border-white/60
-          shadow-2xl shadow-black/10
-          
-          /* Rounding */
-          rounded-t-3xl md:rounded-3xl
-        `}>
-          
-          {/* Mobile Handle / Toggle Area */}
-          <div 
-            className="md:hidden w-full bg-white/50 backdrop-blur-sm border-b border-gray-100/50 flex flex-col items-center pt-3 pb-3 cursor-pointer shrink-0 hover:bg-white/80 transition-colors"
-            onClick={() => setMobilePanelOpen(!isMobilePanelOpen)}
-          >
-            {/* The Grab Handle Pill */}
-            <div className="w-12 h-1.5 bg-gray-300 rounded-full mb-2" />
-            
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500">
-              {isMobilePanelOpen ? (
-                <>
-                  <ChevronDownIcon className="w-3 h-3" />
-                  <span>View Map</span>
-                </>
-              ) : (
-                <>
-                  <ChevronUpIcon className="w-3 h-3" />
-                  <span>Plan Trip</span>
-                </>
-              )}
-            </div>
-          </div>
+        {/* Mobile-only Panel Toggle Handle (hidden on desktop) */}
+        <div className="md:hidden w-full bg-[#F5F5F7] border-b border-gray-200/50 flex flex-col items-center pt-3 pb-3 cursor-pointer shrink-0">
+             {/* Handle content handles in Mobile state management */}
+        </div>
 
-          {/* Contextual Toast Notification (Desktop Only) */}
+        {/* Content Container */}
+        <div className="flex-1 p-0">
+          
           {location.state?.focusTripPlanner && (
-            <div className="hidden md:flex mx-6 mt-6 mb-2 bg-linear-to-r from-teal-600 to-teal-500 text-white px-4 py-3 rounded-xl shadow-lg shadow-teal-600/20 items-center justify-between animate-in fade-in slide-in-from-top-4">
+            <div className="mx-6 mt-6 mb-2 bg-gradient-to-r from-teal-600 to-teal-500 text-white px-4 py-3 rounded-xl shadow-lg shadow-teal-600/20 flex items-center justify-between animate-in fade-in slide-in-from-top-4">
                <div className="flex items-center gap-2">
                  <SparklesIcon className="w-5 h-5" />
                  <span className="text-sm font-bold">Start your adventure here!</span>
@@ -206,31 +153,51 @@ const TripPlanner = () => {
             </div>
           )}
 
-          {/* Scrollable Content */}
-          <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent p-1">
-            <TripSettingsPanel
-              transport={transport}
-              setTransport={setTransport}
-              tripType={tripType}
-              setTripType={setTripType}
-              departureCity={departureCity}
-              setDepartureCity={setDepartureCity}
-              destinationCity={destinationCity}
-              setDestinationCity={setDestinationCity}
-              useCurrentLocation={useCurrentLocation}
-              setUseCurrentLocation={setUseCurrentLocation}
-              stations={stations}
-              setStations={setStations}
-              duration={duration}
-              setDuration={setDuration}
-              interests={interests}
-              onToggleInterest={handleToggleInterest}
-              onGenerateTrip={handleGenerateTrip}
-              onStartNavigation={handleStartNavigation}
-            />
-          </div>
+          <TripSettingsPanel
+            transport={transport}
+            setTransport={setTransport}
+            tripType={tripType}
+            setTripType={setTripType}
+            departureCity={departureCity}
+            setDepartureCity={setDepartureCity}
+            destinationCity={destinationCity}
+            setDestinationCity={setDestinationCity}
+            useCurrentLocation={useCurrentLocation}
+            setUseCurrentLocation={setUseCurrentLocation}
+            stations={stations}
+            setStations={setStations}
+            duration={duration}
+            setDuration={setDuration}
+            interests={interests}
+            onToggleInterest={handleToggleInterest}
+            onGenerateTrip={handleGenerateTrip}
+            onStartNavigation={handleStartNavigation}
+          />
         </div>
       </div>
+
+      {/* 
+        2. RIGHT MAP AREA
+        - Desktop: Sticky positioning so map follows user scrolling down the sidebar
+        - Mobile: Fixed height or flex
+      */}
+      <div className="relative w-full md:flex-1 bg-blue-50">
+        {/* Sticky Map Container */}
+        <div className="h-[500px] md:h-[calc(100vh-64px)] md:sticky md:top-[64px] w-full">
+            <TripMap trip={currentTrip} />
+            
+            {/* Weather Widget */}
+            <div className="hidden md:block absolute top-6 right-6 z-20 w-72">
+              <WeatherSummary 
+                onClick={() => {}} 
+                className="shadow-sm border border-white/60 backdrop-blur-md"
+              />
+            </div>
+        </div>
+      </div>
+
+      {/* Mobile-only FAB to toggle map/list if needed, 
+          though layout is cleaner now without overlaying elements */}
     </div>
   );
 };

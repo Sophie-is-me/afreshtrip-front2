@@ -16,7 +16,19 @@ export const useSubscriptionPlans = () => {
 export const useUserSubscription = (userId: string | undefined) => {
   return useQuery({
     queryKey: QUERY_KEYS.subscription.currentUser(userId || ''),
-    queryFn: () => unifiedSubscriptionService.getUserSubscription(userId!),
+    queryFn: async () => {
+      try {
+        return await unifiedSubscriptionService.getUserSubscription(userId!);
+      } catch (error) {
+        // Handle empty response errors gracefully - treat as no subscription
+        if (error instanceof Error && error.message.includes('Empty response body')) {
+          console.log(`No subscription found for user ${userId} (empty response)`);
+          return null;
+        }
+        // Re-throw other errors
+        throw error;
+      }
+    },
     enabled: !!userId, // Only fetch if user is logged in
   });
 };

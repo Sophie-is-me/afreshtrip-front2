@@ -144,7 +144,7 @@ const TripPlanner = () => {
         <div className="flex-1 p-0">
           
           {location.state?.focusTripPlanner && (
-            <div className="mx-6 mt-6 mb-2 bg-gradient-to-r from-teal-600 to-teal-500 text-white px-4 py-3 rounded-xl shadow-lg shadow-teal-600/20 flex items-center justify-between animate-in fade-in slide-in-from-top-4">
+            <div className="mx-6 mt-6 mb-2 bg-linear-to-r from-teal-600 to-teal-500 text-white px-4 py-3 rounded-xl shadow-lg shadow-teal-600/20 flex items-center justify-between animate-in fade-in slide-in-from-top-4">
                <div className="flex items-center gap-2">
                  <SparklesIcon className="w-5 h-5" />
                  <span className="text-sm font-bold">Start your adventure here!</span>
@@ -183,7 +183,7 @@ const TripPlanner = () => {
       */}
       <div className="relative w-full md:flex-1 bg-blue-50">
         {/* Sticky Map Container */}
-        <div className="h-[500px] md:h-[calc(100vh-64px)] md:sticky md:top-[64px] w-full">
+        <div className="h-[500px] md:h-[calc(100vh-64px)] md:sticky md:top-16 w-full">
             <TripMap trip={currentTrip} />
             
             {/* Weather Widget */}

@@ -64,9 +64,11 @@ if [[ $answer != "y" && $answer != "Y" ]]; then
 fi
 log_step "Starting International Deployment (Firebase)..."
 
+log_info "Setting up International Environment..."
+cp .env.international .env
+
 log_info "Building International Version..."
-# We explicitly build first to ensure the Env Var is applied correctly
-VITE_IS_CHINESE_VERSION=false npm run build
+npm run build
 
 log_info "Deploying to Firebase..."
 # We use --only hosting to avoid triggering unnecessary function/firestore deploys
@@ -86,9 +88,11 @@ if [[ $answer != "y" && $answer != "Y" ]]; then
 fi
 log_step "Starting China Deployment (Aliyun)..."
 
+log_info "Setting up Chinese Environment..."
+cp .env.chinese .env
+
 log_info "Building Chinese Version..."
-# Rebuild the application with the Chinese flag
-VITE_IS_CHINESE_VERSION=true npm run build
+npm run build
 
 log_info "Uploading to Aliyun OSS..."
 # Flags explanation:

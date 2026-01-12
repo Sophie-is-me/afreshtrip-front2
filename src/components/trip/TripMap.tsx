@@ -233,7 +233,7 @@ const TripMap: React.FC<TripMapProps> = ({ trip }) => {
         <MapContainer 
           center={defaultCenter} 
           zoom={4} 
-          className="h-full w-full opacity-60 grayscale-[20%]" 
+          className="h-full w-full opacity-60 grayscale-20" 
           zoomControl={false}
           scrollWheelZoom={false}
           doubleClickZoom={false}
@@ -246,7 +246,7 @@ const TripMap: React.FC<TripMapProps> = ({ trip }) => {
         </MapContainer>
         
         {/* Empty State Overlay */}
-        <div className="absolute inset-0 flex items-center justify-center z-[400] pointer-events-none">
+        <div className="absolute inset-0 flex items-center justify-center z-400 pointer-events-none">
           {/* Content is mostly in the Sidebar/Panel now, so we keep this minimal */}
         </div>
       </div>
@@ -313,7 +313,7 @@ const TripMap: React.FC<TripMapProps> = ({ trip }) => {
                       className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                       loading="lazy"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                    <div className="absolute inset-0 bg-linear-to-t from-black/60 to-transparent" />
                     
                     <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-sm px-2.5 py-1 rounded-full text-[10px] font-bold text-teal-800 shadow-sm uppercase tracking-wide">
                       {index + 1} • {place.category}
@@ -343,7 +343,7 @@ const TripMap: React.FC<TripMapProps> = ({ trip }) => {
       </MapContainer>
       
       {/* Map Attribution Fade (Cosmetic) */}
-      <div className="absolute bottom-0 inset-x-0 h-16 bg-gradient-to-t from-white/80 to-transparent pointer-events-none z-[400]" />
+      <div className="absolute bottom-0 inset-x-0 h-16 bg-linear-to-t from-white/80 to-transparent pointer-events-none z-400" />
     </div>
   );
 };

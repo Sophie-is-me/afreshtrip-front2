@@ -58,5 +58,10 @@
     "active": "Activo",
     "completed": "Completado",
     "cancelled": "Cancelado"
-  }
+  },
+  "testimonialsGallery": "Testimonios y Galería",
+  "photo": "Foto",
+  "video": "Video",
+  "testimonialText": "He pasado un tiempo maravilloso aquí. ¡Volveré seguro!",
+  "carRent": "Alquiler de coches"
 }

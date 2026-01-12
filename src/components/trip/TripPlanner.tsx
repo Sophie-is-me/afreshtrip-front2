@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
-import { SparklesIcon } from '@heroicons/react/24/outline';
+import {  SparklesIcon } from '@heroicons/react/24/outline';
 import TripSettingsPanel from './TripSettingsPanel';
 import TripMap from './TripMap';
 import WeatherSummary from './WeatherSummary';
@@ -116,33 +116,22 @@ const TripPlanner = () => {
   };
 
   return (
-    // Changed: Layout allows natural height expansion
+    // Outer Wrapper
     <div className="flex flex-col md:flex-row w-full bg-[#F5F5F7] relative">
       
       {/* 
-        1. LEFT SIDEBAR (Standard Flow)
-        - Removed: h-full, overflow-y-auto (allows page scroll)
-        - Added: min-h details
+        1. LEFT SIDEBAR
+        - Standard background color to blend with page
+        - No border-r needed if we are using a gap/padding approach
       */}
       <div 
         className={`
-          flex flex-col bg-[#F5F5F7] z-30 transition-all duration-300 shadow-xl border-r border-gray-200
-          
-          /* Desktop: Sidebar layout */
+          flex flex-col bg-[#F5F5F7] z-30 transition-all duration-300
           md:w-[480px] lg:w-[500px] md:min-h-[calc(100vh-64px)] md:shrink-0
-          
-          /* Mobile: Bottom Sheet positioning */
           ${isMobilePanelOpen ? 'relative' : 'hidden md:flex'}
         `}
       >
-        {/* Mobile-only Panel Toggle Handle (hidden on desktop) */}
-        <div className="md:hidden w-full bg-[#F5F5F7] border-b border-gray-200/50 flex flex-col items-center pt-3 pb-3 cursor-pointer shrink-0">
-             {/* Handle content handles in Mobile state management */}
-        </div>
-
-        {/* Content Container */}
         <div className="flex-1 p-0">
-          
           {location.state?.focusTripPlanner && (
             <div className="mx-6 mt-6 mb-2 bg-linear-to-r from-teal-600 to-teal-500 text-white px-4 py-3 rounded-xl shadow-lg shadow-teal-600/20 flex items-center justify-between animate-in fade-in slide-in-from-top-4">
                <div className="flex items-center gap-2">
@@ -177,13 +166,23 @@ const TripPlanner = () => {
       </div>
 
       {/* 
-        2. RIGHT MAP AREA
-        - Desktop: Sticky positioning so map follows user scrolling down the sidebar
-        - Mobile: Fixed height or flex
+        2. RIGHT MAP AREA (The "Grid" Cell)
+        - Added Padding (md:p-4) to create the gap
+        - Added Rounded Corners, Border, and Shadow to the inner container
       */}
-      <div className="relative w-full md:flex-1 bg-blue-50">
-        {/* Sticky Map Container */}
-        <div className="h-[500px] md:h-[calc(100vh-64px)] md:sticky md:top-16 w-full">
+      <div className="relative w-full md:flex-1 bg-[#F5F5F7] md:p-1 md:pl-0">
+        
+        {/* Floating/Sticky Map Card */}
+        <div className={`
+          relative w-full overflow-hidden
+          /* Mobile: Fixed height */
+          h-[500px] 
+          /* Desktop: Sticky height calculation (Viewport - Header - Padding) */
+          md:h-[calc(100vh-80px)] md:sticky md:top-20
+          /* Card Styling */
+          md:rounded-xl md:border md:border-white
+          bg-blue-50
+        `}>
             <TripMap trip={currentTrip} />
             
             {/* Weather Widget */}
@@ -196,8 +195,6 @@ const TripPlanner = () => {
         </div>
       </div>
 
-      {/* Mobile-only FAB to toggle map/list if needed, 
-          though layout is cleaner now without overlaying elements */}
     </div>
   );
 };

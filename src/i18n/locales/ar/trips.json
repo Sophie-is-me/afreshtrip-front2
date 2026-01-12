@@ -58,5 +58,10 @@
     "active": "نشط",
     "completed": "مكتمل",
     "cancelled": "ملغى"
-  }
+  },
+  "testimonialsGallery": "الشهادات والمعرض",
+  "photo": "صورة",
+  "video": "فيديو",
+  "testimonialText": "قضيت وقتًا رائعًا هنا. سأعود بالتأكيد!",
+  "carRent": "تأجير السيارات"
 }

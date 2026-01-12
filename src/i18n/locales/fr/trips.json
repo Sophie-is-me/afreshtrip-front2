@@ -58,5 +58,10 @@
     "active": "Actif",
     "completed": "Terminé",
     "cancelled": "Annulé"
-  }
+  },
+  "testimonialsGallery": "Témoignages et Galerie",
+  "photo": "Photo",
+  "video": "Vidéo",
+  "testimonialText": "J'ai passé un merveilleux moment ici. Je reviendrai sûrement !",
+  "carRent": "Location de voitures"
 }

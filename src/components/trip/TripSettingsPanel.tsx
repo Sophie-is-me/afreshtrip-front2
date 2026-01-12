@@ -171,90 +171,90 @@ const TripSettingsPanel: React.FC<TripSettingsPanelProps> = ({
       <div className={`transition-all duration-500 ${hasResult ? 'mb-4' : 'mb-8'}`}>
         
         {/* Row 1: Transport & Trip Type */}
-        <div className="flex flex-wrap  flex-col justify-between gap-4 mb-8">
+        <div className="flex flex-wrap items-center flex-col justify-between gap-4 mb-8">
           <div className="flex items-center gap-6">
-            <RadioSelector 
-              selected={transport === 'car'} 
-              onClick={() => setTransport('car')} 
-              label="Car Trip" 
-              icon={<FaCar />} 
+            <RadioSelector
+              selected={transport === 'car'}
+              onClick={() => setTransport('car')}
+              label={t('trips.carTrip')}
+              icon={<FaCar />}
             />
-            <RadioSelector 
-              selected={transport === 'bike'} 
-              onClick={() => setTransport('bike')} 
-              label="Bike Trip" 
-              icon={<FaBicycle />} 
+            <RadioSelector
+              selected={transport === 'bike'}
+              onClick={() => setTransport('bike')}
+              label={t('trips.bikeTrip')}
+              icon={<FaBicycle />}
             />
           </div>
 
           <div className="flex items-center gap-4">
-            <CheckboxSelector 
-              checked={tripType === 'one'} 
-              onClick={() => setTripType('one')} 
-              label="One" 
+            <CheckboxSelector
+              checked={tripType === 'one'}
+              onClick={() => setTripType('one')}
+              label={t('trips.oneWay')}
             />
-            <CheckboxSelector 
-              checked={tripType === 'return'} 
-              onClick={() => setTripType('return')} 
-              label="Return way" 
+            <CheckboxSelector
+              checked={tripType === 'return'}
+              onClick={() => setTripType('return')}
+              label={t('trips.returnWay')}
             />
           </div>
         </div>
 
         {/* Row 2: Input Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
-          <InputField 
-            label="Departure city" 
-            value={departureCity} 
-            onChange={setDepartureCity} 
+          <InputField
+            label={t('trips.departureCity')}
+            value={departureCity}
+            onChange={setDepartureCity}
           />
-          <InputField 
-            label="Destination City" 
-            value={destinationCity} 
-            onChange={setDestinationCity} 
+          <InputField
+            label={t('trips.destinationCity')}
+            value={destinationCity}
+            onChange={setDestinationCity}
           />
-          <InputField 
-            label="Station" 
-            value={stations} 
-            onChange={(v) => setStations(Number(v))} 
+          <InputField
+            label={t('trips.stations')}
+            value={stations}
+            onChange={(v) => setStations(Number(v))}
           />
-          <InputField 
-            label="During Times" 
-            value={duration} 
-            onChange={(v) => setDuration(Number(v))} 
-            suffix="days"
+          <InputField
+            label={t('trips.duration')}
+            value={duration}
+            onChange={(v) => setDuration(Number(v))}
+            suffix={t('trips.days')}
           />
         </div>
 
         {/* Row 3: Interests */}
         <div className="flex flex-wrap gap-6 mb-8">
-          <InterestCheckbox 
-            label="Outdoors&Sport" 
-            checked={interests.includes('outdoorsSport')} 
-            onClick={() => onToggleInterest('outdoorsSport')} 
+          <InterestCheckbox
+            label={t('trips.outdoorsSport')}
+            checked={interests.includes('outdoorsSport')}
+            onClick={() => onToggleInterest('outdoorsSport')}
           />
-          <InterestCheckbox 
-            label="Culture&Museum" 
-            checked={interests.includes('cultureMuseum')} 
-            onClick={() => onToggleInterest('cultureMuseum')} 
+          <InterestCheckbox
+            label={t('trips.cultureMuseum')}
+            checked={interests.includes('cultureMuseum')}
+            onClick={() => onToggleInterest('cultureMuseum')}
           />
-          <InterestCheckbox 
-            label="Fjords&Montains" 
-            checked={interests.includes('fjordsMountains')} 
-            onClick={() => onToggleInterest('fjordsMountains')} 
+          <InterestCheckbox
+            label={t('trips.fjordsMountains')}
+            checked={interests.includes('fjordsMountains')}
+            onClick={() => onToggleInterest('fjordsMountains')}
           />
         </div>
 
         {/* Row 4: Action Button (Header for Result) */}
-        <div className="flex items-center gap-4 mb-2">
-           <h2 className="font-serif text-lg font-bold text-gray-800">Trip Generation</h2>
+        <div className="flex items-center justify-center gap-4 mb-2">
+           <h2 className="font-serif text-lg font-bold text-gray-800">{t('trips.tripGeneration')}</h2>
            {!hasResult && (
              <button
                onClick={onGenerateTrip}
                disabled={!destinationCity || isGenerating}
                className="px-6 py-1.5 bg-teal-800 text-white text-sm font-medium rounded-md hover:bg-teal-700 transition-colors flex items-center gap-2 shadow-lg shadow-teal-900/20"
              >
-               {isGenerating ? 'Planning...' : 'Search'}
+               {isGenerating ? t('trips.generatingYourTrip') : t('trips.generateTrip')}
                {!isGenerating && <MagnifyingGlassIcon className="w-4 h-4" />}
              </button>
            )}

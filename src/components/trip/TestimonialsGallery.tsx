@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PlayCircleIcon } from '@heroicons/react/24/solid';
 import { FaceSmileIcon } from '@heroicons/react/24/outline';
 
 const TestimonialsGallery: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'photo' | 'video'>('photo');
+
+  const { t } = useTranslation();
 
   const images = [
     "https://images.unsplash.com/photo-1501785888041-af3ef285b470?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80",
@@ -15,7 +18,7 @@ const TestimonialsGallery: React.FC = () => {
   return (
     <div className="mt-8 mb-6">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="font-serif text-lg font-bold text-gray-800">Testimonials & Gallery</h3>
+        <h3 className="font-serif text-lg font-bold text-gray-800">{t('trips.testimonialsGallery')}</h3>
         <div className="flex bg-gray-100 rounded-full p-0.5">
           <button
             onClick={() => setActiveTab('photo')}
@@ -23,7 +26,7 @@ const TestimonialsGallery: React.FC = () => {
               activeTab === 'photo' ? 'bg-white text-teal-800 shadow-sm' : 'text-gray-400'
             }`}
           >
-            Photo
+            {t('trips.photo')}
           </button>
           <button
             onClick={() => setActiveTab('video')}
@@ -31,7 +34,7 @@ const TestimonialsGallery: React.FC = () => {
               activeTab === 'video' ? 'bg-white text-teal-800 shadow-sm' : 'text-gray-400'
             }`}
           >
-            Video
+            {t('trips.video')}
           </button>
         </div>
       </div>
@@ -42,7 +45,7 @@ const TestimonialsGallery: React.FC = () => {
           <img src={images[0]} alt="Travel" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
           <div className="absolute inset-0 bg-black/30 p-3 flex flex-col justify-end">
             <p className="text-[10px] text-white font-medium leading-tight mb-1">
-              "I've spent a wonderful time here. Will come back for sure!"
+              {t('trips.testimonialText')}
             </p>
             <FaceSmileIcon className="w-4 h-4 text-white" />
           </div>

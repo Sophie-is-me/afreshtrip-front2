@@ -59,5 +59,10 @@
     "active": "Active",
     "completed": "Completed",
     "cancelled": "Cancelled"
-  }
+  },
+  "testimonialsGallery": "Testimonials & Gallery",
+  "photo": "Photo",
+  "video": "Video",
+  "testimonialText": "I've spent a wonderful time here. Will come back for sure!",
+  "carRent": "Car rent"
 }

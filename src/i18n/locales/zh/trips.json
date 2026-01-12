@@ -58,5 +58,10 @@
     "active": "进行中",
     "completed": "已完成",
     "cancelled": "已取消"
-  }
+  },
+  "testimonialsGallery": "推荐与画廊",
+  "photo": "照片",
+  "video": "视频",
+  "testimonialText": "我在那里度过了美好的时光。一定会回来！",
+  "carRent": "租车"
 }

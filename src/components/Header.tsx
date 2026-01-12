@@ -17,7 +17,6 @@ const Header: React.FC<HeaderProps> = ({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
-  const [isScrolled, setIsScrolled] = useState(false);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const userDropdownRef = useRef<HTMLDivElement>(null);
@@ -27,15 +26,6 @@ const Header: React.FC<HeaderProps> = ({
   const navigate = useNavigate();
   const location = useLocation();
   const { t, i18n } = useTranslation();
-
-  // Handle scroll effect for sticky header
-  useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 10);
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
 
   // Handle click outside & Escape key
   useEffect(() => {
@@ -115,28 +105,29 @@ const Header: React.FC<HeaderProps> = ({
         {t('header.skipToMainContent')}
       </a>
 
-      <header 
-        className={`sticky top-0 z-50 transition-all duration-300 border-b ${
-          isScrolled 
-            ? 'bg-teal-900/95 backdrop-blur-md border-teal-800 shadow-lg py-2' 
-            : 'bg-teal-900 border-teal-800/50 py-3 md:py-4'
-        }`}
-      >
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <nav className="flex justify-between items-center" aria-label="Main Navigation">
+      {/* 
+         UPDATED HEADER CONTAINER 
+         - Fixed height (h-20 = 80px)
+         - Removed scroll event listeners and dynamic padding
+         - Consistent teal background
+      */}
+      <header className="sticky top-0 z-50 bg-teal-900 border-b border-teal-800 shadow-md h-20 shrink-0">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 h-full">
+          <nav className="flex justify-between items-center h-full" aria-label="Main Navigation">
             
             {/* Left: Logo & Language */}
             <div className="flex items-center gap-4 lg:gap-8">
               <Link
                 to="/"
-                className="flex items-center gap-2 group focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 rounded-lg p-1 -ml-1"
+                className="flex items-center gap-3 group focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 rounded-lg p-1 -ml-1"
                 aria-label={t('header.afreshtripHome')}
               >
                 <img 
                   src="/assets/tubiao.png" 
                   alt="" 
                   aria-hidden="true"
-                  className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 border-teal-700 shadow-md group-hover:border-teal-500 transition-colors" 
+                  // Fixed size, no transition shrinking
+                  className="w-10 h-10 rounded-full border-2 border-teal-700 shadow-md group-hover:border-teal-500 transition-colors" 
                 />
                 <span className="text-xl md:text-2xl font-bold text-white tracking-tight group-hover:text-teal-200 transition-colors">
                   Afreshtrip
@@ -221,18 +212,6 @@ const Header: React.FC<HeaderProps> = ({
                   </Link>
                 )}
 
-                {/* <Link 
-                  to="/support" 
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 ${
-                    isActiveLink('/support') 
-                      ? 'bg-teal-800 text-white shadow-inner' 
-                      : 'text-teal-100 hover:text-white hover:bg-teal-800/50'
-                  }`}
-                  aria-current={isActiveLink('/support') ? 'page' : undefined}
-                >
-                  {t('header.support')}
-                </Link> */}
-
                 {user && (
                   <>
                     <div className="w-px h-6 bg-teal-800 mx-2" aria-hidden="true" />
@@ -276,7 +255,7 @@ const Header: React.FC<HeaderProps> = ({
                 </div>
               )}
 
-              {/* User Profile / Auth - Always Visible (Removed conditional wrapper) */}
+              {/* User Profile / Auth */}
               <div className="flex items-center gap-3">
                 {!user ? (
                   <Link 
@@ -328,10 +307,6 @@ const Header: React.FC<HeaderProps> = ({
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                           {t('profileNav.trips')}
                         </Link>
-                        <Link to="/notifications" className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-teal-50 hover:text-teal-700" onClick={() => setIsUserDropdownOpen(false)}>
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
-                          {t('profileNav.notifications')}
-                        </Link>
                         
                         <div className="border-t border-gray-100 my-1"></div>
                         
@@ -380,7 +355,7 @@ const Header: React.FC<HeaderProps> = ({
         <div 
           id="mobile-menu"
           ref={mobileMenuRef}
-          className={`lg:hidden fixed inset-x-0 top-[60px] bg-teal-900 border-b border-teal-800 shadow-xl transition-all duration-300 ease-in-out transform origin-top ${
+          className={`lg:hidden fixed inset-x-0 top-20 bg-teal-900 border-b border-teal-800 shadow-xl transition-all duration-300 ease-in-out transform origin-top ${
             isMobileMenuOpen ? 'opacity-100 scale-y-100' : 'opacity-0 scale-y-0 pointer-events-none'
           }`}
         >

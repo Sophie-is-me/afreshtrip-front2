@@ -202,17 +202,21 @@ const TripSettingsPanel: React.FC<TripSettingsPanelProps> = ({
         </div>
 
         {/* Row 2: Input Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+        <div className={`grid gap-6 mb-8 transition-all duration-300 ${tripType === 'one' ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-1 md:grid-cols-3'}`}>
           <InputField
             label={t('trips.departureCity')}
             value={departureCity}
             onChange={setDepartureCity}
           />
-          <InputField
-            label={t('trips.destinationCity')}
-            value={destinationCity}
-            onChange={setDestinationCity}
-          />
+          {tripType === 'one' && (
+            <div className="animate-in fade-in slide-in-from-left-4 duration-300">
+              <InputField
+                label={t('trips.destinationCity')}
+                value={destinationCity}
+                onChange={setDestinationCity}
+              />
+            </div>
+          )}
           <InputField
             label={t('trips.stations')}
             value={stations}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 import {  SparklesIcon } from '@heroicons/react/24/outline';
@@ -21,6 +21,13 @@ const TripPlanner = () => {
   const [stations, setStations] = useState(3);
   const [duration, setDuration] = useState(1);
   const [interests, setInterests] = useState<string[]>(['outdoorsSport']);
+
+  // --- EFFECTS ---
+  useEffect(() => {
+    if (tripType === 'return') {
+      setDestinationCity(departureCity);
+    }
+  }, [tripType, departureCity]);
 
   // --- STORE STATE ---
   const {
@@ -96,6 +103,7 @@ const TripPlanner = () => {
     );
   };
 
+  // TODO: implment reat trip generation logic when backend will be ready
   const handleGenerateTrip = () => {
     setIsGenerating(true);
     resetGenerationState();

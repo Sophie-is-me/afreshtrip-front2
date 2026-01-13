@@ -1,12 +1,13 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Polyline, useMap, Popup } from 'react-leaflet';
 // import { useTranslation } from 'react-i18next';
 import { useTripStore } from '../../stores/tripStore';
 import type { Trip } from '../../types/trip';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { FlagIcon, HomeIcon } from '@heroicons/react/24/solid';
+import { FlagIcon, HomeIcon, MapPinIcon } from '@heroicons/react/24/solid';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { locationService } from '../../services/locationService';
 
 // --- Styles Injection ---
 // Customizing Leaflet via global styles for specific marker animations and popup overrides
@@ -93,13 +94,27 @@ interface TripMapProps {
 }
 
 // --- Controller Component ---
-// Handles programmatic map moves (Flying to active stops, fitting bounds)
-const MapController: React.FC<{ trip: Trip | null }> = ({ trip }) => {
+// Handles programmatic map moves (Flying to active stops, fitting bounds, or centering on user)
+const MapController: React.FC<{ trip: Trip | null; userLocation: [number, number] | null }> = ({ trip, userLocation }) => {
   const map = useMap();
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { selectedStop, generatedStops } = useTripStore();
+  const { selectedStop } = useTripStore();
+  
+  // Track if we've already done the initial fly-to for the user to prevent fighting with manual drag
+  const [hasFlownToUser, setHasFlownToUser] = useState(false);
 
-  // 1. Fit bounds on trip load
+  // 1. Initial User Location Center (Only if no trip is active)
+  useEffect(() => {
+    if (!trip && userLocation && !hasFlownToUser) {
+      map.flyTo(userLocation, 12, { // Zoom level 12 is good for city/area view
+        animate: true,
+        duration: 2.0
+      });
+      setHasFlownToUser(true);
+    }
+  }, [trip, userLocation, hasFlownToUser, map]);
+
+  // 2. Fit bounds on trip load
   useEffect(() => {
     if (trip && trip.places.length > 0) {
       const allPoints: [number, number][] = [
@@ -116,7 +131,7 @@ const MapController: React.FC<{ trip: Trip | null }> = ({ trip }) => {
     }
   }, [trip, map]);
 
-  // 2. Fly to active stop
+  // 3. Fly to active stop
   useEffect(() => {
     if (trip && selectedStop) {
       const place = trip.places.find(p => p.name === selectedStop);
@@ -206,14 +221,73 @@ const createCustomIcon = (index: number, isSelected: boolean, type: 'start' | 's
   });
 };
 
+// Create a simple "You are here" icon
+const createUserIcon = () => {
+  const iconContent = renderToStaticMarkup(<MapPinIcon className="w-6 h-6 text-white" />);
+  
+  const markerHtml = `
+    <div style="
+      position: relative;
+      width: 48px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    ">
+      <div style="
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background-color: rgba(13, 148, 136, 0.2);
+        animation: pulse-ring 2s infinite;
+      "></div>
+      <div style="
+        position: relative;
+        width: 36px;
+        height: 36px;
+        background-color: #0d9488;
+        border: 2px solid white;
+        border-radius: 50%;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      ">
+        ${iconContent}
+      </div>
+    </div>
+  `;
+
+  return L.divIcon({
+    className: 'custom-user-icon',
+    html: markerHtml,
+    iconSize: [48, 48],
+    iconAnchor: [24, 24],
+  });
+};
+
 // --- Main Component ---
 
 const TripMap: React.FC<TripMapProps> = ({ trip }) => {
   // const { t } = useTranslation();
   const { selectedStop, visibleStops } = useTripStore();
+  const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   
-  const defaultCenter: [number, number] = [48.8566, 2.3522]; // Paris fallback
+  // Default to Paris fallback if GPS fails
+  const defaultCenter: [number, number] = [48.8566, 2.3522]; 
   const defaultZoom = 5;
+
+  // Fetch User Location on Mount
+  useEffect(() => {
+    locationService.getCurrentLocation()
+      .then((loc) => {
+        if (loc.latitude && loc.longitude) {
+          setUserLocation([loc.latitude, loc.longitude]);
+        }
+      })
+      .catch((err) => console.log("Map: Failed to get user location", err));
+  }, []);
 
   // Memoize visible places to avoid re-renders
   const visiblePlaces = useMemo(() => {
@@ -233,22 +307,26 @@ const TripMap: React.FC<TripMapProps> = ({ trip }) => {
         <MapContainer 
           center={defaultCenter} 
           zoom={4} 
-          className="h-full w-full opacity-60 grayscale-20" 
+          className="h-full w-full"
           zoomControl={false}
-          scrollWheelZoom={false}
-          doubleClickZoom={false}
+          scrollWheelZoom={true}
+          doubleClickZoom={true}
           dragging={true}
         >
           <TileLayer
             url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
             attribution='&copy; CARTO'
           />
+          
+          {/* Controls the map view (flyTo) when userLocation is found */}
+          <MapController trip={null} userLocation={userLocation} />
+
+          {/* Show a "You are here" marker if location is found */}
+          {userLocation && (
+             <Marker position={userLocation} icon={createUserIcon()} />
+          )}
+
         </MapContainer>
-        
-        {/* Empty State Overlay */}
-        <div className="absolute inset-0 flex items-center justify-center z-400 pointer-events-none">
-          {/* Content is mostly in the Sidebar/Panel now, so we keep this minimal */}
-        </div>
       </div>
     );
   }
@@ -267,7 +345,12 @@ const TripMap: React.FC<TripMapProps> = ({ trip }) => {
           attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
         />
 
-        <MapController trip={trip} />
+        <MapController trip={trip} userLocation={userLocation} />
+
+        {/* Show User Location even during a trip for context */}
+        {userLocation && (
+           <Marker position={userLocation} icon={createUserIcon()} zIndexOffset={-10} />
+        )}
 
         {/* Animated Route Line */}
         {routePositions.length > 1 && (

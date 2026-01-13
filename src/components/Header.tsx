@@ -3,6 +3,9 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { ComponentErrorBoundary } from './error-boundaries/ComponentErrorBoundary';
+import { locationService } from '../services/locationService';
+import { MapPinIcon } from '@heroicons/react/24/solid'; 
+import { MapPinIcon as MapPinOutline } from '@heroicons/react/24/outline';
 
 interface HeaderProps {
   showToolbar?: boolean;
@@ -17,6 +20,10 @@ const Header: React.FC<HeaderProps> = ({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
+  
+  // Location State
+  const [userLocation, setUserLocation] = useState<{ city: string; country: string } | null>(null);
+  const [locationLoading, setLocationLoading] = useState(true);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const userDropdownRef = useRef<HTMLDivElement>(null);
@@ -27,6 +34,23 @@ const Header: React.FC<HeaderProps> = ({
   const location = useLocation();
   const { t, i18n } = useTranslation();
 
+  // --- Location Logic ---
+  useEffect(() => {
+    const fetchLocation = async () => {
+      setLocationLoading(true);
+      try {
+        const loc = await locationService.getCurrentLocation();
+        setUserLocation({ city: loc.city, country: loc.country });
+      } catch (error) {
+        console.error('Could not determine user location:', error);
+      } finally {
+        setLocationLoading(false);
+      }
+    };
+
+    fetchLocation();
+  }, []);
+
   // Handle click outside & Escape key
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -36,6 +60,7 @@ const Header: React.FC<HeaderProps> = ({
       if (userDropdownRef.current && !userDropdownRef.current.contains(event.target as Node)) {
         setIsUserDropdownOpen(false);
       }
+      // Fix logic: check if click is outside menu AND not on the toggle button
       if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target as Node) && 
           !(event.target as Element).closest('button[aria-controls="mobile-menu"]')) {
         setIsMobileMenuOpen(false);
@@ -58,7 +83,6 @@ const Header: React.FC<HeaderProps> = ({
     };
   }, []);
 
-  // Close mobile menu on route change
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
@@ -97,7 +121,6 @@ const Header: React.FC<HeaderProps> = ({
 
   return (
     <ComponentErrorBoundary componentName="header">
-      {/* Skip to Content Link for A11y */}
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-60 focus:px-4 focus:py-2 focus:bg-white focus:text-teal-900 focus:font-bold focus:rounded-md focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
@@ -105,18 +128,12 @@ const Header: React.FC<HeaderProps> = ({
         {t('header.skipToMainContent')}
       </a>
 
-      {/* 
-         UPDATED HEADER CONTAINER 
-         - Fixed height (h-20 = 80px)
-         - Removed scroll event listeners and dynamic padding
-         - Consistent teal background
-      */}
       <header className="sticky top-0 z-50 bg-teal-900 border-b border-teal-800 shadow-md h-20 shrink-0">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 h-full">
           <nav className="flex justify-between items-center h-full" aria-label="Main Navigation">
             
-            {/* Left: Logo & Language */}
-            <div className="flex items-center gap-4 lg:gap-8">
+            {/* Left: Logo & Location */}
+            <div className="flex items-center gap-3 md:gap-4 lg:gap-6">
               <Link
                 to="/"
                 className="flex items-center gap-3 group focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 rounded-lg p-1 -ml-1"
@@ -126,28 +143,50 @@ const Header: React.FC<HeaderProps> = ({
                   src="/assets/tubiao.png" 
                   alt="" 
                   aria-hidden="true"
-                  // Fixed size, no transition shrinking
                   className="w-10 h-10 rounded-full border-2 border-teal-700 shadow-md group-hover:border-teal-500 transition-colors" 
                 />
-                <span className="text-xl md:text-2xl font-bold text-white tracking-tight group-hover:text-teal-200 transition-colors">
+                <span className="text-xl md:text-2xl font-bold text-white tracking-tight group-hover:text-teal-200 transition-colors hidden xl:block">
                   Afreshtrip
                 </span>
               </Link>
 
+              {/* Location Badge */}
+              <div className="flex items-center gap-2 px-2 py-1 md:px-3 md:py-1.5 bg-teal-800/50 rounded-full border border-teal-700/50 text-teal-100 text-xs font-medium animate-in fade-in duration-700">
+                {locationLoading ? (
+                  <>
+                    <MapPinOutline className="w-3.5 h-3.5 animate-pulse" />
+                    <span className="opacity-75 hidden xs:inline">Locating...</span>
+                  </>
+                ) : userLocation ? (
+                  <>
+                    <MapPinIcon className="w-3.5 h-3.5 text-teal-300" />
+                    <span className="truncate max-w-[100px] sm:max-w-[150px]">
+                      {userLocation.city}{userLocation.country ? `, ${userLocation.country}` : ''}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <MapPinOutline className="w-3.5 h-3.5 opacity-50" />
+                    <span className="opacity-75 hidden xs:inline">World</span>
+                  </>
+                )}
+              </div>
+
+              {/* Vertical Separator */}
+              <div className="hidden sm:block h-8 w-px bg-teal-800 mx-1"></div>
+
               {/* Language Selector (Desktop) */}
               <div className="relative hidden sm:block" ref={dropdownRef}>
                 <button
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-teal-100 hover:bg-teal-800 hover:text-white transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 text-sm font-medium"
+                  className="flex items-center gap-2 px-2 py-2 rounded-lg text-teal-100 hover:bg-teal-800 hover:text-white transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 text-sm font-medium"
                   onClick={toggleDropdown}
                   aria-expanded={isDropdownOpen}
                   aria-haspopup="true"
                   aria-label={t('header.language')}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
-                  </svg>
-                  <span className="hidden lg:inline">{t('header.language')}</span>
-                  <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <span className="text-lg">{(languages.find(l => l.code === i18n.language)?.flag || '🌐')}</span>
+                  <span className="pl-1">{languages.find(l => l.code === i18n.language)?.label || ""}</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" className={`h-3 w-3 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
@@ -173,7 +212,7 @@ const Header: React.FC<HeaderProps> = ({
             {/* Right: Navigation Links */}
             <div className="flex items-center gap-4">
               
-              {/* Desktop Nav Links - Always Visible */}
+              {/* Desktop Nav Links */}
               <div className="hidden lg:flex items-center space-x-1">
                 <Link 
                   to="/" 
@@ -198,12 +237,10 @@ const Header: React.FC<HeaderProps> = ({
                   {t('header.blog')}
                 </Link>
 
-                {/* Conditional "Create Blog" Link - Only shows on Blog Screen */}
                 {user && location.pathname === '/blog' && (
                   <Link
                     to="/blog/create"
                     className="flex items-center gap-1.5 px-3 py-1.5 ml-1 rounded-full text-sm font-medium text-teal-100 hover:text-white hover:bg-teal-700/50 transition-all border border-teal-700/50"
-                    aria-label={t('header.add')}
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -242,12 +279,12 @@ const Header: React.FC<HeaderProps> = ({
               {/* Action Toolbar (Optional) */}
               {showToolbar && (
                 <div className="hidden sm:flex gap-2 items-center border-l border-teal-800 pl-4 ml-2">
-                  <button className="p-2 text-teal-200 hover:text-white hover:bg-teal-800 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400" aria-label={t('header.like')}>
+                  <button className="p-2 text-teal-200 hover:text-white hover:bg-teal-800 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                     </svg>
                   </button>
-                  <button className="p-2 text-teal-200 hover:text-white hover:bg-teal-800 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400" aria-label={t('header.save')}>
+                  <button className="p-2 text-teal-200 hover:text-white hover:bg-teal-800 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
                     </svg>
@@ -271,7 +308,6 @@ const Header: React.FC<HeaderProps> = ({
                       onClick={toggleUserDropdown}
                       aria-expanded={isUserDropdownOpen}
                       aria-haspopup="true"
-                      aria-label={t('header.userMenu')}
                     >
                       <span className="hidden md:inline text-sm font-medium text-teal-100 group-hover:text-white">
                         {user.displayName || user.email?.split('@')[0]}
@@ -296,15 +332,12 @@ const Header: React.FC<HeaderProps> = ({
                         </div>
                         
                         <Link to="/profile" className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-teal-50 hover:text-teal-700" onClick={() => setIsUserDropdownOpen(false)}>
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                           {t('profileNav.profile')}
                         </Link>
                         <Link to="/subscription" className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-teal-50 hover:text-teal-700" onClick={() => setIsUserDropdownOpen(false)}>
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
                           {t('profileNav.subscription')}
                         </Link>
                         <Link to="/trips" className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-teal-50 hover:text-teal-700" onClick={() => setIsUserDropdownOpen(false)}>
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                           {t('profileNav.trips')}
                         </Link>
                         
@@ -318,7 +351,6 @@ const Header: React.FC<HeaderProps> = ({
                           disabled={isLoggingOut}
                           className="flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors w-full text-left"
                         >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
                           {isLoggingOut ? t('header.loggingOut') : t('header.logout')}
                         </button>
                       </div>
@@ -361,6 +393,28 @@ const Header: React.FC<HeaderProps> = ({
         >
           <div className="px-4 py-4 space-y-4 max-h-[80vh] overflow-y-auto">
             
+            {/* Mobile Location Display (Duplicated for menu visibility) */}
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-teal-800/30 border border-teal-800 text-teal-100">
+               {locationLoading ? (
+                  <>
+                    <MapPinOutline className="w-4 h-4 animate-pulse" />
+                    <span className="text-sm">Locating...</span>
+                  </>
+                ) : userLocation ? (
+                  <>
+                    <MapPinIcon className="w-4 h-4 text-teal-300" />
+                    <span className="text-sm font-medium">
+                       {userLocation.city}{userLocation.country ? `, ${userLocation.country}` : ''}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <MapPinOutline className="w-4 h-4 opacity-50" />
+                    <span className="text-sm opacity-75">World</span>
+                  </>
+                )}
+            </div>
+
             {/* Public Links */}
             <div className="grid grid-cols-2 gap-3">
               <Link 
@@ -368,7 +422,6 @@ const Header: React.FC<HeaderProps> = ({
                 className="flex items-center gap-2 p-3 rounded-lg bg-teal-800/50 text-teal-50 hover:bg-teal-800"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
                 {t('header.home')}
               </Link>
               <Link 
@@ -376,16 +429,7 @@ const Header: React.FC<HeaderProps> = ({
                 className="flex items-center gap-2 p-3 rounded-lg bg-teal-800/50 text-teal-50 hover:bg-teal-800"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" /></svg>
                 {t('header.blog')}
-              </Link>
-              <Link 
-                to="/support" 
-                className="flex items-center gap-2 p-3 rounded-lg bg-teal-800/50 text-teal-50 hover:bg-teal-800"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-                {t('header.support')}
               </Link>
             </div>
 
@@ -451,9 +495,8 @@ const Header: React.FC<HeaderProps> = ({
         {logoutError && (
           <div className="absolute top-full right-4 mt-2 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg z-50 animate-fade-in-up" role="alert">
             <div className="flex items-center gap-2">
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
               <span>{logoutError}</span>
-              <button onClick={() => setLogoutError(null)} className="ml-2 hover:text-red-900"><span className="sr-only">{t('header.close')}</span>✕</button>
+              <button onClick={() => setLogoutError(null)} className="ml-2 hover:text-red-900">✕</button>
             </div>
           </div>
         )}

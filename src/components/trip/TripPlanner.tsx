@@ -2,30 +2,41 @@ import { useState, useEffect } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 import {  SparklesIcon } from '@heroicons/react/24/outline';
+import BottomSheet from '../BottomSheet';
 import TripSettingsPanel from './TripSettingsPanel';
 import TripMap from './TripMap';
 import WeatherSummary from './WeatherSummary';
 import { tripService } from '../../services/tripService';
 import { useTripStore } from '../../stores/tripStore';
 import { useRefreshTrips } from '../../hooks/queries/useTripQueries';
+import { useCurrentLocation as useCurrentLocationHook } from '../../hooks/useCurrentLocation';
 import type { TripSettings } from '../../types/trip';
 import { tripApiService, type CreateTripRequest } from '../../services/api/tripApiService';
 
 const TripPlanner = () => {
+  // --- HOOKS ---
+  const { location: currentLocation, loading: locationLoading } = useCurrentLocationHook();
+
   // --- LOCAL STATE ---
   const [transport, setTransport] = useState<'car' | 'bike'>('car');
   const [tripType, setTripType] = useState<'one' | 'return'>('return');
-  const [departureCity, setDepartureCity] = useState('Copenhagen');
-  const [destinationCity, setDestinationCity] = useState('Copenhagen');
-  const [useCurrentLocation, setUseCurrentLocation] = useState(false);
+  const [departureCity, setDepartureCity] = useState('');
+  const [destinationCity, setDestinationCity] = useState('');
+  const [useCurrentLocation, setUseCurrentLocation] = useState(true);
   const [stations, setStations] = useState(3);
   const [duration, setDuration] = useState(1);
   const [interests, setInterests] = useState<string[]>(['outdoorsSport']);
 
   // --- EFFECTS ---
   useEffect(() => {
+    if (currentLocation && !locationLoading) {
+      setDepartureCity(currentLocation.city);
+    }
+  }, [currentLocation, locationLoading]);
+
+  useEffect(() => {
     if (tripType === 'return') {
-      setDestinationCity(departureCity);
+      setDestinationCity('');
     }
   }, [tripType, departureCity]);
 
@@ -88,7 +99,7 @@ const TripPlanner = () => {
       setIsGenerating(false);
       
       if (window.innerWidth < 768) {
-        setMobilePanelOpen(false);
+        setMobilePanelOpen(true);
       }
     },
     onError: (error: Error) => {
@@ -103,7 +114,6 @@ const TripPlanner = () => {
     );
   };
 
-  // TODO: implment reat trip generation logic when backend will be ready
   const handleGenerateTrip = () => {
     setIsGenerating(true);
     resetGenerationState();
@@ -124,21 +134,10 @@ const TripPlanner = () => {
   };
 
   return (
-    // Outer Wrapper
-    <div className="flex flex-col md:flex-row w-full bg-[#F5F5F7] relative">
+    <div className="relative w-full md:flex md:flex-row bg-[#F5F5F7] h-[calc(100vh-80px)] md:h-auto md:min-h-[calc(100vh-80px)]">
       
-      {/* 
-        1. LEFT SIDEBAR
-        - Standard background color to blend with page
-        - No border-r needed if we are using a gap/padding approach
-      */}
-      <div 
-        className={`
-          flex flex-col bg-[#F5F5F7] z-30 transition-all duration-300
-          md:w-[480px] lg:w-[500px] md:min-h-[calc(100vh-64px)] md:shrink-0
-          ${isMobilePanelOpen ? 'relative' : 'hidden md:flex'}
-        `}
-      >
+      {/* LEFT SIDEBAR */}
+      <div className="hidden md:flex flex-col bg-[#F5F5F7] z-30 md:w-[480px] lg:w-[500px] md:shrink-0 border-r border-gray-200/50">
         <div className="flex-1 p-0">
           {location.state?.focusTripPlanner && (
             <div className="mx-6 mt-6 mb-2 bg-linear-to-r from-teal-600 to-teal-500 text-white px-4 py-3 rounded-xl shadow-lg shadow-teal-600/20 flex items-center justify-between animate-in fade-in slide-in-from-top-4">
@@ -173,36 +172,70 @@ const TripPlanner = () => {
         </div>
       </div>
 
-      {/* 
-        2. RIGHT MAP AREA (The "Grid" Cell)
-        - Added Padding (md:p-4) to create the gap
-        - Added Rounded Corners, Border, and Shadow to the inner container
-      */}
-      <div className="relative w-full md:flex-1 bg-[#F5F5F7] md:p-1 md:pl-0">
-        
-        {/* Floating/Sticky Map Card */}
+      {/* MAP AREA */}
+      <div className="absolute inset-0 z-0 md:relative md:flex-1 md:p-1 md:pl-0">
         <div className={`
-          relative w-full overflow-hidden
-          /* Mobile: Fixed height */
-          h-[500px] 
-          /* Desktop: Sticky height calculation (Viewport - Header - Padding) */
-          md:h-[calc(100vh-80px)] md:sticky md:top-20
-          /* Card Styling */
-          md:rounded-xl md:border md:border-white
+          relative w-full h-full
+          md:rounded-xl md:border md:border-white md:overflow-hidden md:shadow-sm
           bg-blue-50
+          md:h-[calc(100vh-90px)] md:sticky md:top-20
         `}>
             <TripMap trip={currentTrip} />
             
-            {/* Weather Widget */}
-            <div className="hidden md:block absolute top-6 right-6 z-20 w-72">
+            {/* 
+               Updated Weather Summary Positioning 
+               Removed: shadow/border/blur classes (moved inside component)
+            */}
+            <div className="absolute top-4 right-4 md:top-6 md:right-6 z-1000 w-auto md:w-72">
               <WeatherSummary 
                 onClick={() => {}} 
-                className="shadow-sm border border-white/60 backdrop-blur-md"
+                className="origin-top-right transform scale-90 md:scale-100"
               />
             </div>
         </div>
       </div>
 
+      {/* MOBILE BOTTOM SHEET */}
+      <div className="md:hidden z-30">
+        <BottomSheet
+          isOpen={isMobilePanelOpen}
+          onClose={() => setMobilePanelOpen(false)}
+          title="Trip Settings"
+        >
+          <div className="flex-1 p-0 pb-24">
+            {location.state?.focusTripPlanner && (
+              <div className="mx-6 mt-6 mb-2 bg-linear-to-r from-teal-600 to-teal-500 text-white px-4 py-3 rounded-xl shadow-lg shadow-teal-600/20 flex items-center justify-between">
+                 <div className="flex items-center gap-2">
+                   <SparklesIcon className="w-5 h-5" />
+                   <span className="text-sm font-bold">Start your adventure here!</span>
+                 </div>
+                 <button className="opacity-80 hover:opacity-100 text-xs font-medium">Dismiss</button>
+              </div>
+            )}
+
+            <TripSettingsPanel
+              transport={transport}
+              setTransport={setTransport}
+              tripType={tripType}
+              setTripType={setTripType}
+              departureCity={departureCity}
+              setDepartureCity={setDepartureCity}
+              destinationCity={destinationCity}
+              setDestinationCity={setDestinationCity}
+              useCurrentLocation={useCurrentLocation}
+              setUseCurrentLocation={setUseCurrentLocation}
+              stations={stations}
+              setStations={setStations}
+              duration={duration}
+              setDuration={setDuration}
+              interests={interests}
+              onToggleInterest={handleToggleInterest}
+              onGenerateTrip={handleGenerateTrip}
+              onStartNavigation={handleStartNavigation}
+            />
+          </div>
+        </BottomSheet>
+      </div>
     </div>
   );
 };

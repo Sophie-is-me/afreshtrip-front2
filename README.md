@@ -108,6 +108,7 @@ src/
 4. Use the rich text editor to compose your content
 5. Add categories and tags
 6. Publish or save as draft
+7. N.B: No switch between Chinese Version and old version, change the .env file and set VITE_IS_CHINESE_VERSION=false
 
 ### Browsing Content
 - Visit the blog page to explore posts

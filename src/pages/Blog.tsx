@@ -101,7 +101,7 @@ const EmptyState: React.FC = () => {
 
 const Blog: React.FC = () => {
   const { t } = useTranslation();
-  const { getBlogPostsPaginated } = useBlog();
+  const { getBlogPostsPaginated, getBlogPostsByCategory, toggleLike } = useBlog();
   const { user } = useAuth();
   const { showSuccess } = useSnackbar();
   const [loading, setLoading] = useState(true);
@@ -120,7 +120,7 @@ const Blog: React.FC = () => {
   const [email, setEmail] = useState('');
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [heroImageLoaded, setHeroImageLoaded] = useState(false);
-  const [viewMode, setViewMode] = useState<'all' | 'myblogs'>('all');
+  const [viewMode, setViewMode] = useState<'all' | 'myblogs' | 'liked' | 'saved'>('all');
 
   const [newsletterLoading, setNewsletterLoading] = useState(false);
   const postsRef = useRef<HTMLDivElement>(null);
@@ -139,20 +139,45 @@ const Blog: React.FC = () => {
       } catch (err) {
         console.error('Error fetching categories:', err);
         setCategories([
-          { id: 1, name: 'Travel', slug: 'travel', color: '#3B82F6', icon: 'plane' },
-          { id: 2, name: 'Food', slug: 'food', color: '#EF4444', icon: 'utensils' },
-          { id: 3, name: 'Culture', slug: 'culture', color: '#8B5CF6', icon: 'landmark' },
-          { id: 4, name: 'Adventure', slug: 'adventure', color: '#F59E0B', icon: 'mountain' },
-          { id: 5, name: 'Nature', slug: 'nature', color: '#10B981', icon: 'tree' },
-          { id: 6, name: 'City Guide', slug: 'city-guide', color: '#6B7280', icon: 'building' },
-          { id: 7, name: 'Tips & Tricks', slug: 'tips-tricks', color: '#EC4899', icon: 'lightbulb' },
-          { id: 8, name: 'Photography', slug: 'photography', color: '#6366F1', icon: 'camera' },
+          
+          { id: 1, name: 'Adventure', slug: 'Adventure', color: '#F59E0B', icon: 'mountain' },
+          { id: 2, name: 'Culture', slug: 'Culture', color: '#8B5CF6', icon: 'landmark' },
+          { id: 3, name: 'Food', slug: 'food', color: '#EF4444', icon: 'utensils' },
+         
+        
+       
         ]);
       }
     };
 
     fetchCategories();
   }, []);
+
+  // Handle like button
+  const handleLike = async (postId: string) => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+
+    try {
+      await toggleLike(postId);
+      // Update local state
+      setBlogPosts(prev => prev.map(post => {
+        if (post.id === postId) {
+          const isLiked = !post.isLiked;
+          return {
+            ...post,
+            likes: isLiked ? (post.likes || 0) + 1 : (post.likes || 0) - 1,
+            isLiked
+          };
+        }
+        return post;
+      }));
+    } catch (err) {
+      console.error('Failed to like:', err);
+    }
+  };
 
   // Fetch blog posts
   useEffect(() => {
@@ -184,6 +209,14 @@ const Blog: React.FC = () => {
 
     if (viewMode === 'myblogs') {
       filtered = filtered.filter(post => post.author.id === user?.uid);
+    } else if (viewMode === 'liked') {
+      // For now, mock liked posts (will be replaced with database logic)
+      // Filter posts that user has liked
+      filtered = filtered.filter(post => post.isLiked);
+    } else if (viewMode === 'saved') {
+      // For now, mock saved posts (will be replaced with database logic)
+      // Filter posts that user has saved
+      filtered = filtered.filter(post => post.isSaved);
     }
 
     if (debouncedSearchTerm) {
@@ -389,16 +422,7 @@ const Blog: React.FC = () => {
                 >
                   {t('blog.allBlogs', 'All Blogs')}
                 </button>
-                <button
-                  onClick={() => { setSelectedCategory(''); setViewMode('myblogs'); }}
-                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 border ${
-                    viewMode === 'myblogs'
-                      ? 'bg-teal-600 text-white border-teal-600 shadow-md transform scale-105'
-                      : 'bg-transparent text-gray-600 border-transparent hover:bg-gray-100'
-                  }`}
-                >
-                  {t('blog.myBlogs', 'My Blogs')}
-                </button>
+              
                 {categories.map((category) => (
                   <button
                     key={category.id}
@@ -413,6 +437,56 @@ const Blog: React.FC = () => {
                   </button>
                 ))}
               </div>
+            </div>
+            
+            {/* Action Icons */}
+            <div className="flex items-center gap-2 border-l border-gray-200 pl-4">
+              {/* Create New Blog Icon */}
+              <button
+                onClick={() => navigate('/blog/create')}
+                className="w-10 h-10 flex items-center justify-center rounded-full text-gray-600 hover:bg-teal-50 hover:text-teal-600 transition-all duration-200 group"
+                title={t('blog.createNew', 'Create New Blog')}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+              </button>
+
+              {/* Liked Posts Icon */}
+              <button
+                onClick={() => {
+                  setSelectedCategory('');
+                  setViewMode(viewMode === 'liked' ? 'all' : 'liked');
+                }}
+                className={`w-10 h-10 flex items-center justify-center rounded-full transition-all duration-200 ${
+                  viewMode === 'liked' 
+                    ? 'bg-teal-600 text-white' 
+                    : 'text-gray-600 hover:bg-teal-50 hover:text-teal-600'
+                }`}
+                title={t('blog.likedPosts', 'Liked Posts')}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 transition-all ${viewMode === 'liked' ? '' : 'hover:scale-110'}`} fill={viewMode === 'liked' ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                </svg>
+              </button>
+
+              {/* Saved Posts Icon */}
+              <button
+                onClick={() => {
+                  setSelectedCategory('');
+                  setViewMode(viewMode === 'saved' ? 'all' : 'saved');
+                }}
+                className={`w-10 h-10 flex items-center justify-center rounded-full transition-all duration-200 ${
+                  viewMode === 'saved' 
+                    ? 'bg-teal-600 text-white' 
+                    : 'text-gray-600 hover:bg-teal-50 hover:text-teal-600'
+                }`}
+                title={t('blog.savedPosts', 'Saved Posts')}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 transition-all ${viewMode === 'saved' ? '' : 'hover:scale-110'}`} fill={viewMode === 'saved' ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                </svg>
+              </button>
             </div>
             
             <div className="flex items-center gap-2 shrink-0">
@@ -439,7 +513,7 @@ const Blog: React.FC = () => {
       <main className="container mx-auto px-4 py-8 md:py-16" ref={postsRef}>
         
         {loading ? (
-          /* Loading State using Skeleton Grid */
+          /* Loading State using Skeleton List */
           <div className="animate-fade-in-up">
             {/* Featured Skeleton */}
             <div className="mb-12 h-[400px] w-full bg-white rounded-2xl border border-gray-100 overflow-hidden flex flex-col lg:flex-row">
@@ -452,10 +526,25 @@ const Blog: React.FC = () => {
               </div>
             </div>
             
-            {/* Grid Skeleton */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {/* List Skeleton */}
+            <div className="flex flex-col gap-6">
               {[1, 2, 3, 4, 5, 6].map((i) => (
-                <BlogSkeleton key={i} />
+                <div key={i} className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm flex flex-col sm:flex-row h-64">
+                  <div className="sm:w-2/5 h-full skeleton-shimmer"></div>
+                  <div className="sm:w-3/5 p-6 flex flex-col gap-4">
+                    <div className="flex gap-4">
+                      <div className="h-4 w-24 bg-gray-100 rounded skeleton-shimmer"></div>
+                      <div className="h-4 w-32 bg-gray-100 rounded skeleton-shimmer"></div>
+                    </div>
+                    <div className="h-6 w-3/4 bg-gray-100 rounded skeleton-shimmer"></div>
+                    <div className="h-4 w-full bg-gray-100 rounded skeleton-shimmer"></div>
+                    <div className="h-4 w-2/3 bg-gray-100 rounded skeleton-shimmer"></div>
+                    <div className="mt-auto flex items-center gap-3 pt-4">
+                      <div className="w-10 h-10 rounded-full skeleton-shimmer"></div>
+                      <div className="h-4 w-32 bg-gray-100 rounded skeleton-shimmer"></div>
+                    </div>
+                  </div>
+                </div>
               ))}
             </div>
           </div>
@@ -475,31 +564,128 @@ const Blog: React.FC = () => {
               </section>
             )}
 
-            {/* Grid Posts */}
+            {/* List Posts */}
             <section>
                {featuredPost && <h2 className="text-2xl font-bold font-serif mb-8 text-gray-900 animate-fade-in-up">{t('blog.latestStories', 'Latest Stories')}</h2>}
               {gridPosts.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-12">
+                <div className="flex flex-col gap-6">
                   {gridPosts.map((post, index) => (
                     <div 
                       key={post.id} 
-                      className="animate-fade-in-up h-full" 
-                      style={{ animationDelay: `${index * 100}ms` }} // Staggered Animation
+                      className="animate-fade-in-up" 
+                      style={{ animationDelay: `${index * 100}ms` }}
                     >
-                      <GalleryCard
-                        id={post.id}
-                        image={post.images?.[0] || ''}
-                        title={post.title}
-                        description={post.excerpt || ''}
-                        views={post.views}
-                        category={post.category}
-                        date={post.date}
-                        userAvatar={post.author.avatar}
-                        userName={post.author.name}
-                        readLink={`/blog/${post.id}`}
-                        showEdit={post.author.id === user?.uid}
-                        onEdit={() => navigate(`/blog-editor?id=${post.id}`)}
-                      />
+                      {/* Horizontal List Card */}
+                      <div className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col sm:flex-row h-full">
+                        {/* Image Section */}
+                        <div className="sm:w-2/5 h-64 sm:h-auto relative overflow-hidden group">
+                          <img 
+                            src={post.images?.[0] || 'https://via.placeholder.com/400x300'} 
+                            alt={post.title}
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                          />
+                          {/* Category Badge */}
+                          <div className="absolute top-4 left-4">
+                            <span className="px-3 py-1 bg-teal-600 text-white text-xs font-semibold rounded-full">
+                              {post.category}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        {/* Content Section */}
+                        <div className="sm:w-3/5 p-6 flex flex-col justify-between">
+                          <div>
+                            {/* Meta Info */}
+                            <div className="flex items-center gap-4 text-sm text-gray-500 mb-3">
+                              <div className="flex items-center gap-1">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                                <span>{post.views}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span>{new Date(post.date).toLocaleDateString()}</span>
+                              </div>
+                            </div>
+                            
+                            {/* Title */}
+                            <h3 className="text-xl font-bold text-gray-900 mb-3 line-clamp-2 hover:text-teal-600 transition-colors cursor-pointer" onClick={() => navigate(`/blog/${post.id}`)}>
+                              {post.title}
+                            </h3>
+                            
+                            {/* Description */}
+                            <p className="text-gray-600 line-clamp-2 mb-4 leading-relaxed">
+                              {post.excerpt || 'No description available'}
+                            </p>
+                          </div>
+                          
+                          {/* Author Info & Actions */}
+                          <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                            <div className="flex items-center gap-3">
+                              <img 
+                                src={post.author.avatar || 'https://via.placeholder.com/40'} 
+                                alt={post.author.name}
+                                className="w-10 h-10 rounded-full object-cover"
+                              />
+                              <div>
+                                <p className="text-sm font-medium text-gray-900">{post.author.name}</p>
+                              </div>
+                            </div>
+                            
+                            {/* Action Buttons */}
+                            <div className="flex items-center gap-2">
+                              {/* Heart Icon - Like Button */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleLike(post.id);
+                                }}
+                                disabled={!user}
+                                className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                                  post.isLiked
+                                    ? 'text-red-600 bg-red-50 hover:bg-red-100'
+                                    : 'text-gray-600 hover:bg-gray-100'
+                                } ${!user ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                title={!user ? 'Login to like' : post.isLiked ? 'Unlike' : 'Like'}
+                              >
+                                <svg 
+                                  xmlns="http://www.w3.org/2000/svg" 
+                                  className="h-4 w-4" 
+                                  fill={post.isLiked ? 'currentColor' : 'none'}
+                                  viewBox="0 0 24 24" 
+                                  stroke="currentColor"
+                                  strokeWidth={2}
+                                >
+                                  <path 
+                                    strokeLinecap="round" 
+                                    strokeLinejoin="round" 
+                                    d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" 
+                                  />
+                                </svg>
+                                <span>{post.likes || 0}</span>
+                              </button>
+                              {post.author.id === user?.uid && (
+                                <button
+                                  onClick={() => navigate(`/blog-editor?id=${post.id}`)}
+                                  className="px-4 py-2 text-sm font-medium text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
+                                >
+                                  {t('blog.edit', 'Edit')}
+                                </button>
+                              )}
+                              <button
+                                onClick={() => navigate(`/blog/${post.id}`)}
+                                className="px-4 py-2 text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors"
+                              >
+                                {t('blog.read', 'Read')}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>

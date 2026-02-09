@@ -1,10 +1,9 @@
-// src/services/blogApi.ts (or blogService.ts)
-// Complete Blog API - UPDATED with slug support and likes
+// src/services/blogApi.ts
+// ✅ FIXED: Prevents double view count
 
 import {
   collection,
   doc,
-  setDoc,
   getDoc,
   getDocs,
   updateDoc,
@@ -12,21 +11,18 @@ import {
   query,
   where,
   orderBy,
-  limit,
-  Timestamp,
   increment,
   serverTimestamp,
   addDoc,
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL, listAll } from 'firebase/storage';
-import { db, storage, auth } from '../../../lib/firebase/client'; 
-import type { BlogPost, CreateBlogPostInput, Comment, BlogFilters } from '../../types/blog';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage, auth } from '../../lib/firebase/client'; 
+import type { BlogPost, CreateBlogPostInput } from '../types/blog';
 
 const BLOG_COLLECTION = 'blogs';
 
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
+// ✅ Track which posts we've already incremented views for (session-based)
+const viewedPosts = new Set<string>();
 
 const timestampToString = (timestamp: any): string => {
   if (timestamp?.toDate) {
@@ -47,7 +43,6 @@ const generateSlug = (title: string): string => {
     .trim();
 };
 
-// Category ID to Name mapping
 const getCategoryName = (categoryId: number): string => {
   const categories: Record<number, string> = {
     1: 'Adventure',
@@ -58,7 +53,6 @@ const getCategoryName = (categoryId: number): string => {
   return categories[categoryId] || 'General';
 };
 
-// ✅ NEW: Category SLUG to Name mapping
 const getCategoryNameFromSlug = (slug: string): string => {
   const slugMap: Record<string, string> = {
     'adventure': 'Adventure',
@@ -68,10 +62,6 @@ const getCategoryNameFromSlug = (slug: string): string => {
   };
   return slugMap[slug.toLowerCase()] || '';
 };
-
-// ============================================================================
-// IMAGE UPLOAD
-// ============================================================================
 
 export const uploadBlogImage = async (file: File): Promise<string> => {
   const user = auth.currentUser;
@@ -97,10 +87,6 @@ export const uploadBlogImage = async (file: File): Promise<string> => {
   return downloadURL;
 };
 
-// ============================================================================
-// CREATE BLOG POST
-// ============================================================================
-
 export const createBlogPost = async (input: CreateBlogPostInput): Promise<string> => {
   const user = auth.currentUser;
   
@@ -112,9 +98,6 @@ export const createBlogPost = async (input: CreateBlogPostInput): Promise<string
   const slug = generateSlug(input.title);
 
   console.log('✨ Creating blog post...');
-  console.log('Title:', input.title);
-  console.log('Category:', categoryName);
-  console.log('Slug:', slug);
 
   const postData = {
     title: input.title,
@@ -129,7 +112,7 @@ export const createBlogPost = async (input: CreateBlogPostInput): Promise<string
     isPublished: input.isPublished,
     views: 0,
     likes: 0,
-    likedBy: [], // ✅ NEW: Track who liked this post
+    likedBy: [],
     author: {
       id: user.uid,
       name: user.displayName || 'Anonymous',
@@ -146,11 +129,6 @@ export const createBlogPost = async (input: CreateBlogPostInput): Promise<string
   return docRef.id;
 };
 
-// ============================================================================
-// READ OPERATIONS
-// ============================================================================
-
-// Get all published posts
 export const getAllBlogPosts = async (): Promise<BlogPost[]> => {
   console.log('📖 Fetching all published blog posts...');
   
@@ -177,8 +155,8 @@ export const getAllBlogPosts = async (): Promise<BlogPost[]> => {
       date: timestampToString(data.createdAt),
       views: data.views || 0,
       likes: data.likes || 0,
-      isLiked: currentUserId ? (data.likedBy || []).includes(currentUserId) : false, // ✅ NEW
-      likedBy: data.likedBy || [], // ✅ NEW
+      isLiked: currentUserId ? (data.likedBy || []).includes(currentUserId) : false,
+      likedBy: data.likedBy || [],
       isSaved: false,
       category: data.category,
       categoryId: data.categoryId,
@@ -194,19 +172,15 @@ export const getAllBlogPosts = async (): Promise<BlogPost[]> => {
   return posts;
 };
 
-// ✅ UPDATED: Get posts by category SLUG
 export const getBlogPostsByCategory = async (categorySlug: string): Promise<BlogPost[]> => {
-  console.log('📖 Fetching posts in category (slug):', categorySlug);
+  console.log('📖 Fetching posts in category:', categorySlug);
   
-  // Convert slug to category name
   const categoryName = getCategoryNameFromSlug(categorySlug);
   
   if (!categoryName) {
     console.warn('⚠️ Unknown category slug:', categorySlug);
     return [];
   }
-
-  console.log('📂 Looking for category name:', categoryName);
   
   const blogsRef = collection(db, BLOG_COLLECTION);
   const q = query(
@@ -232,8 +206,8 @@ export const getBlogPostsByCategory = async (categorySlug: string): Promise<Blog
       date: timestampToString(data.createdAt),
       views: data.views || 0,
       likes: data.likes || 0,
-      isLiked: currentUserId ? (data.likedBy || []).includes(currentUserId) : false, // ✅ NEW
-      likedBy: data.likedBy || [], // ✅ NEW
+      isLiked: currentUserId ? (data.likedBy || []).includes(currentUserId) : false,
+      likedBy: data.likedBy || [],
       isSaved: false,
       category: data.category,
       categoryId: data.categoryId,
@@ -249,54 +223,70 @@ export const getBlogPostsByCategory = async (categorySlug: string): Promise<Blog
   return posts;
 };
 
-// Get single post by ID
-export const getBlogPostById = async (postId: string): Promise<BlogPost | null> => {
+// ✅ FIXED: Prevent double view increment with session tracking
+export const getBlogPostById = async (postId: string, skipViewIncrement: boolean = false): Promise<BlogPost | null> => {
   console.log('📖 Fetching post:', postId);
   
   const docRef = doc(db, BLOG_COLLECTION, postId);
-  const docSnap = await getDoc(docRef);
+  
+  try {
+    const docSnap = await getDoc(docRef);
 
-  if (!docSnap.exists()) {
-    console.warn('⚠️ Post not found:', postId);
-    return null;
+    if (!docSnap.exists()) {
+      console.warn('⚠️ Post not found:', postId);
+      return null;
+    }
+
+    const data = docSnap.data();
+    const currentUserId = auth.currentUser?.uid;
+
+    // ✅ Only increment if not already viewed in this session AND not explicitly skipped
+    if (!skipViewIncrement && !viewedPosts.has(postId)) {
+      try {
+        await updateDoc(docRef, {
+          views: increment(1)
+        });
+        viewedPosts.add(postId); // Mark as viewed
+        console.log('✅ View count incremented');
+      } catch (viewError) {
+        console.warn('⚠️ Could not increment views (guest user)');
+      }
+    } else if (viewedPosts.has(postId)) {
+      console.log('ℹ️ Post already viewed in this session, skipping increment');
+    }
+
+    const post: BlogPost = {
+      id: docSnap.id,
+      title: data.title,
+      content: data.content,
+      excerpt: data.excerpt,
+      images: data.images || [],
+      videos: data.videos || [],
+      author: data.author,
+      date: timestampToString(data.createdAt),
+      views: data.views || 0,
+      likes: data.likes || 0,
+      isLiked: currentUserId ? (data.likedBy || []).includes(currentUserId) : false,
+      likedBy: data.likedBy || [],
+      isSaved: false,
+      category: data.category,
+      categoryId: data.categoryId,
+      tags: data.tags || [],
+      slug: data.slug,
+      isPublished: data.isPublished,
+      createdAt: timestampToString(data.createdAt),
+      updatedAt: timestampToString(data.updatedAt)
+    };
+
+    console.log('✅ Post loaded:', post.title);
+    return post;
+    
+  } catch (error) {
+    console.error('❌ Error fetching post:', error);
+    throw error;
   }
-
-  const data = docSnap.data();
-  const currentUserId = auth.currentUser?.uid;
-
-  // Increment view count
-  await updateDoc(docRef, {
-    views: increment(1)
-  });
-
-  const post: BlogPost = {
-    id: docSnap.id,
-    title: data.title,
-    content: data.content,
-    excerpt: data.excerpt,
-    images: data.images || [],
-    videos: data.videos || [],
-    author: data.author,
-    date: timestampToString(data.createdAt),
-    views: (data.views || 0) + 1,
-    likes: data.likes || 0,
-    isLiked: currentUserId ? (data.likedBy || []).includes(currentUserId) : false, // ✅ NEW
-    likedBy: data.likedBy || [], // ✅ NEW
-    isSaved: false,
-    category: data.category,
-    categoryId: data.categoryId,
-    tags: data.tags || [],
-    slug: data.slug,
-    isPublished: data.isPublished,
-    createdAt: timestampToString(data.createdAt),
-    updatedAt: timestampToString(data.updatedAt)
-  };
-
-  console.log('✅ Post loaded:', post.title);
-  return post;
 };
 
-// Get user's own posts
 export const getUserBlogPosts = async (): Promise<BlogPost[]> => {
   const user = auth.currentUser;
   
@@ -346,10 +336,6 @@ export const getUserBlogPosts = async (): Promise<BlogPost[]> => {
   return posts;
 };
 
-// ============================================================================
-// UPDATE OPERATIONS
-// ============================================================================
-
 export const updateBlogPost = async (
   postId: string,
   updates: Partial<CreateBlogPostInput>
@@ -374,10 +360,6 @@ export const updateBlogPost = async (
   console.log('✅ Post updated');
 };
 
-// ============================================================================
-// DELETE OPERATIONS
-// ============================================================================
-
 export const deleteBlogPost = async (postId: string): Promise<void> => {
   console.log('🗑️ Deleting post:', postId);
   
@@ -387,15 +369,6 @@ export const deleteBlogPost = async (postId: string): Promise<void> => {
   console.log('✅ Post deleted');
 };
 
-// ============================================================================
-// ✅ NEW: LIKE FUNCTIONALITY
-// ============================================================================
-
-/**
- * Toggle like on a blog post
- * @param postId - Post ID
- * @returns boolean - true if liked, false if unliked
- */
 export const toggleLike = async (postId: string): Promise<boolean> => {
   const user = auth.currentUser;
   
@@ -416,16 +389,14 @@ export const toggleLike = async (postId: string): Promise<boolean> => {
   const isLiked = likedBy.includes(userId);
 
   if (isLiked) {
-    // Unlike
-    console.log('👎 Unliking post:', postId);
+    console.log('💔 Unliking post:', postId);
     await updateDoc(docRef, {
       likes: increment(-1),
       likedBy: likedBy.filter((id: string) => id !== userId)
     });
     return false;
   } else {
-    // Like
-    console.log('👍 Liking post:', postId);
+    console.log('❤️ Liking post:', postId);
     await updateDoc(docRef, {
       likes: increment(1),
       likedBy: [...likedBy, userId]
@@ -434,23 +405,14 @@ export const toggleLike = async (postId: string): Promise<boolean> => {
   }
 };
 
-/**
- * Check if current user liked a post
- * @param post - BlogPost object
- * @returns boolean - true if user liked the post
- */
 export const isPostLikedByUser = (post: BlogPost): boolean => {
   if (!auth.currentUser) return false;
   return (post.likedBy || []).includes(auth.currentUser.uid);
 };
 
-// ============================================================================
-// EXPORTS
-// ============================================================================
-
 export {
   getCategoryName,
-  getCategoryNameFromSlug, // ✅ NEW
+  getCategoryNameFromSlug,
   generateSlug,
   timestampToString
 };

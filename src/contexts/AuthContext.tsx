@@ -31,6 +31,7 @@ interface AuthContextType {
   registerWithEmail: (email: string, password: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   loginWithSms: (phone: string, code: string) => Promise<void>;
+  registerWithSms: (phone: string, code: string, password: string) => Promise<void>; // NEW
   loginWithEmailCode: (email: string, code: string) => Promise<void>;
   loginWithAlipay: () => Promise<void>;
   loginWithWeChat: () => Promise<void>;
@@ -209,10 +210,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Update user profile with the new user info
         await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.user.profile(response.data.userId.toString()) });
       } else {
-        throw new Error(response.message || 'SMS verification failed');
+        throw new Error(response.message || response.msg || 'SMS verification failed');
       }
     } catch (error) {
       console.error('SMS login error:', error);
+      throw error;
+    }
+  };
+
+  // NEW: Register with SMS
+  const registerWithSms = async (phone: string, code: string, password: string) => {
+    try {
+      const response = await apiClient.registerWithSms(phone, code, password);
+
+      if (response.code === 200 && response.data) {
+        // Store the custom JWT token
+        localStorage.setItem('custom_auth_token', response.data.token);
+
+        // Create a custom user
+        const mockCustomUser: CustomUser = {
+          uid: response.data.userId.toString(),
+          phone: response.data.phone || phone,
+          displayName: response.data.nickname,
+          emailVerified: true,
+          isCustomAuth: true,
+          metadata: {
+            creationTime: new Date().toISOString(),
+          }
+        };
+
+        // Store user data for persistence
+        localStorage.setItem('custom_user_data', JSON.stringify(mockCustomUser));
+
+        setCustomUser(mockCustomUser);
+
+        // Fetch user profile
+        await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.user.profile(response.data.userId.toString()) });
+
+        console.log('SMS registration successful:', mockCustomUser.phone);
+      } else {
+        throw new Error(response.message || response.msg || 'SMS registration failed');
+      }
+    } catch (error) {
+      console.error('SMS registration error:', error);
       throw error;
     }
   };
@@ -242,7 +282,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Update user profile with the new user info
         await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.user.profile(response.data.userId.toString()) });
       } else {
-        throw new Error(response.message || 'Email verification failed');
+        throw new Error(response.message || response.msg || 'Email verification failed');
       }
     } catch (error) {
       console.error('Email login error:', error);
@@ -280,8 +320,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Clear user profile cache
     queryClient.clear();
   };
-
-
 
   const refreshUserProfile = async () => {
     const user = firebaseUser || customUser;
@@ -341,6 +379,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     registerWithEmail,
     loginWithGoogle,
     loginWithSms,
+    registerWithSms, // NEW
     loginWithEmailCode,
     loginWithAlipay,
     loginWithWeChat,

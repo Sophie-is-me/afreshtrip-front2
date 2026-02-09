@@ -7,7 +7,7 @@ import {
   FiArrowLeft, FiImage, FiX, FiCheck, FiGlobe, FiLock,
   FiAlertCircle, FiSettings, FiMoreHorizontal,
   FiBold, FiItalic, FiList, FiLink, FiRotateCcw, FiRotateCw, FiHash,
-  FiMinus
+  FiMinus, FiVideo
 } from 'react-icons/fi';
 
 import { useBlog } from '../contexts/BlogContext';
@@ -17,6 +17,7 @@ import { useFeatureAccess } from '../hooks/useFeatureAccess';
 import FeatureAccessModal from '../components/FeatureAccessModal';
 import { FeatureId } from '../types/features';
 import PhotoLibrary from '../components/PhotoLibrary';
+import MediaUploadButton from '../components/MediaUploadButton';
 import { CategoryService } from '../services/api/categoryService';
 import { SubscriptionRequiredError } from '../services/api';
 
@@ -26,6 +27,8 @@ import StarterKit from '@tiptap/starter-kit';
 import ImageExtension from '@tiptap/extension-image';
 import LinkExtension from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
+import { Video } from '../extensions/VideoExtension';
+import { generateExcerpt } from '../utils/tiptapUtils';
 
 interface BlogFormValues {
   title: string;
@@ -109,6 +112,7 @@ const BlogEditor: React.FC = () => {
       }),
       ImageExtension,
       LinkExtension.configure({ openOnClick: false }),
+      Video, // ✅ VIDEO SUPPORT
       Placeholder.configure({
         placeholder: t('blog.contentPlaceholder', 'Tell your story...'),
       }),
@@ -223,6 +227,9 @@ const BlogEditor: React.FC = () => {
             if (node.type === 'image' && node.attrs?.src && uploadedUrls.has(node.attrs.src)) {
               node.attrs.src = uploadedUrls.get(node.attrs.src);
             }
+            if (node.type === 'video' && node.attrs?.src && uploadedUrls.has(node.attrs.src)) {
+              node.attrs.src = uploadedUrls.get(node.attrs.src);
+            }
             if (node.content) {
               node.content.forEach(replaceSrc);
             }
@@ -239,7 +246,7 @@ const BlogEditor: React.FC = () => {
         await updateBlogPost(postId, {
           title,
           content,
-          excerpt: debouncedValues.excerpt,
+          excerpt: generateExcerpt(content, 150),
           tags: debouncedValues.tags,
           categoryId: debouncedValues.categoryId,
           images: featuredImage ? [featuredImage] : [],
@@ -297,133 +304,147 @@ const BlogEditor: React.FC = () => {
   };
 
   const handlePublishNow = async () => {
-    if (!postId) return;
     try {
-      await updateBlogPost(postId, { isPublished: true });
-      setValue('isPublished', true);
-      showSuccess(t('blog.published'));
-      setShowPublishPrompt(false);
-    } catch (err) {
-      if (err instanceof SubscriptionRequiredError) {
+      if (!hasFeatureAccess) {
         setShowUpgradeModal(true);
-      } else {
-        showError(t('common.error', 'An error occurred'));
+        return;
+      }
+      setValue('isPublished', true, { shouldDirty: true });
+      await handleSubmit(onSave)();
+      showSuccess(t('blog.published', 'Published successfully!'));
+      setShowPublishPrompt(false);
+      setTimeout(() => navigate('/blog'), 500);
+    } catch (error) {
+      if (error instanceof SubscriptionRequiredError) {
+        setShowUpgradeModal(true);
       }
     }
   };
 
   const onSave = async (data: BlogFormValues) => {
-    if (!data.title.trim()) {
-      showError(t('blog.titleRequired'));
+    if (!hasFeatureAccess) {
+      setShowUpgradeModal(true);
       return;
     }
 
     setSaveStatus('saving');
     try {
-      // Upload pending images
-      const uploadedUrls = new Map<string, string>();
-      for (const [blobUrl, file] of pendingUploadsRef.current) {
-        const realUrl = await uploadImage(file);
-        uploadedUrls.set(blobUrl, realUrl);
-        URL.revokeObjectURL(blobUrl);
-      }
-
-      // Replace blob URLs with real URLs in data
-      const updatedData = { ...data };
-
-      // Replace in featuredImage
-      if (updatedData.featuredImage && uploadedUrls.has(updatedData.featuredImage)) {
-        updatedData.featuredImage = uploadedUrls.get(updatedData.featuredImage)!;
-      }
-
-      // Replace in content
-      if (updatedData.content) {
-        const contentJson = JSON.parse(updatedData.content);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const replaceSrc = (node: any) => {
-          if (node.type === 'image' && node.attrs?.src && uploadedUrls.has(node.attrs.src)) {
-            node.attrs.src = uploadedUrls.get(node.attrs.src);
-          }
-          if (node.content) {
-            node.content.forEach(replaceSrc);
-          }
-        };
-        replaceSrc(contentJson);
-        updatedData.content = JSON.stringify(contentJson);
-      }
-
-      // Clear pending uploads
-      pendingUploadsRef.current = new Map();
-
-      const payload = { ...updatedData, images: updatedData.featuredImage ? [updatedData.featuredImage] : [], videos: [] };
       if (postId) {
-        await updateBlogPost(postId, payload);
-        setSaveStatus('saved');
-        showSuccess(t('blog.postUpdated'));
-        reset(getValues()); // Reset dirty state
+        await updateBlogPost(postId, {
+          title: data.title,
+          content: data.content,
+          excerpt: data.excerpt || generateExcerpt(data.content, 150),
+          tags: data.tags,
+          categoryId: data.categoryId,
+          images: data.featuredImage ? [data.featuredImage] : [],
+          videos: [],
+          isPublished: data.isPublished
+        });
+        showSuccess(t('blog.updated', 'Post updated successfully!'));
       } else {
-        const newId = await createBlogPost(payload);
+        const newId = await createBlogPost({
+          title: data.title,
+          content: data.content,
+          excerpt: data.excerpt || generateExcerpt(data.content, 150),
+          tags: data.tags,
+          categoryId: data.categoryId,
+          images: data.featuredImage ? [data.featuredImage] : [],
+          videos: [],
+          isPublished: data.isPublished
+        });
         setPostId(newId);
-        window.history.replaceState(null, '', `?id=${newId}`);
-        setSaveStatus('saved');
-        showSuccess(t('blog.postCreated'));
-        reset(getValues()); // Reset dirty state
+        showSuccess(t('blog.created', 'Post created successfully!'));
       }
-
-      // Show publish prompt if not already published
-      if (!getValues('isPublished')) {
-        setShowPublishPrompt(true);
+      setSaveStatus('saved');
+    } catch (error) {
+      setSaveStatus('error');
+      if (error instanceof SubscriptionRequiredError) {
+        setSaveStatus('forbidden');
+        setShowUpgradeModal(true);
+      } else {
+        showError(t('common.errorSaving', 'Failed to save post'));
       }
-    } catch (err) {
-      setSaveStatus(err instanceof SubscriptionRequiredError ? 'forbidden' : 'error');
-      if (err instanceof SubscriptionRequiredError) setShowUpgradeModal(true);
     }
   };
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 flex flex-col font-sans">
-      
-      {/* 1. CLEAN NAVBAR */}
-      <nav className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-gray-100 h-14 px-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors">
+    <div className="min-h-screen bg-white flex flex-col">
+      {/* 1. TOP NAVIGATION */}
+      <nav className="sticky top-0 z-20 bg-gradient-to-r from-teal-600 to-teal-500 shadow-sm px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          {/* Back Button */}
+          <button
+            onClick={() => navigate('/blog')}
+            className="p-2 text-white hover:bg-teal-600 rounded-full transition-colors"
+          >
             <FiArrowLeft className="w-5 h-5" />
           </button>
-          <div className="flex items-center gap-2 text-sm">
-            {saveStatus === 'saving' && <span className="text-gray-400">{t('blog.saving', 'Saving...')}</span>}
-            {saveStatus === 'saved' && <span className="text-green-600 flex items-center gap-1"><FiCheck className="w-3 h-3"/> {t('blog.saved', 'Saved')}</span>}
-            {saveStatus === 'forbidden' && <span className="text-amber-600 flex items-center gap-1"><FiAlertCircle className="w-3 h-3"/> {t('blog.upgradeRequired')}</span>}
+
+          {/* Title & Status */}
+          <div className="flex items-center gap-3">
+            <h1 className="text-white font-semibold text-lg hidden sm:block">
+              {postId ? t('blog.editPost', 'Edit Post') : t('blog.newPost', 'New Post')}
+            </h1>
+
+            {/* Save Status */}
+            {saveStatus === 'saving' && (
+              <span className="text-teal-100 flex items-center gap-1">
+                <div className="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent"></div>
+                {t('blog.saving', 'Saving...')}
+              </span>
+            )}
+            {saveStatus === 'saved' && (
+              <span className="text-white flex items-center gap-1 bg-teal-600 px-2 py-1 rounded-md">
+                <FiCheck className="w-3 h-3"/>
+                {t('blog.saved', 'Saved')}
+              </span>
+            )}
+            {saveStatus === 'forbidden' && (
+              <span className="text-amber-300 flex items-center gap-1 bg-amber-600/20 px-2 py-1 rounded-md">
+                <FiAlertCircle className="w-3 h-3"/>
+                {t('blog.upgradeRequired')}
+              </span>
+            )}
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Publish Toggle */}
+        {/* Right: Action Buttons */}
+        <div className="flex items-center gap-3">
+          {/* Close and Save Draft Button */}
           <button
-            onClick={onPublishToggle}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-              watch('isPublished')
-                ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
+            onClick={async () => {
+              // Save as draft
+              setValue('isPublished', false, { shouldDirty: true });
+              await handleSubmit(onSave)();
+              // Navigate back after saving
+              setTimeout(() => navigate('/blog'), 500);
+            }}
+            className="px-4 py-2 bg-white/10 text-white border border-white/20 rounded-lg text-sm font-medium hover:bg-white/20 transition-all"
           >
-            {watch('isPublished') ? <FiGlobe className="w-3.5 h-3.5" /> : <FiLock className="w-3.5 h-3.5" />}
-            <span className="hidden sm:inline">{watch('isPublished') ? t('blog.published') : t('blog.draft')}</span>
+            {t('blog.closeAndSaveDraft', 'Close and Save Draft')}
           </button>
 
-          {/* Settings Trigger */}
+          {/* Publish Button */}
+          <button
+            onClick={async () => {
+              // Save and publish
+              setValue('isPublished', true, { shouldDirty: true });
+              await handleSubmit(onSave)();
+              showSuccess(t('blog.published', 'Published successfully!'));
+              // Optional: Navigate to success page or blog list
+              setTimeout(() => navigate('/blog'), 500);
+            }}
+            className="px-5 py-2 bg-white text-teal-700 rounded-lg text-sm font-semibold hover:bg-gray-100 transition-all shadow-sm"
+          >
+            {t('blog.publish', 'Publish')}
+          </button>
+
+          {/* Settings Trigger (Optional) */}
           <button 
             onClick={() => setIsSettingsOpen(true)}
-            className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors"
+            className="p-2 text-white hover:bg-teal-600 rounded-full transition-colors"
           >
             <FiSettings className="w-5 h-5" />
-          </button>
-
-          {/* Primary Save Button (Mainly for manual trigger) */}
-          <button
-            onClick={handleSubmit(onSave)}
-            className="hidden sm:block ml-2 bg-black text-white px-5 py-1.5 rounded-full text-sm font-medium hover:bg-gray-800 transition-transform active:scale-95"
-          >
-            {t('blog.save', 'Save')}
           </button>
         </div>
       </nav>
@@ -550,6 +571,16 @@ const BlogEditor: React.FC = () => {
               >
                 <FiMinus className="w-4 h-4" />
               </button>
+              
+              {/* ✅ INLINE MEDIA UPLOAD BUTTONS */}
+              <MediaUploadButton
+                type="image"
+                onInsert={(url) => editor.chain().focus().setImage({ src: url }).run()}
+              />
+              <MediaUploadButton
+                type="video"
+                onInsert={(url) => editor.chain().focus().setVideo({ src: url }).run()}
+              />
             </div>
           )}
 
@@ -577,12 +608,19 @@ const BlogEditor: React.FC = () => {
              <button onClick={() => editor.chain().focus().toggleBulletList().run()} className={`p-1 ${editor.isActive('bulletList') ? 'text-blue-600' : 'text-gray-600'}`}>
                <FiList className="w-5 h-5" />
              </button>
-             <button
-               onClick={() => { setPhotoTarget('editor'); setIsPhotoLibraryOpen(true); }}
-               className="p-1 text-gray-600"
-             >
-               <FiImage className="w-5 h-5" />
-             </button>
+             
+             {/* ✅ INLINE MEDIA UPLOAD BUTTONS - MOBILE */}
+             <MediaUploadButton
+               type="image"
+               onInsert={(url) => editor.chain().focus().setImage({ src: url }).run()}
+               className="p-1"
+             />
+             <MediaUploadButton
+               type="video"
+               onInsert={(url) => editor.chain().focus().setVideo({ src: url }).run()}
+               className="p-1"
+             />
+             
              <button onClick={() => setIsSettingsOpen(true)} className="p-1 text-gray-600">
                <FiMoreHorizontal className="w-5 h-5" />
              </button>

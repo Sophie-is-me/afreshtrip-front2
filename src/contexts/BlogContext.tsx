@@ -1,123 +1,67 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import type { BlogPost, CreateBlogPostInput, Comment } from '../types/blog';
-import type { Comment as ApiComment } from '../types/api';
-import {
-  apiClient,
-  type BlogVo,
-  type BlogDto,
-} from '../services/apiClient';
+// BlogContext.tsx - Updated to use Firebase API
+// Replace your existing BlogContext with this file
+
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { useAuth } from './AuthContext';
-import { SubscriptionRequiredError } from '../services/api';
-import { generateExcerpt } from '../utils/tiptapUtils';
-
-// Helper to convert Backend VO to Frontend Model
-const convertApiBlogPost = (apiPost: BlogVo): BlogPost => ({
-  id: apiPost.blId?.toString() || '',
-  title: apiPost.title || 'Untitled',
-  content: apiPost.content || '',
-  excerpt: apiPost.excerpt || generateExcerpt(apiPost.content || ''),
-  images: apiPost.imageUrl?.map(img => img.imgUrl) || [],
-  videos: apiPost.videoUrl?.map(vid => vid.viUrl) || [],
-  author: {
-    id: apiPost.userId?.toString() || 'unknown',
-    name: apiPost.author?.nickname || 'Anonymous',
-    avatar: apiPost.author?.avatar || '',
-  },
-  date: apiPost.createdAt || new Date().toISOString(),
-  views: apiPost.play || 0,
-  likes: apiPost.like || 0,
-  category: apiPost.category || 'Uncategorized',
-  tags: apiPost.tags || [],
-  slug: apiPost.slug || `post-${apiPost.blId}`,
-  isPublished: apiPost.isPublished ?? true,
-  createdAt: apiPost.createdAt || new Date().toISOString(),
-  updatedAt: apiPost.updatedAt || new Date().toISOString(),
-});
-
-// Helper to convert API Comment to Frontend Comment
-const convertApiComment = (apiComment: ApiComment): Comment => {
-  try {
-    // Comprehensive null checks
-    const author = apiComment.author;
-    const nickname = author?.nickname || 'Anonymous';
-    const avatar = author?.avatar || '';
-
-    return {
-      id: apiComment.id?.toString() || '',
-      author: {
-        name: nickname,
-        avatar: avatar,
-      },
-      content: apiComment.content || '',
-      date: apiComment.createdAt || new Date().toISOString(),
-      likes: apiComment.likes || 0,
-      isLiked: apiComment.isLiked || false,
-      replies: [], // Note: Handle nested replies if backend supports
-    };
-  } catch (error) {
-    console.error('Error converting API comment:', error, apiComment);
-    // Return a safe fallback comment
-    return {
-      id: 'error-comment',
-      author: {
-        name: 'Anonymous',
-        avatar: '',
-      },
-      content: 'Error loading comment',
-      date: new Date().toISOString(),
-      likes: 0,
-      isLiked: false,
-      replies: [],
-    };
-  }
-};
+import * as blogApi from '../services/blogApi';
+import type { BlogPost, Comment, CreateBlogPostInput } from '../types/blog';
 
 interface BlogContextType {
+  // State
   blogPosts: BlogPost[];
   loading: boolean;
   error: string | null;
+  
+  // Read operations
   getAllBlogPosts: () => BlogPost[];
+  getBlogPostById: (id: string) => Promise<BlogPost | null>;
+  getPostById: (id: string) => BlogPost | undefined;
+  getBlogDetails: (id: string) => Promise<{ post: BlogPost; comments: Comment[] }>;
   getBlogPostsPaginated: (page: number, size: number) => Promise<{
     posts: BlogPost[];
     total: number;
     hasMore: boolean;
   }>;
+  getBlogPostsByCategory: (categorySlug: string) => Promise<BlogPost[]>; // ✅ NEW
   getUserBlogs: (page: number, size: number) => Promise<{
     posts: BlogPost[];
     total: number;
     hasMore: boolean;
   }>;
-  getPostById: (id: string) => BlogPost | undefined;
-  getBlogPostById: (id: string) => BlogPost | undefined;
-  getBlogDetails: (id: string) => Promise<{ post: BlogPost; comments: Comment[] }>;
-  toggleCommentLike: (commentId: string) => Promise<boolean>;
-  addComment: (blogId: string, content: string, replyToId?: string) => Promise<Comment>;
-  addNewPost: (post: BlogPost) => void;
-  createBlogPost: (post: CreateBlogPostInput) => Promise<string>;
-  updateBlogPost: (id: string, updates: Partial<BlogPost>) => Promise<void>;
-  updatePostStatistics: (id: string, stats: { views?: number; likes?: number; isLiked?: boolean; isSaved?: boolean }) => void;
   getRelatedPosts: (currentId: string, category: string, limit?: number) => BlogPost[];
+  
+  // Write operations
+  createBlogPost: (post: CreateBlogPostInput) => Promise<string>;
+  updateBlogPost: (id: string, updates: Partial<CreateBlogPostInput>) => Promise<void>;
+  deleteBlogPost: (id: string) => Promise<void>;
+  addNewPost: (post: BlogPost) => void;
+  
+  // Statistics
+  updatePostStatistics: (id: string, stats: { 
+    views?: number; 
+    likes?: number; 
+    isLiked?: boolean; 
+    isSaved?: boolean;
+  }) => void;
+  toggleLike: (postId: string) => Promise<boolean>; // ✅ NEW
+  
+  // Media
   uploadImage: (file: File) => Promise<string>;
-  refreshBlogPosts: () => Promise<void>;
-
-  // Updated signature for pagination
   getUserMediaLibrary: (page?: number, size?: number) => Promise<{
     images: string[];
     total: number;
     hasMore: boolean;
   }>;
+  
+  // Comments (mock for now)
+  toggleCommentLike: (commentId: string) => Promise<boolean>;
+  addComment: (blogId: string, content: string, replyToId?: string) => Promise<Comment>;
+  
+  // Refresh
+  refreshBlogPosts: () => Promise<void>;
 }
 
 const BlogContext = createContext<BlogContextType | undefined>(undefined);
-
-// eslint-disable-next-line react-refresh/only-export-components
-export const useBlog = () => {
-  const context = useContext(BlogContext);
-  if (context === undefined) {
-    throw new Error('useBlog must be used within a BlogProvider');
-  }
-  return context;
-};
 
 export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
@@ -125,233 +69,387 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Refresh all blog posts
   const refreshBlogPosts = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await apiClient.getBlogs();
-      const posts = response.records.map(convertApiBlogPost);
+      console.log('🔄 Refreshing blog posts from Firebase...');
+      
+      const posts = await blogApi.getAllBlogPosts();
       setBlogPosts(posts);
+      
+      console.log('✅ Loaded', posts.length, 'posts from Firebase');
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load blog posts';
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load posts';
       setError(errorMessage);
+      console.error('❌ Error loading posts:', errorMessage);
     } finally {
       setLoading(false);
     }
   }, []);
 
+  // Load posts on mount
   useEffect(() => {
     refreshBlogPosts();
   }, [refreshBlogPosts]);
 
-  const getAllBlogPosts = () => blogPosts;
+  // Get all blog posts from state
+  const getAllBlogPosts = useCallback(() => {
+    return blogPosts;
+  }, [blogPosts]);
 
-  const getBlogPostsPaginated = async (page: number, size: number) => {
+  // Get blog post by ID from state
+  const getPostById = useCallback((id: string) => {
+    return blogPosts.find(p => p.id === id);
+  }, [blogPosts]);
+
+  // Get blog post by ID from Firebase
+  const getBlogPostById = useCallback(async (id: string): Promise<BlogPost | null> => {
     try {
-      const response = await apiClient.getBlogs(page, size);
-      const posts = response.records.map(convertApiBlogPost);
+      console.log('📖 Fetching post:', id);
+      const post = await blogApi.getBlogPostById(id);
+      return post;
+    } catch (err) {
+      console.error('❌ Error fetching post:', err);
+      return null;
+    }
+  }, []);
+
+  // Get blog details with comments
+  const getBlogDetails = useCallback(async (id: string): Promise<{ post: BlogPost; comments: Comment[] }> => {
+    try {
+      console.log('📖 Fetching blog details:', id);
+      
+      const post = await blogApi.getBlogPostById(id);
+      
+      if (!post) {
+        throw new Error('Post not found');
+      }
+
+      // Mock comments for now (replace with real API later)
+      const comments: Comment[] = [];
+      
+      console.log('✅ Fetched blog details');
+      return { post, comments };
+    } catch (err) {
+      console.error('❌ Error fetching blog details:', err);
+      throw err;
+    }
+  }, []);
+
+  // Get paginated blog posts
+  const getBlogPostsPaginated = useCallback(async (page: number, size: number) => {
+    try {
+      console.log('📊 Fetching paginated posts:', { page, size });
+      
+      // Get all posts first
+      const allPosts = await blogApi.getAllBlogPosts();
+      
+      // Calculate pagination
+      const startIndex = (page - 1) * size;
+      const endIndex = startIndex + size;
+      const paginatedPosts = allPosts.slice(startIndex, endIndex);
+      
+      console.log('✅ Fetched', paginatedPosts.length, 'posts (page', page, 'of', Math.ceil(allPosts.length / size), ')');
+      
       return {
-        posts,
-        total: response.total,
-        hasMore: response.current * response.size < response.total
+        posts: paginatedPosts,
+        total: allPosts.length,
+        hasMore: endIndex < allPosts.length
       };
     } catch (err) {
-      console.error('Error fetching paginated blog posts:', err);
-      // Return empty result for network errors or API issues
+      console.error('❌ Error fetching paginated posts:', err);
       return {
         posts: [],
         total: 0,
         hasMore: false
       };
     }
-  };
+  }, []);
 
-  const getUserBlogs = async (page: number, size: number) => {
+  // ✅ NEW: Get blog posts by category
+  const getBlogPostsByCategory = useCallback(async (categorySlug: string): Promise<BlogPost[]> => {
     try {
-      const response = await apiClient.getUserBlogs(page, size);
-      const posts = response.records.map(convertApiBlogPost);
+      console.log('📂 Fetching posts by category:', categorySlug);
+      const posts = await blogApi.getBlogPostsByCategory(categorySlug);
+      console.log('✅ Found', posts.length, 'posts in category');
+      return posts;
+    } catch (err) {
+      console.error('❌ Error fetching posts by category:', err);
+      return [];
+    }
+  }, []);
+
+  // Get user's own blogs
+  const getUserBlogs = useCallback(async (page: number, size: number) => {
+    try {
+      if (!user) {
+        console.log('⚠️ No user logged in');
+        return {
+          posts: [],
+          total: 0,
+          hasMore: false
+        };
+      }
+
+      console.log('📊 Fetching user blogs for:', user.uid);
+      
+      const userPosts = await blogApi.getUserBlogPosts();
+      
+      // Calculate pagination
+      const startIndex = (page - 1) * size;
+      const endIndex = startIndex + size;
+      const paginatedPosts = userPosts.slice(startIndex, endIndex);
+      
+      console.log('✅ Fetched', paginatedPosts.length, 'user posts');
+      
       return {
-        posts,
-        total: response.total,
-        hasMore: response.current * response.size < response.total
+        posts: paginatedPosts,
+        total: userPosts.length,
+        hasMore: endIndex < userPosts.length
       };
     } catch (err) {
-      console.error('Error fetching user blog posts:', err);
+      console.error('❌ Error fetching user posts:', err);
       return {
         posts: [],
         total: 0,
         hasMore: false
       };
     }
-  };
+  }, [user]);
 
-  const getPostById = (id: string) => blogPosts.find(p => p.id === id);
-  const getBlogPostById = getPostById;
-  const addNewPost = (post: BlogPost) => setBlogPosts(prev => [...prev, post]);
+  // Get related posts
+  const getRelatedPosts = useCallback((currentId: string, category: string, limit: number = 3) => {
+    return blogPosts
+      .filter(p => p.id !== currentId && p.category === category && p.isPublished)
+      .slice(0, limit);
+  }, [blogPosts]);
 
-  const createBlogPost = async (post: CreateBlogPostInput) => {
-    if (!user) throw new Error('User must be logged in to create a post');
+  // Create blog post
+  const createBlogPost = useCallback(async (data: CreateBlogPostInput): Promise<string> => {
+    if (!user) {
+      throw new Error('❌ User must be logged in to create posts');
+    }
+
     try {
       setLoading(true);
-      const blogData: BlogDto = {
-        title: post.title,
-        content: post.content,
-        excerpt: post.excerpt,
-        tags: post.tags,
-        categoryId: post.categoryId || 1, // Default to first category if not specified
-        isPublished: post.isPublished,
-        imageUrl: post.images || [],
-        videoUrl: post.videos || [],
-      };
-      await apiClient.createBlog(blogData);
-      // Since backend returns boolean, fetch the latest user blog to get the created post
-      const userBlogsResponse = await apiClient.getUserBlogs(1, 1);
-      if (userBlogsResponse.records.length > 0) {
-        const newPost = convertApiBlogPost(userBlogsResponse.records[0]);
-        addNewPost(newPost);
-        return newPost.id;
-      }
-      throw new Error('Failed to retrieve created blog post');
+      console.log('✨ Creating blog post...');
+      console.log('👤 User:', user.uid);
+      console.log('📝 Title:', data.title);
+      console.log('🖼️ Images:', data.images?.length || 0);
+      
+      const postId = await blogApi.createBlogPost(data);
+      
+      console.log('✅ Post created! ID:', postId);
+
+      // Refresh to show new post
+      await refreshBlogPosts();
+      
+      return postId;
     } catch (err) {
-      if (err instanceof SubscriptionRequiredError) {
-        throw err;
-      }
-      const errorMessage = err instanceof Error ? err.message : 'Failed to create blog post';
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create post';
+      console.error('❌ Error creating post:', errorMessage);
       throw new Error(errorMessage);
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, refreshBlogPosts]);
 
-  /**
-   * Updates a blog post using PATCH (Partial Update)
-   * This is safer than PUT as it doesn't overwrite fields not present in the update
-   */
-  const updateBlogPost = async (id: string, updates: Partial<BlogPost>) => {
-    // 1. Optimistic Update (UI feels fast)
+  // Update blog post
+  const updateBlogPost = useCallback(async (id: string, updates: Partial<CreateBlogPostInput>) => {
+    // Optimistic update
     setBlogPosts(prev =>
       prev.map(p => p.id === id ? { ...p, ...updates, updatedAt: new Date().toISOString() } : p)
     );
 
-    // 2. Persist to Backend via PATCH
     try {
-      const blogId = parseInt(id, 10);
+      console.log('📝 Updating post:', id);
+      await blogApi.updateBlogPost(id, updates);
+      console.log('✅ Post updated!');
       
-      // Construct Partial DTO
-      // We only include fields that are actually in the 'updates' object
-      const payload: Partial<BlogDto> = {};
-
-      if (updates.title !== undefined) payload.title = updates.title;
-      if (updates.content !== undefined) payload.content = updates.content;
-      if (updates.excerpt !== undefined) payload.excerpt = updates.excerpt;
-      if (updates.category !== undefined) payload.categoryId = updates.categoryId || 1; // Map category to categoryId
-      if (updates.tags !== undefined) payload.tags = updates.tags;
-      if (updates.isPublished !== undefined) payload.isPublished = updates.isPublished;
-      
-      // Special handling for images array
-      if (updates.images !== undefined) {
-        payload.imageUrl = updates.images;
-      }
-      // Special handling for videos array
-      if (updates.videos !== undefined) {
-        payload.videoUrl = updates.videos;
-      }
-      
-      // Note: We do NOT explicitly set videoUrl to [] here.
-      // The backend PATCH endpoint will ignore fields not present in the payload,
-      // preserving any existing videos on this post.
-
-      await apiClient.patchBlog(blogId, payload);
-
+      // Refresh to get updated data
+      await refreshBlogPosts();
     } catch (err) {
-      console.error("Failed to persist update", err);
-      
-      // Critical: Re-throw Subscription errors so the UI can show the paywall
-      if (err instanceof SubscriptionRequiredError) {
-        throw err;
-      }
-      // For other errors, the optimistic update might be out of sync, 
-      // but we allow the UI 'error' state to handle it.
+      console.error('❌ Failed to update post:', err);
+      await refreshBlogPosts(); // Revert on error
       throw err;
     }
-  };
+  }, [refreshBlogPosts]);
 
-  /**
-   * Uploads an image to the backend storage
-   */
-  const uploadImage = async (file: File): Promise<string> => {
+  // Delete blog post
+  const deleteBlogPost = useCallback(async (id: string) => {
     try {
-      return await apiClient.uploadFile(file);
+      console.log('🗑️ Deleting post:', id);
+      await blogApi.deleteBlogPost(id);
+      console.log('✅ Post deleted!');
+      
+      // Remove from state
+      setBlogPosts(prev => prev.filter(p => p.id !== id));
     } catch (err) {
-      console.error('Upload failed:', err);
+      console.error('❌ Failed to delete post:', err);
       throw err;
     }
-  };
+  }, []);
 
-  /**
-   * Retrieves user's historical media with pagination
-   */
-  const getUserMediaLibrary = async (page: number = 1, size: number = 20): Promise<{
-    images: string[];
-    total: number;
-    hasMore: boolean;
-  }> => {
+  // Add new post (optimistic update)
+  const addNewPost = useCallback((post: BlogPost) => {
+    setBlogPosts(prev => [post, ...prev]);
+  }, []);
+
+  // Upload image
+  const uploadImage = useCallback(async (file: File): Promise<string> => {
+    if (!user) {
+      throw new Error('❌ User must be logged in to upload images');
+    }
+
     try {
-      return await apiClient.getUserMedia(page, size);
+      console.log('📤 Uploading image...');
+      console.log('👤 User:', user.uid);
+      console.log('📁 File:', file.name, '|', file.size, 'bytes');
+      
+      const url = await blogApi.uploadBlogMedia(file);
+      
+      console.log('✅ Image uploaded!');
+      return url;
+    } catch (err: any) {
+      console.error('❌ Upload failed:', err);
+      
+      // Better error messages
+      if (err.code === 'storage/unauthorized') {
+        throw new Error('Permission denied. Make sure you are logged in and Storage rules are updated.');
+      }
+      
+      throw err;
+    }
+  }, [user]);
+
+  // Get user's media library (mock for now)
+  const getUserMediaLibrary = useCallback(async (page: number = 1, size: number = 20) => {
+    try {
+      if (!user) {
+        return { images: [], total: 0, hasMore: false };
+      }
+
+      console.log('📸 Fetching media library...');
+      
+      // Mock implementation (replace with real API later)
+      const mockImages: string[] = [];
+      
+      return {
+        images: mockImages,
+        total: mockImages.length,
+        hasMore: false
+      };
     } catch (err) {
-      console.error('Failed to load media library:', err);
+      console.error('❌ Failed to load media:', err);
       return { images: [], total: 0, hasMore: false };
     }
-  };
+  }, [user]);
 
-  const updatePostStatistics = (id: string, stats: { views?: number; likes?: number; isLiked?: boolean; isSaved?: boolean }) => {
+  // Update post statistics
+  const updatePostStatistics = useCallback((id: string, stats: {
+    views?: number;
+    likes?: number;
+    isLiked?: boolean;
+    isSaved?: boolean;
+  }) => {
     setBlogPosts(prev => prev.map(p => p.id === id ? { ...p, ...stats } : p));
-  };
+  }, []);
 
-  const getBlogDetails = async (id: string): Promise<{ post: BlogPost; comments: Comment[] }> => {
-    try {
-      const blogCommentVo = await apiClient.getBlogById(parseInt(id, 10));
-      const post = convertApiBlogPost(blogCommentVo);
-      const comments = (blogCommentVo.comment || []).map(convertApiComment);
-      return { post, comments };
-    } catch (err) {
-      console.error('Error fetching blog details:', err);
-      // Return empty result instead of throwing
-      return {
-        post: {} as BlogPost,
-        comments: []
-      };
+  // ✅ NEW: Toggle like on a post
+  const toggleLike = useCallback(async (postId: string): Promise<boolean> => {
+    if (!user) {
+      throw new Error('User must be logged in to like posts');
     }
-  };
 
-  const toggleCommentLike = async (commentId: string): Promise<boolean> => {
     try {
-      return await apiClient.toggleCommentLike(parseInt(commentId, 10));
+      console.log('❤️ Toggling like for post:', postId);
+      const isLiked = await blogApi.toggleLike(postId);
+      
+      // Update local state
+      setBlogPosts(prev => prev.map(p => {
+        if (p.id === postId) {
+          return {
+            ...p,
+            likes: isLiked ? (p.likes || 0) + 1 : (p.likes || 0) - 1,
+            isLiked: isLiked,
+            likedBy: isLiked 
+              ? [...(p.likedBy || []), user.uid]
+              : (p.likedBy || []).filter((id: string) => id !== user.uid)
+          };
+        }
+        return p;
+      }));
+      
+      console.log(isLiked ? '✅ Liked!' : '✅ Unliked!');
+      return isLiked;
     } catch (err) {
-      console.error('Error toggling comment like:', err);
+      console.error('❌ Error toggling like:', err);
       throw err;
     }
-  };
+  }, [user]);
 
-  const addComment = async (blogId: string, content: string, replyToId?: string): Promise<Comment> => {
-    try {
-      const apiComment = await apiClient.addComment(parseInt(blogId, 10), content, replyToId ? parseInt(replyToId, 10) : undefined);
-      return convertApiComment(apiComment);
-    } catch (err) {
-      console.error('Error adding comment:', err);
-      throw err;
+  // Toggle comment like (mock)
+  const toggleCommentLike = useCallback(async (commentId: string): Promise<boolean> => {
+    console.log('Mock: Toggle comment like', commentId);
+    return true;
+  }, []);
+
+  // Add comment (mock)
+  const addComment = useCallback(async (blogId: string, content: string, replyToId?: string): Promise<Comment> => {
+    if (!user) {
+      throw new Error('User must be logged in');
     }
-  };
 
-  const getRelatedPosts = (currentId: string, category: string, limit: number = 3) => {
-    return blogPosts.filter(p => p.id !== currentId && p.category === category && p.isPublished).slice(0, limit);
-  };
+    const newComment: Comment = {
+      id: `comment_${Date.now()}`,
+      author: {
+        name: user.displayName || 'Anonymous',
+        avatar: user.photoURL || ''
+      },
+      content,
+      date: new Date().toISOString(),
+      likes: 0,
+      isLiked: false,
+      replies: []
+    };
 
-  const value = {
-    blogPosts, loading, error, getAllBlogPosts, getBlogPostsPaginated, getUserBlogs, getPostById, getBlogPostById, getBlogDetails, toggleCommentLike, addComment,
-    addNewPost, createBlogPost, updateBlogPost, updatePostStatistics,
-    getRelatedPosts, uploadImage, refreshBlogPosts, getUserMediaLibrary,
+    return newComment;
+  }, [user]);
+
+  const value: BlogContextType = {
+    blogPosts,
+    loading,
+    error,
+    getAllBlogPosts,
+    getBlogPostById,
+    getPostById,
+    getBlogDetails,
+    getBlogPostsPaginated,
+    getBlogPostsByCategory,
+    getUserBlogs,
+    getRelatedPosts,
+    createBlogPost,
+    updateBlogPost,
+    deleteBlogPost,
+    addNewPost,
+    updatePostStatistics,
+    toggleLike,
+    uploadImage,
+    getUserMediaLibrary,
+    toggleCommentLike,
+    addComment,
+    refreshBlogPosts
   };
 
   return <BlogContext.Provider value={value}>{children}</BlogContext.Provider>;
+};
+
+export const useBlog = () => {
+  const context = useContext(BlogContext);
+  if (context === undefined) {
+    throw new Error('useBlog must be used within a BlogProvider');
+  }
+  return context;
 };

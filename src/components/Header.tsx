@@ -248,30 +248,22 @@ const Header: React.FC<HeaderProps> = ({
                     <span>{t('header.add')}</span>
                   </Link>
                 )}
-
+                      <Link 
+        to="/trips" 
+        className={`px-4 py-2 rounded-full text-sm font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 ${
+          isActiveLink('/trips') 
+            ? 'bg-teal-800 text-white shadow-inner' 
+            : 'text-teal-100 hover:text-white hover:bg-teal-800/50'
+        }`}
+        aria-current={isActiveLink('/trips') ? 'page' : undefined}
+      >
+        {t('header.travelTool')}
+      </Link>
                 {user && (
                   <>
                     <div className="w-px h-6 bg-teal-800 mx-2" aria-hidden="true" />
-                    <Link 
-                      to="/subscription" 
-                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 ${
-                        isActiveLink('/subscription') 
-                          ? 'bg-teal-800 text-white shadow-inner' 
-                          : 'text-teal-100 hover:text-white hover:bg-teal-800/50'
-                      }`}
-                    >
-                      {t('header.subscription')}
-                    </Link>
-                    <Link 
-                      to="/trips" 
-                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 ${
-                        isActiveLink('/trips') 
-                          ? 'bg-teal-800 text-white shadow-inner' 
-                          : 'text-teal-100 hover:text-white hover:bg-teal-800/50'
-                      }`}
-                    >
-                      {t('profileNav.trips')}
-                    </Link>
+                     {/* Hidden menus when a user logged in, removed some menus here*/}
+                  
                   </>
                 )}
               </div>
@@ -431,6 +423,13 @@ const Header: React.FC<HeaderProps> = ({
               >
                 {t('header.blog')}
               </Link>
+              <Link
+  to="/travel-tools"
+ onClick={() => setIsMobileMenuOpen(false)}
+     className="flex items-center gap-2 p-3 rounded-lg bg-teal-800/50 text-teal-50 hover:bg-teal-800"
+>
+  {t('header.travelTool')}
+</Link>
             </div>
 
             {/* Authenticated Links */}
@@ -440,9 +439,7 @@ const Header: React.FC<HeaderProps> = ({
                 <Link to="/profile" className="block px-3 py-2 text-teal-100 hover:bg-teal-800 rounded-md" onClick={() => setIsMobileMenuOpen(false)}>
                   {t('profileNav.profile')}
                 </Link>
-                <Link to="/subscription" className="block px-3 py-2 text-teal-100 hover:bg-teal-800 rounded-md" onClick={() => setIsMobileMenuOpen(false)}>
-                  {t('header.subscription')}
-                </Link>
+              
                 <Link to="/trips" className="block px-3 py-2 text-teal-100 hover:bg-teal-800 rounded-md" onClick={() => setIsMobileMenuOpen(false)}>
                   {t('profileNav.trips')}
                 </Link>

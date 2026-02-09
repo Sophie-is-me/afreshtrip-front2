@@ -1,521 +1,829 @@
-// src/services/apiClient.ts
+// Firebase API Client + SMS Authentication
+// This version uses:
+// - Firestore for blog operations
+// - HTTP API for SMS authentication (Chinese version)
 
-import { AuthService } from './api/authService';
-import { UserService } from './api/userService';
-import { BlogService } from './api/blogService';
-import { PaymentService } from './api/paymentService';
-import { StorageService } from './api/storageService';
-import { unifiedSubscriptionService } from './subscription/UnifiedSubscriptionService';
-import { FeatureService } from './api/featureService';
+import {
+  collection,
+  doc,
+  setDoc,
+  getDoc,
+  getDocs,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+  orderBy,
+  limit,
+  Timestamp,
+  writeBatch,
+  increment,
+  addDoc
+} from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL, listAll } from 'firebase/storage';
+import { db, storage } from '../../lib/firebase/client';
+import axios from "axios";
 
-// Import Types
-import type {
-  LocationInfo,
-  WeatherInfo,
-  WeatherForecast,
-  CollectedAddress,
-  NationInfo,
-  ResultIPageCollectAddress,
-  User,
-  UserDto,
-  BlogVo,
-  BlogCommentVo,
-  BlogDto,
-  Comment,
-  VipOrder,
-  IPageUsers
-} from '../types/api';
+// ============================================================================
+// TYPE DEFINITIONS - BLOG
+// ============================================================================
 
-import type { FeatureId } from '../types/features';
-import type { SubscriptionUpdateResult, FeatureAccessResult, UpgradeSuggestion } from '../types/backend';
-import type { UserSubscription } from '../types/subscription';
-import type { SubscriptionPlanResponse } from '../types/api';
-import { HttpClient } from './api/httpClient';
+export interface BlogVo {
+  blId?: number;
+  title?: string;
+  content?: string;
+  excerpt?: string;
+  imageUrl?: Array<{ imgUrl: string }>;
+  videoUrl?: Array<{ viUrl: string }>;
+  userId?: number;
+  author?: {
+    nickname?: string;
+    avatar?: string;
+  };
+  createdAt?: string;
+  updatedAt?: string;
+  play?: number;
+  like?: number;
+  category?: string;
+  categoryId?: number;
+  tags?: string[];
+  slug?: string;
+  isPublished?: boolean;
+  comment?: Array<Comment>;
+}
 
-/**
- * API Base URLs for different deployment environments
- * 
- * International (GCP): Used for global users, Firebase auth
- * Chinese (Aliyun): Used for Chinese users, SMS/Email auth
- */
-const getApiBaseUrl = () => {
-  if (import.meta.env.DEV) {
-    return import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+export interface BlogDto {
+  title: string;
+  content: string;
+  excerpt?: string;
+  tags?: string[];
+  categoryId: number;
+  isPublished: boolean;
+  imageUrl?: string[];
+  videoUrl?: string[];
+}
+
+export interface Comment {
+  id?: number;
+  author?: {
+    nickname?: string;
+    avatar?: string;
+  };
+  content?: string;
+  createdAt?: string;
+  likes?: number;
+  isLiked?: boolean;
+  replies?: Comment[];
+}
+
+interface PaginatedResponse<T> {
+  records: T[];
+  total: number;
+  size: number;
+  current: number;
+  pages: number;
+}
+
+// ============================================================================
+// TYPE DEFINITIONS - SMS AUTHENTICATION
+// ============================================================================
+
+export interface UserInfo {
+  userId: number;
+  email?: string;
+  nickname?: string;
+  phone?: string;
+  gender?: string;
+  imageurl?: string;
+  birthDate?: string;
+}
+
+export interface UserDto {
+  nickname: string;
+  gender?: string;
+  phone?: string;
+  imageurl?: string;
+  birthDate?: string;
+}
+
+// API Response Types
+export interface ApiResponse<T = any> {
+  code: number;
+  message?: string;
+  msg?: string;
+  data?: T;
+}
+
+export interface SmsCodeResponse {
+  token?: string;
+  userId?: number;
+  phone?: string;
+  nickname?: string;
+  email?: string;
+}
+
+export interface EmailCodeResponse {
+  token?: string;
+  userId?: number;
+  email?: string;
+  nickname?: string;
+  phone?: string;
+}
+
+export interface RegisterResponse {
+  token: string;
+  userId: number;
+  phone?: string;
+  email?: string;
+  nickname?: string;
+}
+
+// Custom API Error
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public code?: number,
+    public data?: any
+  ) {
+    super(message);
+    this.name = 'ApiError';
   }
-  
-  const isChineseVersion = import.meta.env.VITE_IS_CHINESE_VERSION === 'true';
-  
-  // Use different backends based on version
-  return isChineseVersion 
-    ? import.meta.env.VITE_ALIYUN_BACKEND_URL  // Chinese backend
-    : import.meta.env.VITE_GCP_BACKEND_URL; // International backend
+}
+
+// ============================================================================
+// FIREBASE COLLECTIONS
+// ============================================================================
+
+const COLLECTIONS = {
+  BLOGS: 'blogs',
+  USERS: 'users',
+  COMMENTS: 'comments',
+  CATEGORIES: 'categories',
+  MEDIA: 'user_media'
 };
 
-const API_BASE_URL = getApiBaseUrl();
+// ============================================================================
+// HTTP CLIENT CONFIGURATION (for SMS Auth)
+// ============================================================================
 
-console.log('Initializing API Client with base URL:', API_BASE_URL);
-console.log('Environment DEV:', import.meta.env.DEV);
-console.log('VITE_API_BASE_URL:', import.meta.env.VITE_API_BASE_URL);
-console.log('VITE_IS_CHINESE_VERSION:', import.meta.env.VITE_IS_CHINESE_VERSION);
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://192.168.10.243:9000/web';
 
-/**
- * Main API Client that composes all service modules
- */
-export class ApiClient {
-  private readonly auth: AuthService;
-  private readonly user: UserService;
-  private readonly blog: BlogService;
-  private readonly payment: PaymentService;
-  private readonly storage: StorageService;
-  // Removed subscription service - now using unified service directly
-  private readonly feature: FeatureService;
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
 
-  constructor(baseUrl: string = API_BASE_URL) {
-    this.auth = new AuthService(baseUrl);
-    this.user = new UserService(baseUrl);
-    this.blog = new BlogService(baseUrl);
-    this.payment = new PaymentService(baseUrl);
-    this.storage = new StorageService(baseUrl);
-    // Removed subscription service - now using unified service directly
-    this.feature = new FeatureService(baseUrl);
+const generateId = (): string => {
+  return doc(collection(db, COLLECTIONS.BLOGS)).id;
+};
+
+const timestampToString = (timestamp: any): string => {
+  if (timestamp?.toDate) {
+    return timestamp.toDate().toISOString();
+  }
+  if (timestamp instanceof Date) {
+    return timestamp.toISOString();
+  }
+  return new Date().toISOString();
+};
+
+const generateSlug = (title: string): string => {
+  return title
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .trim();
+};
+
+const getCategoryName = (categoryId: number): string => {
+  const categories: Record<number, string> = {
+    1: 'Adventure',
+    2: 'Culture',
+    3: 'Food',
+    4: 'Travel'
+  };
+  return categories[categoryId] || 'General';
+};
+
+// ============================================================================
+// API CLIENT CLASS
+// ============================================================================
+
+class FirebaseApiClient {
+  private httpClient: AxiosInstance;
+
+  constructor() {
+    // Initialize HTTP client for SMS authentication
+    this.httpClient = axios.create({
+      baseURL: API_BASE_URL,
+      timeout: 30000,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    // Request interceptor to add auth token
+    this.httpClient.interceptors.request.use(
+      (config) => {
+        // Try to get custom auth token (for Chinese version SMS auth)
+        const customToken = localStorage.getItem('custom_auth_token');
+        if (customToken) {
+          config.headers.Authorization = `Bearer ${customToken}`;
+        }
+        return config;
+      },
+      (error) => {
+        return Promise.reject(error);
+      }
+    );
+
+    // Response interceptor for error handling
+    this.httpClient.interceptors.response.use(
+      (response) => response,
+      (error: AxiosError<ApiResponse>) => {
+        if (error.response?.status === 401) {
+          // Unauthorized - clear auth and redirect to login
+          localStorage.removeItem('custom_auth_token');
+          localStorage.removeItem('custom_user_data');
+          window.location.href = '/login';
+        }
+        return Promise.reject(error);
+      }
+    );
   }
 
-  // ============================================================================
-  // AUTHENTICATION & HEALTH CHECKS
-  // ============================================================================
-
-  getAuthHealth(): Promise<string> {
-    return this.auth.getAuthHealth();
-  }
-
-  getAuthStatus(): Promise<{
-    firebaseEnabled: boolean;
-    status: string;
-    description: string;
-  }> {
-    return this.auth.getAuthStatus();
-  }
-
-  isAuthenticated(): Promise<boolean> {
-    return this.auth.isAuthenticated();
-  }
-
-  // ============================================================================
-  // SMS AUTHENTICATION (CHINESE MARKET)
-  // ============================================================================
-
-  sendSmsCode(phone: string): Promise<{
-    code: number;
-    message: string;
-    data: null;
-    timestamp?: number;
-  }> {
-    return this.auth.sendSmsCode(phone);
-  }
-
-  verifySmsCode(phone: string, code: string): Promise<{
-    code: number;
-    message: string;
-    data: {
-      token: string;
-      userId: number;
-      nickname: string;
-      phone: string;
-    };
-    timestamp?: number;
-  }> {
-    return this.auth.verifySmsCode(phone, code);
-  }
-
-  // ============================================================================
-  // EMAIL AUTHENTICATION (CHINESE MARKET)
-  // ============================================================================
-
-  sendEmailCode(email: string): Promise<{
-    code: number;
-    message: string;
-    data: null;
-    timestamp?: number;
-  }> {
-    return this.auth.sendEmailCode(email);
-  }
-
-  verifyEmailCode(email: string, code: string): Promise<{
-    code: number;
-    message: string;
-    data: {
-      token: string;
-      userId: number;
-      nickname: string;
-      email: string;
-    };
-    timestamp?: number;
-  }> {
-    return this.auth.verifyEmailCode(email, code);
-  }
-
-  // ============================================================================
-  // USER MANAGEMENT
-  // ============================================================================
-
-  getUserInfo(): Promise<User> {
-    return this.user.getUserInfo();
-  }
-
-  updateUserProfile(userData: UserDto): Promise<boolean> {
-    return this.user.updateUserProfile(userData);
-  }
-
-  getUserByEmail(userEmail: string): Promise<User> {
-    return this.user.getUserByEmail(userEmail);
-  }
-
-  getUsers(page?: number, size?: number): Promise<IPageUsers> {
-    return this.user.getUsers(page || 0, size || 20);
-  }
-
-  searchUsers(keyword: string): Promise<User[]> {
-    return this.user.searchUsers(keyword);
-  }
-
-  updateUserStatus(userEmail: string, isActive: boolean): Promise<boolean> {
-    return this.user.updateUserStatus(userEmail, isActive);
-  }
-
-  // ============================================================================
-  // BLOG MANAGEMENT
-  // ============================================================================
-
-  getBlogs(page?: number, size?: number): Promise<{
-    records: BlogVo[];
-    total: number;
-    size: number;
-    current: number;
-    pages: number;
-  }> {
-    return this.blog.getBlogs(page, size);
-  }
-
-  getBlogById(blId: number): Promise<BlogCommentVo> {
-    return this.blog.getBlogById(blId);
-  }
-
-  createBlog(blogData: BlogDto): Promise<boolean> {
-    return this.blog.createBlog(blogData);
-  }
-
-  updateBlog(blId: number, blogData: BlogDto): Promise<boolean> {
-    return this.blog.updateBlog(blId, blogData);
-  }
-
-  patchBlog(blId: number, updates: Partial<BlogDto>): Promise<boolean> {
-    return this.blog.patchBlog(blId, updates);
-  }
-
-  deleteBlog(blId: number): Promise<boolean> {
-    return this.blog.deleteBlog(blId);
-  }
-
-  toggleBlogLike(blId: number): Promise<boolean> {
-    return this.blog.toggleBlogLike(blId);
-  }
-
-  getUserBlogs(page?: number, size?: number): Promise<{
-    records: BlogVo[];
-    total: number;
-    size: number;
-    current: number;
-    pages: number;
-  }> {
-    return this.blog.getUserBlogs(page, size);
-  }
-
-  addComment(blId: number, content: string, replyToCommentId?: number): Promise<Comment> {
-    return this.blog.addComment(blId, content, replyToCommentId);
-  }
-
-  toggleCommentLike(commentId: number): Promise<boolean> {
-    return this.blog.toggleCommentLike(commentId);
-  }
-
-  // ============================================================================
-  // PAYMENT SYSTEMS (UPDATED FLOW)
-  // ============================================================================
+  // ==========================================================================
+  // SMS AUTHENTICATION OPERATIONS
+  // ==========================================================================
 
   /**
-   * Unified payment initiation (NEW)
-   * @param vipType - VIP_WEEK | VIP_MONTH | VIP_QUARTER | VIP_YEAR
-   * @param paymentMethod - ALIPAY | STRIPE
+   * Send SMS verification code
+   * POST /sms/send-code
    */
-  initiatePayment(vipType: 'VIP_WEEK' | 'VIP_MONTH' | 'VIP_QUARTER' | 'VIP_YEAR', paymentMethod: 'ALIPAY' | 'STRIPE'): Promise<{
-    success: boolean;
-    orderNo: string;
-    paymentMethod: 'ALIPAY' | 'STRIPE';
-    paymentHtml?: string;
-    clientSecret?: string;
-    errorMessage?: string;
-    errorCode?: string;
-  }> {
-    return this.payment.initiatePayment(vipType, paymentMethod);
+  async sendSmsCode(phone: string): Promise<ApiResponse<string>> {
+    try {
+      const response = await this.httpClient.post<ApiResponse<string>>('/sms/send-code', {
+        phone,
+      });
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
   }
 
   /**
-   * Check payment status (UPDATED)
-   * @param orderNo - Order number to check
+   * Verify SMS code and login
+   * POST /sms/verify-code
    */
-  checkPaymentStatus(orderNo: string): Promise<{
-    success: boolean;
-    isPaid: boolean;
-    status: string;
-    orderNo: string;
-    message?: string;
-  }> {
-    return this.payment.checkPaymentStatus(orderNo);
+  async verifySmsCode(phone: string, code: string): Promise<ApiResponse<SmsCodeResponse>> {
+    try {
+      const response = await this.httpClient.post<ApiResponse<SmsCodeResponse>>('/sms/verify-code', {
+        phone,
+        code,
+      });
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
   }
 
   /**
-   * Get subscription information (UPDATED)
+   * Register new user with SMS verification
+   * POST /sms/register
    */
-  getSubscriptionInfo(): Promise<{
-    success: boolean;
-    status?: 'active' | 'expired';
-    planId?: string;
-    vipTypeId?: string;
-    expiresAt?: string;
-    autoRenew?: boolean;
-    message?: string;
-  }> {
-    return this.payment.getSubscription();
+  async registerWithSms(
+    phone: string,
+    code: string,
+    password: string
+  ): Promise<ApiResponse<RegisterResponse>> {
+    try {
+      const response = await this.httpClient.post<ApiResponse<RegisterResponse>>('/sms/register', {
+        phone,
+        code,
+        password,
+      });
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  // ==========================================================================
+  // EMAIL AUTHENTICATION OPERATIONS
+  // ==========================================================================
+
+  /**
+   * Send email verification code
+   * POST /email/send-code
+   */
+  async sendEmailCode(email: string): Promise<ApiResponse<string>> {
+    try {
+      const response = await this.httpClient.post<ApiResponse<string>>('/email/send-code', {
+        email,
+      });
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
   }
 
   /**
-   * Activate free trial (NEW)
+   * Verify email code and login
+   * POST /email/verify-code
    */
-  activateFreeTrial(): Promise<{
-    success: boolean;
-    message?: string;
-    errorMessage?: string;
-  }> {
-    return this.payment.activateFreeTrial();
+  async verifyEmailCode(email: string, code: string): Promise<ApiResponse<EmailCodeResponse>> {
+    try {
+      const response = await this.httpClient.post<ApiResponse<EmailCodeResponse>>('/email/verify-code', {
+        email,
+        code,
+      });
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
   }
 
   /**
-   * Get order history (UPDATED)
+   * Register new user with email verification
+   * POST /email/register
    */
-  getOrders(page?: number, size?: number): Promise<{
-    success: boolean;
-    data?: {
-      records: VipOrder[];
-      total: number;
-      size: number;
-      current: number;
-      pages: number;
-    };
-    message?: string;
-  }> {
-    return this.payment.getOrders(page, size);
+  async registerWithEmail(
+    email: string,
+    code: string,
+    password: string
+  ): Promise<ApiResponse<RegisterResponse>> {
+    try {
+      const response = await this.httpClient.post<ApiResponse<RegisterResponse>>('/email/register', {
+        email,
+        code,
+        password,
+      });
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  // ==========================================================================
+  // USER PROFILE OPERATIONS
+  // ==========================================================================
+
+  /**
+   * Get current user info
+   * GET /user/info
+   */
+  async getUserInfo(): Promise<UserInfo> {
+    try {
+      const response = await this.httpClient.get<ApiResponse<UserInfo>>('/user/info');
+      if (response.data.code === 200 && response.data.data) {
+        return response.data.data;
+      }
+      throw new ApiError('Failed to get user info', response.data.code);
+    } catch (error) {
+      throw this.handleError(error);
+    }
   }
 
   /**
-   * Delete/cancel order (UPDATED)
+   * Update user profile
+   * PUT /user/profile
    */
-  deleteOrder(orderNo: string): Promise<{
-    success: boolean;
-    message?: string;
-  }> {
-    return this.payment.deleteOrder(orderNo);
+  async updateUserProfile(userDto: UserDto): Promise<UserInfo> {
+    try {
+      const response = await this.httpClient.put<ApiResponse<UserInfo>>('/user/profile', userDto);
+      if (response.data.code === 200 && response.data.data) {
+        return response.data.data;
+      }
+      throw new ApiError('Failed to update user profile', response.data.code);
+    } catch (error) {
+      throw this.handleError(error);
+    }
   }
 
-  // ============================================================================
-  // STORAGE & MEDIA SERVICES
-  // ============================================================================
+  // ==========================================================================
+  // ERROR HANDLING
+  // ==========================================================================
 
-  uploadFile(file: File): Promise<string> {
-    return this.storage.uploadFile(file);
+  private handleError(error: unknown): ApiError {
+    if (axios.isAxiosError(error)) {
+      const axiosError = error as AxiosError<ApiResponse>;
+      const errorMessage = 
+        axiosError.response?.data?.message || 
+        axiosError.response?.data?.msg || 
+        axiosError.message || 
+        'An unknown error occurred';
+      
+      const errorCode = axiosError.response?.data?.code || axiosError.response?.status;
+      const errorData = axiosError.response?.data?.data;
+
+      return new ApiError(errorMessage, errorCode, errorData);
+    }
+
+    if (error instanceof Error) {
+      return new ApiError(error.message);
+    }
+
+    return new ApiError('An unknown error occurred');
   }
 
-  getUserMedia(page: number = 1, size: number = 20): Promise<{
+  // ==========================================================================
+  // BLOG OPERATIONS (Firebase Firestore)
+  // ==========================================================================
+
+  /**
+   * Get all blogs with pagination
+   */
+  async getBlogs(page: number = 1, size: number = 9): Promise<PaginatedResponse<BlogVo>> {
+    try {
+      const blogsRef = collection(db, COLLECTIONS.BLOGS);
+      const q = query(
+        blogsRef,
+        where('isPublished', '==', true),
+        orderBy('createdAt', 'desc')
+      );
+
+      const snapshot = await getDocs(q);
+      const allBlogs: BlogVo[] = [];
+
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        allBlogs.push({
+          blId: parseInt(doc.id.slice(-8), 16), // Generate numeric ID from doc ID
+          title: data.title,
+          content: data.content,
+          excerpt: data.excerpt,
+          imageUrl: data.images?.map((url: string) => ({ imgUrl: url })) || [],
+          videoUrl: data.videos?.map((url: string) => ({ viUrl: url })) || [],
+          userId: data.author?.id ? parseInt(data.author.id.slice(-8), 16) : 0,
+          author: {
+            nickname: data.author?.name || 'Anonymous',
+            avatar: data.author?.avatar || ''
+          },
+          createdAt: timestampToString(data.createdAt),
+          updatedAt: timestampToString(data.updatedAt),
+          play: data.views || 0,
+          like: data.likes || 0,
+          category: data.category,
+          categoryId: data.categoryId,
+          tags: data.tags || [],
+          slug: data.slug,
+          isPublished: data.isPublished
+        });
+      });
+
+      // Pagination
+      const start = (page - 1) * size;
+      const end = start + size;
+      const paginatedBlogs = allBlogs.slice(start, end);
+
+      return {
+        records: paginatedBlogs,
+        total: allBlogs.length,
+        size,
+        current: page,
+        pages: Math.ceil(allBlogs.length / size)
+      };
+    } catch (error) {
+      console.error('Error fetching blogs:', error);
+      return {
+        records: [],
+        total: 0,
+        size,
+        current: page,
+        pages: 0
+      };
+    }
+  }
+
+  /**
+   * Get user's own blogs
+   */
+  async getUserBlogs(page: number = 1, size: number = 9, userId?: string): Promise<PaginatedResponse<BlogVo>> {
+    try {
+      if (!userId) {
+        return {
+          records: [],
+          total: 0,
+          size,
+          current: page,
+          pages: 0
+        };
+      }
+
+      const blogsRef = collection(db, COLLECTIONS.BLOGS);
+      const q = query(
+        blogsRef,
+        where('author.id', '==', userId),
+        orderBy('createdAt', 'desc')
+      );
+
+      const snapshot = await getDocs(q);
+      const allBlogs: BlogVo[] = [];
+
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        allBlogs.push({
+          blId: parseInt(doc.id.slice(-8), 16),
+          title: data.title,
+          content: data.content,
+          excerpt: data.excerpt,
+          imageUrl: data.images?.map((url: string) => ({ imgUrl: url })) || [],
+          videoUrl: data.videos?.map((url: string) => ({ viUrl: url })) || [],
+          userId: parseInt(userId.slice(-8), 16),
+          author: {
+            nickname: data.author?.name || 'Anonymous',
+            avatar: data.author?.avatar || ''
+          },
+          createdAt: timestampToString(data.createdAt),
+          updatedAt: timestampToString(data.updatedAt),
+          play: data.views || 0,
+          like: data.likes || 0,
+          category: data.category,
+          categoryId: data.categoryId,
+          tags: data.tags || [],
+          slug: data.slug,
+          isPublished: data.isPublished
+        });
+      });
+
+      const start = (page - 1) * size;
+      const end = start + size;
+      const paginatedBlogs = allBlogs.slice(start, end);
+
+      return {
+        records: paginatedBlogs,
+        total: allBlogs.length,
+        size,
+        current: page,
+        pages: Math.ceil(allBlogs.length / size)
+      };
+    } catch (error) {
+      console.error('Error fetching user blogs:', error);
+      return {
+        records: [],
+        total: 0,
+        size,
+        current: page,
+        pages: 0
+      };
+    }
+  }
+
+  /**
+   * Get single blog by ID with comments
+   */
+  async getBlogById(blogId: number): Promise<BlogVo> {
+    try {
+      // Search for blog by numeric ID (stored in blId field or derived from doc ID)
+      const blogsRef = collection(db, COLLECTIONS.BLOGS);
+      const snapshot = await getDocs(blogsRef);
+      
+      let blogDoc: any = null;
+      let blogDocId: string = '';
+
+      snapshot.forEach((doc) => {
+        const numericId = parseInt(doc.id.slice(-8), 16);
+        if (numericId === blogId) {
+          blogDoc = doc.data();
+          blogDocId = doc.id;
+        }
+      });
+
+      if (!blogDoc) {
+        throw new Error('Blog not found');
+      }
+
+      // Increment view count
+      await updateDoc(doc(db, COLLECTIONS.BLOGS, blogDocId), {
+        views: increment(1)
+      });
+
+      // Get comments (mock for now - you can implement Firestore comments collection)
+      const comments: Comment[] = [];
+
+      return {
+        blId: blogId,
+        title: blogDoc.title,
+        content: blogDoc.content,
+        excerpt: blogDoc.excerpt,
+        imageUrl: blogDoc.images?.map((url: string) => ({ imgUrl: url })) || [],
+        videoUrl: blogDoc.videos?.map((url: string) => ({ viUrl: url })) || [],
+        userId: blogDoc.author?.id ? parseInt(blogDoc.author.id.slice(-8), 16) : 0,
+        author: {
+          nickname: blogDoc.author?.name || 'Anonymous',
+          avatar: blogDoc.author?.avatar || ''
+        },
+        createdAt: timestampToString(blogDoc.createdAt),
+        updatedAt: timestampToString(blogDoc.updatedAt),
+        play: (blogDoc.views || 0) + 1,
+        like: blogDoc.likes || 0,
+        category: blogDoc.category,
+        categoryId: blogDoc.categoryId,
+        tags: blogDoc.tags || [],
+        slug: blogDoc.slug,
+        isPublished: blogDoc.isPublished,
+        comment: comments
+      };
+    } catch (error) {
+      console.error('Error fetching blog by ID:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create a new blog post
+   */
+  async createBlog(blogData: BlogDto, userId: string, userEmail: string, userName?: string, userAvatar?: string): Promise<boolean> {
+    try {
+      const docId = generateId();
+      const now = Timestamp.now();
+
+      const blogPost = {
+        title: blogData.title,
+        content: blogData.content,
+        excerpt: blogData.excerpt || '',
+        images: blogData.imageUrl || [],
+        videos: blogData.videoUrl || [],
+        author: {
+          id: userId,
+          name: userName || userEmail,
+          avatar: userAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userName || userEmail)}&background=0d9488&color=fff`
+        },
+        date: now.toDate().toISOString(),
+        views: 0,
+        likes: 0,
+        isLiked: false,
+        isSaved: false,
+        category: getCategoryName(blogData.categoryId),
+        categoryId: blogData.categoryId,
+        tags: blogData.tags || [],
+        slug: generateSlug(blogData.title),
+        isPublished: blogData.isPublished,
+        createdAt: now,
+        updatedAt: now
+      };
+
+      await setDoc(doc(db, COLLECTIONS.BLOGS, docId), blogPost);
+      console.log('✅ Blog created in Firestore:', docId);
+      
+      return true;
+    } catch (error) {
+      console.error('❌ Error creating blog:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update blog post (PATCH - partial update)
+   */
+  async patchBlog(blogId: number, updates: Partial<BlogDto>): Promise<boolean> {
+    try {
+      // Find blog by numeric ID
+      const blogsRef = collection(db, COLLECTIONS.BLOGS);
+      const snapshot = await getDocs(blogsRef);
+      
+      let blogDocId: string = '';
+
+      snapshot.forEach((doc) => {
+        const numericId = parseInt(doc.id.slice(-8), 16);
+        if (numericId === blogId) {
+          blogDocId = doc.id;
+        }
+      });
+
+      if (!blogDocId) {
+        throw new Error('Blog not found');
+      }
+
+      const updateData: any = {
+        updatedAt: Timestamp.now()
+      };
+
+      if (updates.title) updateData.title = updates.title;
+      if (updates.content) updateData.content = updates.content;
+      if (updates.excerpt) updateData.excerpt = updates.excerpt;
+      if (updates.tags) updateData.tags = updates.tags;
+      if (updates.categoryId) {
+        updateData.categoryId = updates.categoryId;
+        updateData.category = getCategoryName(updates.categoryId);
+      }
+      if (updates.isPublished !== undefined) updateData.isPublished = updates.isPublished;
+      if (updates.imageUrl) updateData.images = updates.imageUrl;
+      if (updates.videoUrl) updateData.videos = updates.videoUrl;
+
+      if (updates.title) {
+        updateData.slug = generateSlug(updates.title);
+      }
+
+      await updateDoc(doc(db, COLLECTIONS.BLOGS, blogDocId), updateData);
+      console.log('✅ Blog updated in Firestore:', blogDocId);
+      
+      return true;
+    } catch (error) {
+      console.error('❌ Error updating blog:', error);
+      throw error;
+    }
+  }
+
+  // ==========================================================================
+  // FILE UPLOAD OPERATIONS (Firebase Storage)
+  // ==========================================================================
+
+  /**
+   * Upload image to Firebase Storage
+   */
+  async uploadFile(file: File, userId?: string): Promise<string> {
+    try {
+      const timestamp = Date.now();
+      const safeUserId = userId || 'anonymous';
+      const fileName = `blogs/${safeUserId}/${timestamp}_${file.name}`;
+      const storageRef = ref(storage, fileName);
+
+      console.log('📤 Uploading image to Firebase Storage...');
+      await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(storageRef);
+
+      console.log('✅ Image uploaded:', downloadURL);
+      return downloadURL;
+    } catch (error) {
+      console.error('❌ Error uploading image:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get user's media library
+   */
+  async getUserMedia(page: number = 1, size: number = 20, userId?: string): Promise<{
     images: string[];
     total: number;
     hasMore: boolean;
   }> {
-    return this.storage.getUserMedia(page, size);
-  }
+    try {
+      if (!userId) {
+        return { images: [], total: 0, hasMore: false };
+      }
 
-  // ============================================================================
-  // SUBSCRIPTION SERVICES
-  // ============================================================================
+      const folderPath = `blogs/${userId}`;
+      const storageRef = ref(storage, folderPath);
+      
+      const result = await listAll(storageRef);
+      const imageUrls: string[] = [];
 
-  getSubscription(userId: string): Promise<UserSubscription | null> {
-    return unifiedSubscriptionService.getUserSubscription(userId);
-  }
+      for (const itemRef of result.items) {
+        const url = await getDownloadURL(itemRef);
+        imageUrls.push(url);
+      }
 
-  async updateSubscription(userId: string, request: { planId: string; paymentMethodId?: string }): Promise<SubscriptionUpdateResult> {
-    // Map to unified service method
-    const result = await unifiedSubscriptionService.purchaseVip(
-      userId, 
-      request.planId, 
-      request.paymentMethodId === 'stripe' ? 'stripe' : 'alipay'
-    );
-    return {
-      success: result.success,
-      subscription: result.success ? {
-        id: result.orderNo || `sub_${Date.now()}`,
-        userId,
-        planId: request.planId,
-        status: 'active' as const,
-        startDate: new Date(),
-        endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Default 30 days
-        autoRenew: true,
-        paymentMethodId: request.paymentMethodId || 'alipay'
-      } : {} as UserSubscription,
-      error: result.error
-    };
-  }
+      // Sort by newest first (timestamp in filename)
+      imageUrls.sort().reverse();
 
-  cancelSubscription(userId: string, reason?: string): Promise<void> {
-    return unifiedSubscriptionService.cancelSubscription(userId, reason);
-  }
+      // Pagination
+      const start = (page - 1) * size;
+      const end = start + size;
+      const paginatedImages = imageUrls.slice(start, end);
 
-  // ============================================================================
-  // FEATURE SERVICES
-  // ============================================================================
-
-  checkFeatureAccess(userId: string, featureId: FeatureId): Promise<FeatureAccessResult> {
-    return this.feature.checkFeatureAccess(userId, featureId);
-  }
-
-  getAccessibleFeatures(userId: string): Promise<FeatureId[]> {
-    return this.feature.getUserAccessibleFeatures(userId);
-  }
-
-  getUpgradeSuggestions(userId: string, featureIds: FeatureId[]): Promise<Partial<Record<FeatureId, UpgradeSuggestion>>> {
-    return this.feature.getUpgradeSuggestions(userId, featureIds);
-  }
-
-  getSubscriptionPlans(): Promise<SubscriptionPlanResponse[]> {
-    return this.feature.getSubscriptionPlans();
-  }
-
-  // ============================================================================
-  // UTILITY & LOCATION SERVICES
-  // ============================================================================
-
-  async getLocationInfo(lat: number, lng: number): Promise<LocationInfo> {
-    const httpClient = new HttpClient(API_BASE_URL);
-    const response = await httpClient.get<{
-      code: number;
-      message: string;
-      data: LocationInfo;
-      timestamp?: number;
-    }>(`/api/v1/location?lat=${lat}&lon=${lng}`);
-    return response.data;
-  }
-
-  async getWeatherInfo(city: string): Promise<WeatherInfo> {
-    const httpClient = new HttpClient(API_BASE_URL);
-    const response = await httpClient.get<{
-      code: number;
-      message: string;
-      data: WeatherInfo;
-      timestamp?: number;
-    }>(`/app/weather/weather/realtime?cityCode=${encodeURIComponent(city)}`);
-    return response.data;
-  }
-
-  async getWeatherForecast(city: string): Promise<WeatherForecast> {
-    const httpClient = new HttpClient(API_BASE_URL);
-    const response = await httpClient.get<{
-      code: number;
-      message: string;
-      data: WeatherForecast;
-      timestamp?: number;
-    }>(`/app/weather/weather/forecast?cityCode=${encodeURIComponent(city)}`);
-    return response.data;
-  }
-
-  // ============================================================================
-  // ADDRESS & NATION MANAGEMENT
-  // ============================================================================
-
-  async getCollectedAddresses(page: number = 1, size: number = 10): Promise<{
-    records: CollectedAddress[];
-    total: number;
-    size: number;
-    current: number;
-    pages: number;
-  }> {
-    const httpClient = new HttpClient(API_BASE_URL);
-    const response = await httpClient.get<ResultIPageCollectAddress>(
-      `/app/collectAddress/getCollectAddress?page=${page}&size=${size}`
-    );
-    return response.data;
-  }
-
-  async addCollectedAddress(address: Omit<CollectedAddress, 'id' | 'userId' | 'createdAt'>): Promise<CollectedAddress> {
-    const httpClient = new HttpClient(API_BASE_URL);
-    const response = await httpClient.post<{
-      code: number;
-      message: string;
-      data: CollectedAddress;
-      timestamp?: number;
-    }>('/app/collectAddress/addCollectAddress', address);
-    return response.data;
-  }
-
-  async deleteCollectedAddress(id: number): Promise<boolean> {
-    const httpClient = new HttpClient(API_BASE_URL);
-    const response = await httpClient.delete<{
-      code: number;
-      message: string;
-      data: boolean;
-      timestamp?: number;
-    }>(`/app/collectAddress/deleteCollectAddress?id=${id}`);
-    return response.data;
-  }
-
-  async getNations(page: number = 1, size: number = 100): Promise<NationInfo[]> {
-    const httpClient = new HttpClient(API_BASE_URL);
-    const response = await httpClient.get<{
-      code: number;
-      message: string;
-      data: {
-        records: NationInfo[];
-        total: number;
-        size: number;
-        current: number;
-        pages: number;
+      return {
+        images: paginatedImages,
+        total: imageUrls.length,
+        hasMore: end < imageUrls.length
       };
-      timestamp?: number;
-    }>(`/app/nation/getNationList?page=${page}&size=${size}`);
-    return response.data.records;
+    } catch (error) {
+      console.error('Error fetching user media:', error);
+      return { images: [], total: 0, hasMore: false };
+    }
+  }
+
+  // ==========================================================================
+  // COMMENT OPERATIONS (Mock - implement Firestore comments later)
+  // ==========================================================================
+
+  async toggleCommentLike(commentId: number): Promise<boolean> {
+    // Mock implementation - return true (liked)
+    console.log('Mock: Toggle comment like', commentId);
+    return true;
+  }
+
+  async addComment(blogId: number, content: string, replyToId?: number): Promise<Comment> {
+    // Mock implementation
+    console.log('Mock: Add comment to blog', blogId, content, replyToId);
+    return {
+      id: Date.now(),
+      content,
+      createdAt: new Date().toISOString(),
+      likes: 0,
+      isLiked: false,
+      author: {
+        nickname: 'Current User',
+        avatar: ''
+      },
+      replies: []
+    };
   }
 }
 
-// Export singleton instance
-export const apiClient = new ApiClient();
+// ============================================================================
+// EXPORT SINGLETON INSTANCE
+// ============================================================================
 
-// Re-export error classes
-export { ApiError, SubscriptionRequiredError } from './api/errors';
-
-// Export all types
-export type {
-  User,
-  UserDto,
-  BlogVo,
-  BlogCommentVo,
-  BlogDto,
-  BlogPost,
-  VipOrder,
-  VipType,
-  PaymentResponse,
-  LocationInfo,
-  WeatherInfo,
-  WeatherForecast,
-  CollectedAddress,
-  NationInfo,
-  UserInfo
-} from '../types/api';
-
-// Export trip API service
-export { tripApiService } from './api/tripApiService';
+export const apiClient = new FirebaseApiClient();

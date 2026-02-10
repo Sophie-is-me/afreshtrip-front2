@@ -11,6 +11,7 @@ export interface Author {
 
 export interface BlogPost {
   id: string;
+  userId?: string;  
   title: string;
   content: string; // Full content for details view
   excerpt?: string; // Short summary for listing view
@@ -29,6 +30,7 @@ export interface BlogPost {
   isPublished: boolean;
   createdAt: string; // Creation timestamp
   updatedAt: string; // Last update timestamp
+  comments?: Comment[];  // 
 }
 
 export interface CreateBlogPostInput {

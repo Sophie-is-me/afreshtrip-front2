@@ -1,3 +1,6 @@
+// src/pages/BlogDetails.tsx
+// ✅ COMPLETE FIX: SEO URLs + String IDs + Default Avatar
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -30,7 +33,8 @@ import ImageExtension from '@tiptap/extension-image';
 import LinkExtension from '@tiptap/extension-link';
 
 const BlogDetails: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  // ✅ Get both ID and slug from URL params
+  const { id, slug } = useParams<{ id: string; slug?: string }>();
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { updatePostStatistics, getRelatedPosts, getBlogDetails, toggleCommentLike, addComment } = useBlog();
@@ -51,7 +55,6 @@ const BlogDetails: React.FC = () => {
   // Calculate reading time
   const calculateReadingTime = (html: string) => {
     const wordsPerMinute = 200;
-    // Strip HTML tags and count words
     const text = html.replace(/<[^>]*>/g, '').trim();
     const words = text.split(/\s+/).filter(w => w.length > 0).length;
     return Math.ceil(words / wordsPerMinute);
@@ -60,22 +63,47 @@ const BlogDetails: React.FC = () => {
   // Fetch blog post
   useEffect(() => {
     const fetchPost = async () => {
+      if (!id) {
+        console.error('❌ No blog ID in URL');
+        navigate('/blog');
+        return;
+      }
+
+      console.log('🔍 BlogDetails - Fetching post with ID:', id);
+      console.log('🔍 ID type:', typeof id);
+      console.log('🔍 ID length:', id.length, 'characters');
+      console.log('🔍 URL slug:', slug);
+
       try {
         setLoading(true);
 
-        const { post, comments: fetchedComments } = await getBlogDetails(id!);
-        setPost(post);
-        setIsLiked(post.isLiked || false);
-        setIsSaved(post.isSaved || false);
+        // ✅ Fetch using string ID
+        const { post: fetchedPost, comments: fetchedComments } = await getBlogDetails(id);
+        
+        console.log('✅ Post fetched:', fetchedPost.title);
+        console.log('✅ Post ID from API:', fetchedPost.id);
+        console.log('✅ Post slug:', fetchedPost.slug);
+        
+        setPost(fetchedPost);
+        setIsLiked(fetchedPost.isLiked || false);
+        setIsSaved(fetchedPost.isSaved || false);
+
+        // ✅ Update URL with slug if missing (SEO optimization)
+        if (fetchedPost.slug && slug !== fetchedPost.slug) {
+          console.log('🔄 Updating URL with correct slug:', fetchedPost.slug);
+          navigate(`/blog/${id}/${fetchedPost.slug}`, { replace: true });
+        }
 
         // Get related posts
-        const related = getRelatedPosts(post.id, post.category);
+        const related = getRelatedPosts(fetchedPost.id, fetchedPost.category);
         setRelatedPosts(related);
 
         // Set comments from API
         setComments(fetchedComments);
+        
+        console.log('✅ Page fully loaded!');
       } catch (err) {
-        console.error('Error fetching blog post:', err);
+        console.error('❌ Error fetching blog post:', err);
         i18nErrorHandler.showErrorToUser(
           err,
           { component: 'BlogDetails', action: 'fetchPost' },
@@ -93,10 +121,8 @@ const BlogDetails: React.FC = () => {
       }
     };
 
-    if (id) {
-      fetchPost();
-    }
-  }, [id, t, getBlogDetails, getRelatedPosts]);
+    fetchPost();
+  }, [id, slug, navigate, t, getBlogDetails, getRelatedPosts]);
 
   // Extract headings for table of contents after content is rendered
   useEffect(() => {
@@ -131,6 +157,7 @@ const BlogDetails: React.FC = () => {
   const handleLike = () => {
     if (!post || !id) return;
     
+    console.log('❤️ Toggling like for post:', id);
     setIsLiked(!isLiked);
     updatePostStatistics(id, { 
       likes: isLiked ? post.likes - 1 : post.likes + 1,
@@ -142,6 +169,7 @@ const BlogDetails: React.FC = () => {
   const handleSave = () => {
     if (!post || !id) return;
     
+    console.log('📌 Toggling save for post:', id);
     setIsSaved(!isSaved);
     updatePostStatistics(id, { 
       isSaved: !isSaved
@@ -155,21 +183,31 @@ const BlogDetails: React.FC = () => {
       return;
     }
 
-    if (!id) return;
+    if (!id) {
+      console.error('❌ No blog ID for comment');
+      return;
+    }
+
+    console.log('💬 Adding comment to blog ID:', id, '(type:', typeof id, ')');
+    console.log('💬 Reply to:', replyToId);
 
     try {
       // Validate and sanitize comment
       const sanitizedComment = sanitizeText(comment);
       commentSchema.parse(sanitizedComment);
 
-      // Call API to persist comment
+      // ✅ Call API with STRING ID
       const newComment = await addComment(id, sanitizedComment, replyToId);
 
       // Add the new comment to the list
       setComments(prevComments => [newComment, ...prevComments]);
       showSuccess(t('blog.commentAdded', 'Comment added successfully!'));
-    } catch (err) {
-      console.error('Failed to add comment:', err);
+      
+      console.log('✅ Comment added successfully!');
+    } catch (err: any) {
+      console.error('❌ Failed to add comment:', err);
+      console.error('   Error message:', err.message);
+      
       i18nErrorHandler.showErrorToUser(
         err,
         { component: 'BlogDetails', action: 'addComment' },
@@ -183,7 +221,6 @@ const BlogDetails: React.FC = () => {
   const handleLikeComment = async (commentId: string) => {
     try {
       const isLiked = await toggleCommentLike(commentId);
-      // Update local state optimistically
       setComments(prevComments => updateCommentLikes(prevComments, commentId, isLiked));
     } catch (err) {
       console.error('Error liking comment:', err);
@@ -229,10 +266,8 @@ const BlogDetails: React.FC = () => {
     window.print();
   };
 
-
-
   if (loading) return <LoadingSkeleton />;
-  if (!post) return null; // Should not happen
+  if (!post) return null;
 
   const currentUrl = window.location.href;
 

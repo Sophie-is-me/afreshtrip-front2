@@ -1,18 +1,15 @@
-// BlogContext.tsx - Updated to use Firebase API
-// Replace your existing BlogContext with this file
+// src/contexts/BlogContext.tsx
+// ✅ FIXED: No auto-refresh, author checks, comment support
 
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { useAuth } from './AuthContext';
 import * as blogApi from '../services/blogApi';
 import type { BlogPost, Comment, CreateBlogPostInput } from '../types/blog';
 
 interface BlogContextType {
-  // State
   blogPosts: BlogPost[];
   loading: boolean;
   error: string | null;
-  
-  // Read operations
   getAllBlogPosts: () => BlogPost[];
   getBlogPostById: (id: string) => Promise<BlogPost | null>;
   getPostById: (id: string) => BlogPost | undefined;
@@ -22,43 +19,34 @@ interface BlogContextType {
     total: number;
     hasMore: boolean;
   }>;
-  getBlogPostsByCategory: (categorySlug: string) => Promise<BlogPost[]>; // ✅ NEW
+  getBlogPostsByCategory: (categorySlug: string) => Promise<BlogPost[]>;
   getUserBlogs: (page: number, size: number) => Promise<{
     posts: BlogPost[];
     total: number;
     hasMore: boolean;
   }>;
   getRelatedPosts: (currentId: string, category: string, limit?: number) => BlogPost[];
-  
-  // Write operations
   createBlogPost: (post: CreateBlogPostInput) => Promise<string>;
   updateBlogPost: (id: string, updates: Partial<CreateBlogPostInput>) => Promise<void>;
   deleteBlogPost: (id: string) => Promise<void>;
   addNewPost: (post: BlogPost) => void;
-  
-  // Statistics
   updatePostStatistics: (id: string, stats: { 
     views?: number; 
     likes?: number; 
     isLiked?: boolean; 
     isSaved?: boolean;
   }) => void;
-  toggleLike: (postId: string) => Promise<boolean>; // ✅ NEW
-  
-  // Media
+  toggleLike: (postId: string) => Promise<boolean>;
   uploadImage: (file: File) => Promise<string>;
   getUserMediaLibrary: (page?: number, size?: number) => Promise<{
     images: string[];
     total: number;
     hasMore: boolean;
   }>;
-  
-  // Comments (mock for now)
   toggleCommentLike: (commentId: string) => Promise<boolean>;
   addComment: (blogId: string, content: string, replyToId?: string) => Promise<Comment>;
-  
-  // Refresh
   refreshBlogPosts: () => Promise<void>;
+  canUserEdit: (post: BlogPost) => boolean;
 }
 
 const BlogContext = createContext<BlogContextType | undefined>(undefined);
@@ -68,18 +56,21 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // ✅ FIX: Use ref to prevent infinite loops
+  const isInitialMount = useRef(true);
 
-  // Refresh all blog posts
+  // ✅ FIX: Stable refresh function with no dependencies
   const refreshBlogPosts = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      console.log('🔄 Refreshing blog posts from Firebase...');
+      console.log('🔄 Refreshing blog posts...');
       
       const posts = await blogApi.getAllBlogPosts();
       setBlogPosts(posts);
       
-      console.log('✅ Loaded', posts.length, 'posts from Firebase');
+      console.log('✅ Loaded', posts.length, 'posts');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load posts';
       setError(errorMessage);
@@ -87,24 +78,24 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, []); // ✅ No dependencies = stable function
 
-  // Load posts on mount
+  // ✅ FIX: Load posts ONLY on mount, NOT on every render
   useEffect(() => {
-    refreshBlogPosts();
-  }, [refreshBlogPosts]);
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      refreshBlogPosts();
+    }
+  }, []); // ✅ Empty dependency array = runs once
 
-  // Get all blog posts from state
   const getAllBlogPosts = useCallback(() => {
     return blogPosts;
   }, [blogPosts]);
 
-  // Get blog post by ID from state
   const getPostById = useCallback((id: string) => {
     return blogPosts.find(p => p.id === id);
   }, [blogPosts]);
 
-  // Get blog post by ID from Firebase
   const getBlogPostById = useCallback(async (id: string): Promise<BlogPost | null> => {
     try {
       console.log('📖 Fetching post:', id);
@@ -116,7 +107,6 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  // Get blog details with comments
   const getBlogDetails = useCallback(async (id: string): Promise<{ post: BlogPost; comments: Comment[] }> => {
     try {
       console.log('📖 Fetching blog details:', id);
@@ -127,8 +117,8 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('Post not found');
       }
 
-      // Mock comments for now (replace with real API later)
-      const comments: Comment[] = [];
+      // ✅ Use comments from post if available
+      const comments: Comment[] = (post as any).comments || [];
       
       console.log('✅ Fetched blog details');
       return { post, comments };
@@ -138,15 +128,12 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  // Get paginated blog posts
   const getBlogPostsPaginated = useCallback(async (page: number, size: number) => {
     try {
       console.log('📊 Fetching paginated posts:', { page, size });
       
-      // Get all posts first
       const allPosts = await blogApi.getAllBlogPosts();
       
-      // Calculate pagination
       const startIndex = (page - 1) * size;
       const endIndex = startIndex + size;
       const paginatedPosts = allPosts.slice(startIndex, endIndex);
@@ -168,7 +155,6 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  // ✅ NEW: Get blog posts by category
   const getBlogPostsByCategory = useCallback(async (categorySlug: string): Promise<BlogPost[]> => {
     try {
       console.log('📂 Fetching posts by category:', categorySlug);
@@ -181,7 +167,6 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  // Get user's own blogs
   const getUserBlogs = useCallback(async (page: number, size: number) => {
     try {
       if (!user) {
@@ -197,7 +182,6 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       const userPosts = await blogApi.getUserBlogPosts();
       
-      // Calculate pagination
       const startIndex = (page - 1) * size;
       const endIndex = startIndex + size;
       const paginatedPosts = userPosts.slice(startIndex, endIndex);
@@ -219,14 +203,12 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [user]);
 
-  // Get related posts
   const getRelatedPosts = useCallback((currentId: string, category: string, limit: number = 3) => {
     return blogPosts
       .filter(p => p.id !== currentId && p.category === category && p.isPublished)
       .slice(0, limit);
   }, [blogPosts]);
 
-  // Create blog post
   const createBlogPost = useCallback(async (data: CreateBlogPostInput): Promise<string> => {
     if (!user) {
       throw new Error('❌ User must be logged in to create posts');
@@ -256,8 +238,13 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [user, refreshBlogPosts]);
 
-  // Update blog post
   const updateBlogPost = useCallback(async (id: string, updates: Partial<CreateBlogPostInput>) => {
+    // ✅ Check if user can edit
+    const post = blogPosts.find(p => p.id === id);
+    if (post && !blogApi.canEditPost(post, user?.uid)) {
+      throw new Error('You are not authorized to edit this post');
+    }
+
     // Optimistic update
     setBlogPosts(prev =>
       prev.map(p => p.id === id ? { ...p, ...updates, updatedAt: new Date().toISOString() } : p)
@@ -275,10 +262,15 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await refreshBlogPosts(); // Revert on error
       throw err;
     }
-  }, [refreshBlogPosts]);
+  }, [user, blogPosts, refreshBlogPosts]);
 
-  // Delete blog post
   const deleteBlogPost = useCallback(async (id: string) => {
+    // ✅ Check if user can delete
+    const post = blogPosts.find(p => p.id === id);
+    if (post && !blogApi.canEditPost(post, user?.uid)) {
+      throw new Error('You are not authorized to delete this post');
+    }
+
     try {
       console.log('🗑️ Deleting post:', id);
       await blogApi.deleteBlogPost(id);
@@ -290,14 +282,12 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('❌ Failed to delete post:', err);
       throw err;
     }
-  }, []);
+  }, [user, blogPosts]);
 
-  // Add new post (optimistic update)
   const addNewPost = useCallback((post: BlogPost) => {
     setBlogPosts(prev => [post, ...prev]);
   }, []);
 
-  // Upload image
   const uploadImage = useCallback(async (file: File): Promise<string> => {
     if (!user) {
       throw new Error('❌ User must be logged in to upload images');
@@ -315,7 +305,6 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (err: any) {
       console.error('❌ Upload failed:', err);
       
-      // Better error messages
       if (err.code === 'storage/unauthorized') {
         throw new Error('Permission denied. Make sure you are logged in and Storage rules are updated.');
       }
@@ -324,7 +313,6 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [user]);
 
-  // Get user's media library (mock for now)
   const getUserMediaLibrary = useCallback(async (page: number = 1, size: number = 20) => {
     try {
       if (!user) {
@@ -347,7 +335,6 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [user]);
 
-  // Update post statistics
   const updatePostStatistics = useCallback((id: string, stats: {
     views?: number;
     likes?: number;
@@ -357,7 +344,6 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setBlogPosts(prev => prev.map(p => p.id === id ? { ...p, ...stats } : p));
   }, []);
 
-  // ✅ NEW: Toggle like on a post
   const toggleLike = useCallback(async (postId: string): Promise<boolean> => {
     if (!user) {
       throw new Error('User must be logged in to like posts');
@@ -390,32 +376,24 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [user]);
 
-  // Toggle comment like (mock)
   const toggleCommentLike = useCallback(async (commentId: string): Promise<boolean> => {
     console.log('Mock: Toggle comment like', commentId);
     return true;
   }, []);
 
-  // Add comment (mock)
   const addComment = useCallback(async (blogId: string, content: string, replyToId?: string): Promise<Comment> => {
     if (!user) {
       throw new Error('User must be logged in');
     }
 
-    const newComment: Comment = {
-      id: `comment_${Date.now()}`,
-      author: {
-        name: user.displayName || 'Anonymous',
-        avatar: user.photoURL || ''
-      },
-      content,
-      date: new Date().toISOString(),
-      likes: 0,
-      isLiked: false,
-      replies: []
-    };
-
+    // ✅ Use real API
+    const newComment = await blogApi.addComment(blogId, content, replyToId);
     return newComment;
+  }, [user]);
+
+  // ✅ Helper function to check if user can edit post
+  const canUserEdit = useCallback((post: BlogPost): boolean => {
+    return blogApi.canEditPost(post, user?.uid);
   }, [user]);
 
   const value: BlogContextType = {
@@ -440,7 +418,8 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
     getUserMediaLibrary,
     toggleCommentLike,
     addComment,
-    refreshBlogPosts
+    refreshBlogPosts,
+    canUserEdit
   };
 
   return <BlogContext.Provider value={value}>{children}</BlogContext.Provider>;

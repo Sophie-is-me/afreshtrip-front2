@@ -45,7 +45,7 @@ function App() {
           
           {/* Blog Routes */}
           <Route path="/blog" element={<PageErrorBoundary pageName="blog"><BlogProvider><SectionErrorBoundary sectionName="maincontent"><Blog /></SectionErrorBoundary></BlogProvider></PageErrorBoundary>} />
-          <Route path="/blog/:id" element={<PageErrorBoundary pageName="blogdetails"><BlogProvider><SectionErrorBoundary sectionName="maincontent"><BlogDetails /></SectionErrorBoundary></BlogProvider></PageErrorBoundary>} />
+          <Route path="/blog/:id/:slug?" element={<PageErrorBoundary pageName="blogdetails"><BlogProvider><SectionErrorBoundary sectionName="maincontent"><BlogDetails /></SectionErrorBoundary></BlogProvider></PageErrorBoundary>} />
           <Route path="/blog/publish-success" element={<PageErrorBoundary pageName="publishsuccess"><BlogProvider><PublishSuccess /></BlogProvider></PageErrorBoundary>} />
           <Route path="/blog/create" element={<PageErrorBoundary pageName="blogeditor"><BlogProvider><ProtectedRoute><BlogEditor /></ProtectedRoute></BlogProvider></PageErrorBoundary>} />
           <Route path="/blog-editor" element={<PageErrorBoundary pageName="blogeditor"><BlogProvider><ProtectedRoute><BlogEditor /></ProtectedRoute></BlogProvider></PageErrorBoundary>} />

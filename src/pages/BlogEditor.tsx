@@ -29,6 +29,7 @@ import LinkExtension from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
 import { Video } from '../extensions/VideoExtension';
 import { generateExcerpt } from '../utils/tiptapUtils';
+import { extractMediaFromContent } from '../utils/extractMediaFromContent';
 
 interface BlogFormValues {
   title: string;
@@ -62,7 +63,7 @@ const BlogEditor: React.FC = () => {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showPublishPrompt, setShowPublishPrompt] = useState(false);
   const pendingUploadsRef = useRef<Map<string, File>>(new Map());
-
+  const lastSavedValuesRef = useRef<string>('');
   // Refs
   const titleTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -195,8 +196,27 @@ const BlogEditor: React.FC = () => {
   }, []);
 
   // --- AUTO SAVE ---
-  useEffect(() => {
+ useEffect(() => {
     if (!isDirty || !postId) return;
+
+    // ✅ FIX: Create a stable string representation of values
+    const currentValuesString = JSON.stringify({
+      title: debouncedValues.title,
+      content: debouncedValues.content,
+      categoryId: debouncedValues.categoryId,
+      tags: debouncedValues.tags,
+      isPublished: debouncedValues.isPublished,
+      featuredImage: debouncedValues.featuredImage
+    });
+
+    // ✅ FIX: Only save if values actually changed
+    if (currentValuesString === lastSavedValuesRef.current) {
+      console.log('⏭️ Skipping auto-save: No changes detected');
+      return;
+    }
+
+    console.log('💾 Auto-saving changes...');
+    lastSavedValuesRef.current = currentValuesString;
 
     const autoSave = async () => {
       setSaveStatus('saving');
@@ -253,9 +273,19 @@ const BlogEditor: React.FC = () => {
           videos: [],
           isPublished: debouncedValues.isPublished,
         });
+        
         setSaveStatus('saved');
-        reset(getValues()); // Reset dirty state
+        console.log('✅ Auto-save complete!');
+        
+        // ✅ FIX: Mark form as clean WITHOUT triggering re-render loop
+        setTimeout(() => {
+          reset(getValues(), { keepValues: true, keepDirty: false });
+        }, 100);
+        
       } catch (error) {
+        console.error('❌ Auto-save error:', error);
+        lastSavedValuesRef.current = ''; // Reset on error to allow retry
+        
         if (error instanceof SubscriptionRequiredError) {
           setSaveStatus('forbidden');
         } else {
@@ -263,8 +293,10 @@ const BlogEditor: React.FC = () => {
         }
       }
     };
+    
     autoSave();
-  }, [debouncedValues, postId, isDirty, updateBlogPost, uploadImage, reset, getValues]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedValues, postId, isDirty]);
 
   // --- HANDLERS ---
   const handlePhotoInsert = (src: string, file?: File) => {
@@ -284,88 +316,107 @@ const BlogEditor: React.FC = () => {
     e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px`;
   };
 
-  const onPublishToggle = async () => {
-    if (!hasFeatureAccess) {
-      setShowUpgradeModal(true);
-      return;
+const onPublishToggle = async () => {
+  // ✅ Don't block immediately - let backend decide
+  const newValue = !getValues('isPublished');
+  setValue('isPublished', newValue, { shouldDirty: true }); // Optimistic
+
+  if (postId) {
+    try {
+      await updateBlogPost(postId, { isPublished: newValue });
+      showSuccess(newValue ? t('blog.published') : t('blog.draftSaved', 'Reverted to draft'));
+    } catch (err) {
+      setValue('isPublished', !newValue); // Revert
+      // ✅ Only show modal on actual subscription error from backend
+      if (err instanceof SubscriptionRequiredError) {
+        setShowUpgradeModal(true);
+      } else {
+        showError('Failed to update publish status');
+      }
     }
-    const newValue = !getValues('isPublished');
-    setValue('isPublished', newValue, { shouldDirty: true }); // Optimistic
+  }
+};
+
+const handlePublishNow = async () => {
+  try {
+    // ✅ Don't check hasFeatureAccess here - let backend decide
+    setValue('isPublished', true, { shouldDirty: true });
+    await handleSubmit(onSave)();
+    showSuccess(t('blog.published', 'Published successfully!'));
+    setShowPublishPrompt(false);
+    setTimeout(() => navigate('/blog'), 500);
+  } catch (error) {
+    console.error('❌ Publish error:', error);
+    // ✅ Only show subscription modal if backend says so
+    if (error instanceof SubscriptionRequiredError) {
+      setShowUpgradeModal(true);
+    }
+  }
+};
+
+const onSave = async (data: BlogFormValues) => {
+  // ❌ REMOVE THIS - Don't block with subscription modal immediately
+  // if (!hasFeatureAccess) {
+  //   setShowUpgradeModal(true);
+  //   return;
+  // }
+
+  setSaveStatus('saving');
+  try {
+    // ✅ Extract media from TipTap content
+    const { images: contentImages, videos: contentVideos } = extractMediaFromContent(data.content);
+    
+    // ✅ Combine featured image with content images
+    const allImages = data.featuredImage 
+      ? [data.featuredImage, ...contentImages.filter(img => img !== data.featuredImage)]
+      : contentImages;
+    
+    console.log('📦 Preparing blog post data:');
+    console.log('  Images:', allImages);
+    console.log('  Videos:', contentVideos);
 
     if (postId) {
-      try {
-        await updateBlogPost(postId, { isPublished: newValue });
-        showSuccess(newValue ? t('blog.published') : t('blog.draftSaved', 'Reverted to draft'));
-      } catch (err) {
-        setValue('isPublished', !newValue); // Revert
-        if (err instanceof SubscriptionRequiredError) setShowUpgradeModal(true);
-      }
+      // Update existing post
+      await updateBlogPost(postId, {
+        title: data.title,
+        content: data.content,
+        excerpt: data.excerpt || generateExcerpt(data.content, 150),
+        tags: data.tags,
+        categoryId: data.categoryId,
+        images: allImages,  // ✅ All images from content
+        videos: contentVideos,  // ✅ All videos from content
+        isPublished: data.isPublished
+      });
+      showSuccess(t('blog.updated', 'Post updated successfully!'));
+    } else {
+      // Create new post
+      const newId = await createBlogPost({
+        title: data.title,
+        content: data.content,
+        excerpt: data.excerpt || generateExcerpt(data.content, 150),
+        tags: data.tags,
+        categoryId: data.categoryId,
+        images: allImages,  // ✅ All images from content
+        videos: contentVideos,  // ✅ All videos from content
+        isPublished: data.isPublished
+      });
+      setPostId(newId);
+      showSuccess(t('blog.created', 'Post created successfully!'));
     }
-  };
-
-  const handlePublishNow = async () => {
-    try {
-      if (!hasFeatureAccess) {
-        setShowUpgradeModal(true);
-        return;
-      }
-      setValue('isPublished', true, { shouldDirty: true });
-      await handleSubmit(onSave)();
-      showSuccess(t('blog.published', 'Published successfully!'));
-      setShowPublishPrompt(false);
-      setTimeout(() => navigate('/blog'), 500);
-    } catch (error) {
-      if (error instanceof SubscriptionRequiredError) {
-        setShowUpgradeModal(true);
-      }
-    }
-  };
-
-  const onSave = async (data: BlogFormValues) => {
-    if (!hasFeatureAccess) {
+    setSaveStatus('saved');
+  } catch (error) {
+    console.error('❌ Save error:', error);
+    setSaveStatus('error');
+    
+    // ✅ Only show subscription modal if it's actually a subscription error
+    if (error instanceof SubscriptionRequiredError) {
+      setSaveStatus('forbidden');
       setShowUpgradeModal(true);
-      return;
+    } else {
+      showError(t('common.errorSaving', 'Failed to save post'));
     }
-
-    setSaveStatus('saving');
-    try {
-      if (postId) {
-        await updateBlogPost(postId, {
-          title: data.title,
-          content: data.content,
-          excerpt: data.excerpt || generateExcerpt(data.content, 150),
-          tags: data.tags,
-          categoryId: data.categoryId,
-          images: data.featuredImage ? [data.featuredImage] : [],
-          videos: [],
-          isPublished: data.isPublished
-        });
-        showSuccess(t('blog.updated', 'Post updated successfully!'));
-      } else {
-        const newId = await createBlogPost({
-          title: data.title,
-          content: data.content,
-          excerpt: data.excerpt || generateExcerpt(data.content, 150),
-          tags: data.tags,
-          categoryId: data.categoryId,
-          images: data.featuredImage ? [data.featuredImage] : [],
-          videos: [],
-          isPublished: data.isPublished
-        });
-        setPostId(newId);
-        showSuccess(t('blog.created', 'Post created successfully!'));
-      }
-      setSaveStatus('saved');
-    } catch (error) {
-      setSaveStatus('error');
-      if (error instanceof SubscriptionRequiredError) {
-        setSaveStatus('forbidden');
-        setShowUpgradeModal(true);
-      } else {
-        showError(t('common.errorSaving', 'Failed to save post'));
-      }
-    }
-  };
+  }
+};
 
   return (
     <div className="min-h-screen bg-white flex flex-col">

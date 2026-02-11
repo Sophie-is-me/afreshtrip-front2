@@ -1,195 +1,288 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import React from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { FiCheckCircle, FiXCircle, FiArrowRight } from 'react-icons/fi';
-import { unifiedSubscriptionService } from '../services/subscription/UnifiedSubscriptionService';
-import { useAuth } from '../contexts/AuthContext';
-import { useSnackbar } from '../contexts/SnackbarContext';
-import { i18nErrorHandler } from '../utils/i18nErrorHandler';
+import Header from '../components/Header';
+import Footer from '../components/Footer';
+import { CheckCircleIcon } from '@heroicons/react/24/solid';
+import { ClockIcon, CreditCardIcon, DocumentTextIcon, CalendarIcon } from '@heroicons/react/24/outline';
+
+interface LocationState {
+  planId: string;
+  planName?: string;
+  planPrice?: number;
+  paymentMethod: string;
+  orderNumber: string;
+  // ✅ Real backend order data
+  orderData?: {
+    id: number;
+    userId: number;
+    vipTypeId: number;
+    orderNo: string;
+    amount: number;
+    status: number;
+    payType: number;
+    startTime: string;
+    endTime: string;
+    createAt: string | null;
+    updateAt: string | null;
+    payQrCode: string;
+  };
+  vipTypeId?: number;
+  startTime?: string;
+  endTime?: string;
+}
 
 const PaymentResult: React.FC = () => {
   const { t } = useTranslation();
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { user, refreshUserProfile } = useAuth();
-  
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
-  const { showSuccess } = useSnackbar();
-  
-  // Prevent double-firing in strict mode
-  const processingRef = useRef(false);
+  const location = useLocation();
+  const state = location.state as LocationState;
 
-  useEffect(() => {
-    const verifyPayment = async () => {
-      const orderNo = searchParams.get('orderNo');
-      const outTradeNo = searchParams.get('out_trade_no'); // Alipay sometimes uses this param name
-      
-      const transactionId = orderNo || outTradeNo;
-
-      if (!transactionId) {
-        i18nErrorHandler.showErrorToUser(
-          new Error('No order number found'),
-          { component: 'PaymentResult', action: 'verifyPayment' },
-          [
-            {
-              label: t('common.retry'),
-              onClick: () => window.location.reload(),
-              style: 'primary'
-            }
-          ],
-          t.bind(t)
-        );
-        setStatus('error');
-        return;
-      }
-
-      if (!user) {
-        // If user is not logged in (session lost during redirect), redirect to login
-        // In a real app, you might store the orderNo in local storage and check after login
-        i18nErrorHandler.showErrorToUser(
-          new Error('Please log in to verify payment'),
-          { component: 'PaymentResult', action: 'verifyPayment' },
-          [
-            {
-              label: t('common.login'),
-              onClick: () => navigate('/login'),
-              style: 'primary'
-            }
-          ],
-          t.bind(t)
-        );
-        setStatus('error');
-        return;
-      }
-
-      if (processingRef.current) return;
-      processingRef.current = true;
-
-      try {
-        // Start polling the backend using the new unified payment system
-        const result = await unifiedSubscriptionService.handlePaymentReturn(user.uid, transactionId);
-
-        if (result.success) {
-          setStatus('success');
-          // Refresh the global user profile/auth context so the UI updates immediately
-          await refreshUserProfile();
-          showSuccess(t('payment.success.title', 'Payment Successful!')); 
-        } else {
-          i18nErrorHandler.showErrorToUser(
-            new Error(result.error || 'Payment verification failed'),
-            { component: 'PaymentResult', action: 'verifyPayment' },
-            [
-              {
-                label: t('common.retry'),
-                onClick: () => window.location.reload(),
-                style: 'primary'
-              }
-            ],
-            t.bind(t)
-          );
-          setStatus('error');
-        }
-      } catch (err) {
-        console.error(err);
-        i18nErrorHandler.showErrorToUser(
-          err,
-          { component: 'PaymentResult', action: 'verifyPayment' },
-          [
-            {
-              label: t('common.retry'),
-              onClick: () => window.location.reload(),
-              style: 'primary'
-            }
-          ],
-          t.bind(t)
-        );
-        setStatus('error');
-      }
-    };
-
-    if (user) {
-      verifyPayment();
+  // Redirect if accessed directly without payment
+  React.useEffect(() => {
+    if (!state?.orderNumber) {
+      navigate('/pricing');
     }
-  }, [searchParams, user, t, refreshUserProfile]);
+  }, [state, navigate]);
 
-  const handleContinue = () => {
-    // Redirect to the blog editor or dashboard
-    navigate('/blog-editor?new=true'); 
+  const handleGoToDashboard = () => {
+    navigate('/dashboard');
   };
 
-  const handleRetry = () => {
+  const handleViewOrders = () => {
     navigate('/subscription');
   };
 
+  // ✅ Use real backend data
+  const orderData = state?.orderData;
+  const orderNumber = orderData?.orderNo || state?.orderNumber || 'N/A';
+  const amount = orderData?.amount || state?.planPrice || 0;
+  const vipTypeId = orderData?.vipTypeId || state?.vipTypeId;
+  const startTime = orderData?.startTime || state?.startTime;
+  const endTime = orderData?.endTime || state?.endTime;
+
+  // Format dates
+  const formatDate = (dateString: string | undefined) => {
+    if (!dateString) return 'N/A';
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    } catch {
+      return dateString;
+    }
+  };
+
+  const formatDateTime = (dateString: string | undefined) => {
+    if (!dateString) {
+      return new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch {
+      return dateString;
+    }
+  };
+
+  // Get plan name from vipTypeId
+  const getPlanName = (vipTypeId: number | undefined): string => {
+    const planNames: Record<number, string> = {
+      1: 'Week',
+      2: 'Month',
+      3: 'Season',
+      4: 'Year'
+    };
+    return vipTypeId ? planNames[vipTypeId] : state?.planName || 'N/A';
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="bg-white max-w-md w-full rounded-2xl shadow-xl p-8 text-center">
-        
-        {/* LOADING STATE */}
-        {status === 'loading' && (
-          <div className="py-12 flex flex-col items-center">
-            <div className="relative">
-              <div className="w-16 h-16 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" />
+    <div className="min-h-screen bg-gradient-to-b from-green-50 to-white">
+      <Header />
+      
+      <div className="pt-24 pb-16 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-2xl mx-auto">
+          {/* Success Icon */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-24 h-24 bg-green-100 rounded-full mb-6 animate-bounce">
+              <CheckCircleIcon className="w-16 h-16 text-green-600" />
             </div>
-            <h2 className="mt-6 text-xl font-semibold text-gray-900">
-              {t('payment.verifying', 'Verifying Payment...')}
-            </h2>
-            <p className="mt-2 text-gray-500">
-              {t('payment.waitMessage', 'Please wait while we confirm your transaction.')}
+            <h1 className="text-4xl font-bold text-slate-900 mb-4">
+              {t('payment.success.title', 'Your Order Successfully Created')}
+            </h1>
+            <p className="text-lg text-slate-600">
+              {t('payment.success.subtitle', 'Thank you for your purchase! Your subscription is now active.')}
             </p>
           </div>
-        )}
 
-        {/* SUCCESS STATE */}
-        {status === 'success' && (
-          <div className="py-8 flex flex-col items-center">
-            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-6 text-green-600">
-              <FiCheckCircle className="w-10 h-10" />
-            </div>
-            <h2 className="text-2xl font-bold text-gray-900">
-              {t('payment.success.title', 'Payment Successful!')}
+          {/* Order Details Card */}
+          <div className="bg-white rounded-2xl shadow-lg p-8 mb-8">
+            <h2 className="text-xl font-semibold text-slate-900 mb-6">
+              {t('payment.success.orderDetails', 'Order Details')}
             </h2>
-            <p className="mt-2 text-gray-600 mb-8">
-              {t('payment.success.message', 'Your subscription is now active. You have full access to all premium features.')}
-            </p>
+
+            <div className="space-y-4">
+              {/* Order Number */}
+              <div className="flex items-start gap-4 p-4 bg-slate-50 rounded-lg">
+                <DocumentTextIcon className="w-6 h-6 text-teal-600 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm text-slate-500 mb-1">
+                    {t('payment.success.orderNumber', 'Order Number')}
+                  </p>
+                  <p className="font-semibold text-slate-900 font-mono">
+                    #{orderNumber}
+                  </p>
+                </div>
+              </div>
+
+              {/* Plan Details */}
+              <div className="flex items-start gap-4 p-4 bg-slate-50 rounded-lg">
+                <CreditCardIcon className="w-6 h-6 text-teal-600 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm text-slate-500 mb-1">
+                    {t('payment.success.subscriptionPlan', 'Subscription Plan')}
+                  </p>
+                  <p className="font-semibold text-slate-900">
+                    {getPlanName(vipTypeId)}
+                    {vipTypeId && (
+                      <span className="ml-2 text-xs bg-teal-100 text-teal-700 px-2 py-1 rounded">
+                        VIP Type {vipTypeId}
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              {/* Payment Method */}
+              <div className="flex items-start gap-4 p-4 bg-slate-50 rounded-lg">
+                <CreditCardIcon className="w-6 h-6 text-teal-600 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm text-slate-500 mb-1">
+                    {t('payment.success.paymentMethod', 'Payment Method')}
+                  </p>
+                  <p className="font-semibold text-slate-900">
+                    {state?.paymentMethod || 'Alipay'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Subscription Period */}
+              {startTime && endTime && (
+                <div className="flex items-start gap-4 p-4 bg-slate-50 rounded-lg">
+                  <CalendarIcon className="w-6 h-6 text-teal-600 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm text-slate-500 mb-1">
+                      {t('payment.success.subscriptionPeriod', 'Subscription Period')}
+                    </p>
+                    <p className="font-semibold text-slate-900">
+                      {formatDate(startTime)} → {formatDate(endTime)}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Payment Date */}
+              <div className="flex items-start gap-4 p-4 bg-slate-50 rounded-lg">
+                <ClockIcon className="w-6 h-6 text-teal-600 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm text-slate-500 mb-1">
+                    {t('payment.success.date', 'Payment Date')}
+                  </p>
+                  <p className="font-semibold text-slate-900">
+                    {formatDateTime(orderData?.createAt || undefined)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Amount */}
+              <div className="flex items-center justify-between p-4 bg-teal-50 border-2 border-teal-200 rounded-lg">
+                <p className="text-slate-700 font-medium">
+                  {t('payment.success.total', 'Total Amount')}
+                </p>
+                <p className="text-2xl font-bold text-teal-600">
+                  ${amount}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* What's Next */}
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-8">
+            <h3 className="font-semibold text-blue-900 mb-3">
+              {t('payment.success.whatsNext', "What's Next?")}
+            </h3>
+            <ul className="space-y-2 text-blue-800">
+              <li className="flex items-start gap-2">
+                <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                <span>{t('payment.success.step1', 'A confirmation email has been sent to your inbox')}</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                <span>{t('payment.success.step2', 'Your subscription is now active and ready to use')}</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                <span>{t('payment.success.step3', 'Access all premium features from your dashboard')}</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* Debug Info (Remove in production) */}
+          {process.env.NODE_ENV === 'development' && orderData && (
+            <div className="bg-slate-900 text-white rounded-xl p-6 mb-8 font-mono text-xs">
+              <p className="text-slate-400 mb-2">Backend Response (Dev Only):</p>
+              <pre className="whitespace-pre-wrap break-all">
+                {JSON.stringify(orderData, null, 2)}
+              </pre>
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="space-y-4">
             <button
-              onClick={handleContinue}
-              className="w-full bg-black text-white py-3 rounded-full font-medium hover:bg-gray-800 transition-transform active:scale-95 flex items-center justify-center gap-2"
+              onClick={handleGoToDashboard}
+              className="w-full py-4 bg-teal-600 text-white rounded-xl font-semibold hover:bg-teal-700 transition-all shadow-lg"
             >
-              {t('payment.continue', 'Start Creating')} <FiArrowRight />
+              {t('payment.success.goToDashboard', 'Go to Dashboard')}
+            </button>
+
+            <button
+              onClick={handleViewOrders}
+              className="w-full py-4 border-2 border-slate-300 text-slate-700 rounded-xl font-semibold hover:bg-slate-50 transition-all"
+            >
+              {t('payment.success.viewSubscription', 'View Subscription Details')}
+            </button>
+
+            <button
+              onClick={() => navigate('/')}
+              className="w-full py-3 text-slate-600 hover:text-slate-900 transition-colors"
+            >
+              {t('payment.success.backToHome', 'Back to Home')}
             </button>
           </div>
-        )}
-
-        {/* ERROR STATE */}
-        {status === 'error' && (
-          <div className="py-8 flex flex-col items-center">
-            <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mb-6 text-red-600">
-              <FiXCircle className="w-10 h-10" />
-            </div>
-            <h2 className="text-2xl font-bold text-gray-900">
-              {t('payment.failed.title', 'Payment Failed')}
-            </h2>
-            <p className="mt-2 text-gray-600 mb-8">
-              {t('payment.error.verificationFailed', 'Payment verification failed. Please try again or contact support.')}
-            </p>
-            <div className="flex flex-col gap-3 w-full">
-              <button
-                onClick={handleRetry}
-                className="w-full bg-black text-white py-3 rounded-full font-medium hover:bg-gray-800 transition-colors"
-              >
-                {t('payment.retry', 'Try Again')}
-              </button>
-              <button
-                onClick={() => navigate('/')}
-                className="w-full py-3 text-gray-600 font-medium hover:bg-gray-50 rounded-full transition-colors"
-              >
-                {t('common.cancel', 'Cancel')}
-              </button>
-            </div>
-          </div>
-        )}
+        </div>
       </div>
+
+      <Footer />
     </div>
   );
 };

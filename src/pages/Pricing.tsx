@@ -11,6 +11,7 @@ interface PricingPlan {
   price: number;
   period: string;
   billingCycle: 'week' | 'month' | 'season' | 'year';
+  vipTypeId: number; // ✅ Added vipTypeId
   popular?: boolean;
   features: string[];
   savings?: string;
@@ -27,48 +28,60 @@ const Pricing: React.FC = () => {
       id: 'week',
       name: t('pricing.week', 'Week'),
       price: 19,
-      period: t('pricing.perWeek', ''),
+      period: t('pricing.perWeek', 'Per week'),
       billingCycle: 'week',
+      vipTypeId: 1, // ✅ Week = 1
       features: [
-        t('Per week'),
-     
+        t('pricing.features.unlimitedTrips', 'Unlimited trip planning'),
+        t('pricing.features.aiRecommendations', 'AI-powered recommendations'),
+        t('pricing.features.offlineAccess', 'Offline access'),
+        t('pricing.features.prioritySupport', 'Priority support'),
       ]
     },
     {
       id: 'month',
       name: t('pricing.month', 'Month'),
       price: 39,
-      period: t('pricing.perMonth', ''),
+      period: t('pricing.perMonth', 'Per month'),
       billingCycle: 'month',
+      vipTypeId: 2, // ✅ Month = 2
       popular: true,
       savings: t('pricing.save30', 'Save 30%'),
       features: [
-        t('Per month'),
-     
+        t('pricing.features.allWeekFeatures', 'All Week features'),
+        t('pricing.features.advancedAnalytics', 'Advanced analytics'),
+        t('pricing.features.teamCollaboration', 'Team collaboration'),
+        t('pricing.features.customBranding', 'Custom branding'),
       ]
     },
     {
       id: 'season',
       name: t('pricing.season', 'Season'),
       price: 89,
-      period: t('pricing.perMonth', ''),
+      period: t('pricing.perMonth', 'Per month'),
       billingCycle: 'season',
+      vipTypeId: 3, // ✅ Season = 3
       savings: t('pricing.save40', 'Save 40%'),
       features: [
-        t('Per season'),
-     
+        t('pricing.features.allMonthFeatures', 'All Month features'),
+        t('pricing.features.dedicatedManager', 'Dedicated account manager'),
+        t('pricing.features.apiAccess', 'API access'),
+        t('pricing.features.whiteLabel', 'White-label options'),
       ]
     },
     {
       id: 'year',
       name: t('pricing.year', 'Year'),
       price: 199,
-      period: t('pricing.perMonth', ''),
+      period: t('pricing.perMonth', 'Per month'),
       billingCycle: 'year',
+      vipTypeId: 4, // ✅ Year = 4
       savings: t('pricing.save50', 'Save 50%'),
       features: [
-        t('Per year'),
-       
+        t('pricing.features.allSeasonFeatures', 'All Season features'),
+        t('pricing.features.lifetimeUpdates', 'Lifetime updates'),
+        t('pricing.features.vipSupport', 'VIP support'),
+        t('pricing.features.earlyAccess', 'Early access to new features'),
       ]
     }
   ];
@@ -78,9 +91,24 @@ const Pricing: React.FC = () => {
   };
 
   const handleUpdatePlan = (planId: string) => {
-    // TODO: Integrate with your payment system
-    console.log('Updating to plan:', planId);
-    navigate('/payment/method', { state: { planId } });
+    const selectedPlanData = plans.find(p => p.id === planId);
+    
+    console.log('✅ Plan selected:', {
+      planId,
+      vipTypeId: selectedPlanData?.vipTypeId,
+      name: selectedPlanData?.name,
+      price: selectedPlanData?.price
+    });
+    
+    // Navigate to payment method selection with all plan details
+    navigate('/payment/method', { 
+      state: { 
+        planId: planId,
+        planName: selectedPlanData?.name,
+        planPrice: selectedPlanData?.price,
+        vipTypeId: selectedPlanData?.vipTypeId // ✅ Pass vipTypeId
+      } 
+    });
   };
 
   return (

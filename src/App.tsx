@@ -1,3 +1,5 @@
+// Updated App.tsx with Car Rental Routes
+
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -14,10 +16,10 @@ import BlogEditor from './pages/BlogEditor';
 import Profile from './pages/Profile';
 import Subscription from './pages/Subscription';
 import Pricing from './pages/Pricing';
-import PaymentMethod from './pages/PaymentMethod'; // ✅ NEW
-import CardPayment from './pages/CardPayment'; // ✅ NEW
-import AlipayPayment from './pages/AlipayPayment'; // ✅ NEW
-import PaymentSuccess from './pages/PaymentSuccess'; // ✅ NEW
+import PaymentMethod from './pages/PaymentMethod';
+import CardPayment from './pages/CardPayment';
+import AlipayPayment from './pages/AlipayPayment';
+import PaymentSuccess from './pages/PaymentSuccess';
 import Trips from './pages/Trips';
 import Notifications from './pages/Notifications';
 import Support from './pages/Support';
@@ -32,6 +34,8 @@ import Accessibility from './pages/Accessibility';
 import Dashboard from './pages/Dashboard';
 import NotFound from './pages/NotFound';
 import PaymentResult from './pages/PaymentResult';
+import CarRentals from './pages/CarRentals';
+import CarRentalDetails from './pages/CarRentalDetails';
 
 function App() {
   return (
@@ -50,6 +54,10 @@ function App() {
           <Route path="/blog/create" element={<PageErrorBoundary pageName="blogeditor"><BlogProvider><ProtectedRoute><BlogEditor /></ProtectedRoute></BlogProvider></PageErrorBoundary>} />
           <Route path="/blog-editor" element={<PageErrorBoundary pageName="blogeditor"><BlogProvider><ProtectedRoute><BlogEditor /></ProtectedRoute></BlogProvider></PageErrorBoundary>} />
           
+          {/* ✅ NEW: Car Rental Routes */}
+          <Route path="/car-rentals" element={<PageErrorBoundary pageName="carrentals"><CarRentals /></PageErrorBoundary>} />
+          <Route path="/car-rentals/:id" element={<PageErrorBoundary pageName="carrentaldetails"><CarRentalDetails /></PageErrorBoundary>} />
+          
           {/* User Pages */}
           <Route path="/profile" element={<PageErrorBoundary pageName="profile"><Profile /></PageErrorBoundary>} />
           <Route path="/subscription" element={<PageErrorBoundary pageName="subscription"><Subscription /></PageErrorBoundary>} />
@@ -57,10 +65,10 @@ function App() {
           
           {/* Pricing & Payment Routes */}
           <Route path="/pricing" element={<PageErrorBoundary pageName="pricing"><Pricing /></PageErrorBoundary>} />
-          <Route path="/payment/method" element={<PageErrorBoundary pageName="paymentmethod"><PaymentMethod /></PageErrorBoundary>} /> {/* ✅ NEW */}
-          <Route path="/payment/card" element={<PageErrorBoundary pageName="cardpayment"><CardPayment /></PageErrorBoundary>} /> {/* ✅ NEW */}
-          <Route path="/payment/alipay" element={<PageErrorBoundary pageName="alipaypayment"><AlipayPayment /></PageErrorBoundary>} /> {/* ✅ NEW */}
-          <Route path="/payment/success" element={<PageErrorBoundary pageName="paymentsuccess"><PaymentSuccess /></PageErrorBoundary>} /> {/* ✅ NEW */}
+          <Route path="/payment/method" element={<PageErrorBoundary pageName="paymentmethod"><PaymentMethod /></PageErrorBoundary>} />
+          <Route path="/payment/card" element={<PageErrorBoundary pageName="cardpayment"><CardPayment /></PageErrorBoundary>} />
+          <Route path="/payment/alipay" element={<PageErrorBoundary pageName="alipaypayment"><AlipayPayment /></PageErrorBoundary>} />
+          <Route path="/payment/success" element={<PageErrorBoundary pageName="paymentsuccess"><PaymentSuccess /></PageErrorBoundary>} />
           <Route path="/payment/result" element={<PageErrorBoundary pageName="paymentresult"><PaymentResult /></PageErrorBoundary>} />
           
           {/* Other Pages */}

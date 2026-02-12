@@ -3,12 +3,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FunnelIcon, AdjustmentsHorizontalIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { FunnelIcon, AdjustmentsHorizontalIcon, XMarkIcon, PlusCircleIcon } from '@heroicons/react/24/outline';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import CarSearchBar from '../components/trip/CarSearchBar';
 import CarCard from '../components/trip/CarCard';
 import Pagination from '../components/Pagination';
+import BecomeHostModal from '../components/trip/BecomeHostModal';
 import { mockCars, filterCars, sortCars } from '../data/mockCars';
 import { type Car, type CarFilters } from '../types/car';
 
@@ -18,6 +19,7 @@ const CarRentals: React.FC = () => {
   const [filteredCars, setFilteredCars] = useState<Car[]>(mockCars);
   const [currentPage, setCurrentPage] = useState(1);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [showHostModal, setShowHostModal] = useState(false);
   const [sortBy, setSortBy] = useState('popular');
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
 
@@ -229,14 +231,25 @@ const CarRentals: React.FC = () => {
       </div>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            {t('trips.availableCars') || 'Available Cars'}
-          </h1>
-          <p className="text-gray-600">
-            {filteredCars.length} {t('trips.carsAvailable') || 'cars available'}
-          </p>
+        {/* Header with Become a Host Button */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              {t('trips.availableCars') || 'Available Cars'}
+            </h1>
+            <p className="text-gray-600">
+              {filteredCars.length} {t('trips.carsAvailable') || 'cars available'}
+            </p>
+          </div>
+          
+          {/* ✅ Become a Host Button */}
+          <button
+            onClick={() => setShowHostModal(true)}
+            className="group flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-teal-600 to-teal-500 text-white hover:from-teal-700 hover:to-teal-600 rounded-xl transition-all font-semibold shadow-lg hover:shadow-xl transform hover:scale-105"
+          >
+            <PlusCircleIcon className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
+            {t('trips.becomeHost') || 'Become a Host'}
+          </button>
         </div>
 
         {/* Mobile Filter Button & Sort */}
@@ -402,6 +415,12 @@ const CarRentals: React.FC = () => {
           </div>
         </div>
       </main>
+
+      {/* ✅ Become a Host Modal */}
+      <BecomeHostModal
+        isOpen={showHostModal}
+        onClose={() => setShowHostModal(false)}
+      />
 
       <Footer />
     </div>

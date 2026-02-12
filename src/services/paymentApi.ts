@@ -1,20 +1,15 @@
 // src/services/paymentApi.ts
-// Complete Alipay Payment Integration with Backend
+// Payment API Service - Fixed for actual backend response structure
 
-import { auth } from '../../lib/firebase/client';
+const API_BASE_URL = 'http://192.168.10.243:9000/web';
 
-// ✅ Use your actual API URL
-const API_BASE_URL =  'http://192.168.10.243:9000/web';
-
-// VIP Type Code mapping (for backend request)
 const VIP_TYPE_CODE_MAPPING: Record<string, string> = {
-  'week': 'WEEK',
-  'month': 'MONTH',
-  'season': 'SEASON',
-  'year': 'YEAR'
+  'week': 'VIP_WEEK',
+  'month': 'VIP_MONTH',
+  'season': 'VIP_QUARTER',
+  'year': 'VIP_YEAR'
 };
 
-// VIP Type ID mapping (from backend response)
 const VIP_TYPE_ID_MAPPING: Record<string, number> = {
   'week': 1,
   'month': 2,
@@ -22,12 +17,59 @@ const VIP_TYPE_ID_MAPPING: Record<string, number> = {
   'year': 4
 };
 
-// Plan pricing
 const PLAN_PRICING: Record<string, number> = {
   'week': 19,
   'month': 39,
   'season': 89,
   'year': 199
+};
+
+// ============================================================================
+// AUTH TOKEN
+// ============================================================================
+
+const getAuthToken = (): string => {
+  const token = localStorage.getItem('token') ||
+                localStorage.getItem('authToken') ||
+                localStorage.getItem('custom_auth_token') ||
+                sessionStorage.getItem('token');
+  
+  if (!token) {
+    throw new Error('未登录，请先登录 / Not logged in. Please login first.');
+  }
+
+  console.log('✅ Using authentication token');
+  console.log('Token source:', localStorage.getItem('token') ? 'token' : 
+                               localStorage.getItem('custom_auth_token') ? 'custom_auth_token' : 
+                               'other');
+  console.log('Token (first 30 chars):', token.substring(0, 30) + '...');
+  
+  return token;
+};
+
+const getUserId = (): number | null => {
+  const userDataStr = localStorage.getItem('userData') || 
+                      localStorage.getItem('user') ||
+                      localStorage.getItem('custom_user_data') ||
+                      sessionStorage.getItem('userData');
+  
+  if (userDataStr) {
+    try {
+      const userData = JSON.parse(userDataStr);
+      if (userData.userId) {
+        return userData.userId;
+      }
+    } catch (e) {
+      console.warn('Failed to parse user data:', e);
+    }
+  }
+
+  const userId = localStorage.getItem('userId') || sessionStorage.getItem('userId');
+  if (userId) {
+    return parseInt(userId);
+  }
+
+  return null;
 };
 
 // ============================================================================
@@ -44,13 +86,13 @@ interface OrderData {
   vipTypeId: number;
   orderNo: string;
   amount: number;
-  status: number; // 0 = pending, 1 = paid, 2 = cancelled
-  payType: number; // 1 = Alipay
+  status: number;
+  payType: number;
   startTime: string;
   endTime: string;
   createAt: string | null;
   updateAt: string | null;
-  payQrCode: string; // ✅ Alipay QR code URL
+  payQrCode: string;
 }
 
 interface CreateOrderResponse {
@@ -59,11 +101,13 @@ interface CreateOrderResponse {
   data: OrderData;
 }
 
+// ✅ UPDATED: Handle actual backend response
 interface CheckOrderStatusResponse {
   msg: string;
   code: number;
   data: {
-    status: number;
+    status?: number;      // Might have status
+    payType?: number;     // Or might have payType
     orderNo: string;
   };
 }
@@ -72,28 +116,20 @@ interface CheckOrderStatusResponse {
 // CREATE ORDER
 // ============================================================================
 
-/**
- * Create an Alipay order
- * @param planId - The plan ID (week, month, season, year)
- * @returns Order data with QR code
- */
 export const createAlipayOrder = async (planId: string): Promise<OrderData> => {
-  const user = auth.currentUser;
-  
-  if (!user) {
-    throw new Error('User must be authenticated to create an order');
+  let token: string;
+  try {
+    token = getAuthToken();
+  } catch (error: any) {
+    throw new Error(error.message || 'Authentication failed. Please login.');
   }
-
-  // Get Firebase auth token
-  const token = await user.getIdToken();
   
-  // Map plan ID to VIP type code
   const vipTypeCode = VIP_TYPE_CODE_MAPPING[planId] || 'MONTH';
 
   console.log('🛒 Creating Alipay order...');
   console.log('Plan ID:', planId);
   console.log('VIP Type Code:', vipTypeCode);
-  console.log('Expected VIP Type ID:', VIP_TYPE_ID_MAPPING[planId]);
+  console.log('API URL:', `${API_BASE_URL}/order/createOrder`);
 
   try {
     const response = await fetch(`${API_BASE_URL}/order/createOrder`, {
@@ -101,8 +137,6 @@ export const createAlipayOrder = async (planId: string): Promise<OrderData> => {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
-        
-        // Add any other headers your backend requires
       },
       body: JSON.stringify({
         vipTypeCode: vipTypeCode
@@ -111,16 +145,20 @@ export const createAlipayOrder = async (planId: string): Promise<OrderData> => {
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error('Error response:', errorText);
+      
       let errorData;
       try {
         errorData = JSON.parse(errorText);
       } catch {
         throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
+      
       throw new Error(errorData.msg || `Failed to create order (${response.status})`);
     }
 
     const result: CreateOrderResponse = await response.json();
+    console.log('Backend response:', result);
 
     if (result.code !== 200) {
       throw new Error(result.msg || 'Order creation failed');
@@ -128,30 +166,19 @@ export const createAlipayOrder = async (planId: string): Promise<OrderData> => {
 
     console.log('✅ Order created successfully!');
     console.log('Order Number:', result.data.orderNo);
-    console.log('VIP Type ID:', result.data.vipTypeId);
-    console.log('Amount:', result.data.amount);
     console.log('QR Code URL:', result.data.payQrCode);
-    console.log('Start Time:', result.data.startTime);
-    console.log('End Time:', result.data.endTime);
-
-    // Validate vipTypeId matches expected
-    const expectedVipTypeId = VIP_TYPE_ID_MAPPING[planId];
-    if (result.data.vipTypeId !== expectedVipTypeId) {
-      console.warn(`⚠️ VIP Type ID mismatch! Expected ${expectedVipTypeId}, got ${result.data.vipTypeId}`);
-    }
 
     return result.data;
 
   } catch (error: any) {
     console.error('❌ Error creating order:', error);
     
-    // Enhance error message for common issues
-    if (error.message.includes('fetch')) {
-      throw new Error('Network error. Please check your connection and try again.');
+    if (error.message.includes('fetch') || error.message.includes('Failed to fetch')) {
+      throw new Error('网络错误，请检查网络连接 / Network error. Please check your connection.');
     }
     
     if (error.message.includes('401') || error.message.includes('403')) {
-      throw new Error('Authentication failed. Please log in again.');
+      throw new Error('认证失败，请重新登录 / Authentication failed. Please login again.');
     }
 
     throw error;
@@ -159,25 +186,21 @@ export const createAlipayOrder = async (planId: string): Promise<OrderData> => {
 };
 
 // ============================================================================
-// CHECK ORDER STATUS
+// CHECK ORDER STATUS - FIXED FOR ACTUAL BACKEND
 // ============================================================================
 
-/**
- * Check the payment status of an order
- * @param orderNo - The order number to check
- * @returns Order status (0=pending, 1=paid, 2=cancelled)
- */
 export const checkOrderStatus = async (orderNo: string): Promise<number> => {
-  const user = auth.currentUser;
-  
-  if (!user) {
-    throw new Error('User must be authenticated');
+  let token: string;
+  try {
+    token = getAuthToken();
+  } catch (error: any) {
+    throw new Error(error.message || 'Authentication failed');
   }
 
-  const token = await user.getIdToken();
-
   try {
-    // ✅ Adjust this endpoint to match your backend
+    console.log('🔍 Checking order status...');
+    console.log('Order No:', orderNo);
+    
     const response = await fetch(`${API_BASE_URL}/order/checkStatus`, {
       method: 'POST',
       headers: {
@@ -193,12 +216,60 @@ export const checkOrderStatus = async (orderNo: string): Promise<number> => {
     }
 
     const result: CheckOrderStatusResponse = await response.json();
+    
+    // ✅ LOG THE FULL RESPONSE
+    console.log('📡 FULL Backend Response:', result);
+    console.log('📦 Response code:', result.code);
+    console.log('📦 Response msg:', result.msg);
+    console.log('📦 Response data:', result.data);
 
     if (result.code !== 200) {
       throw new Error(result.msg || 'Status check failed');
     }
 
-    return result.data.status;
+    // ✅ HANDLE DIFFERENT RESPONSE STRUCTURES
+    let statusValue: number;
+
+    if (result.data.status !== undefined) {
+      // Structure 1: Has "status" field
+      console.log('✅ Found status field:', result.data.status);
+      statusValue = result.data.status;
+    } else if (result.data.payType !== undefined) {
+      // Structure 2: Has "payType" field
+      console.log('⚠️ No status field, found payType:', result.data.payType);
+      
+      // Check if message indicates success
+      if (result.msg === '支付成功' || result.msg.includes('成功')) {
+        console.log('✅ Message indicates success! Treating as PAID');
+        statusValue = 1; // PAID
+      } else {
+        console.log('⏳ No success indicator, treating as PENDING');
+        statusValue = 0; // PENDING
+      }
+    } else {
+      // Structure 3: Neither field exists
+      console.error('❌ Response has neither status nor payType!');
+      console.error('Full data object:', JSON.stringify(result.data, null, 2));
+      
+      // Check message as fallback
+      if (result.msg === '支付成功' || result.msg.includes('成功')) {
+        console.log('✅ Using message as indicator: PAID');
+        statusValue = 1;
+      } else {
+        console.log('⏳ Assuming PENDING');
+        statusValue = 0;
+      }
+    }
+
+    console.log('🎯 Final status value:', statusValue);
+    console.log('🎯 Status meaning:', 
+      statusValue === 0 ? '⏳ PENDING' : 
+      statusValue === 1 ? '✅ PAID' : 
+      statusValue === 2 ? '❌ CANCELLED' : 
+      '❓ UNKNOWN'
+    );
+
+    return statusValue;
 
   } catch (error: any) {
     console.error('❌ Error checking order status:', error);
@@ -210,13 +281,6 @@ export const checkOrderStatus = async (orderNo: string): Promise<number> => {
 // POLL ORDER STATUS
 // ============================================================================
 
-/**
- * Poll order status until payment is complete or timeout
- * @param orderNo - The order number to poll
- * @param maxAttempts - Maximum number of polling attempts (default: 60 = 3 minutes)
- * @param intervalMs - Polling interval in milliseconds (default: 3000 = 3 seconds)
- * @returns Promise that resolves to true if paid, false if cancelled/timeout
- */
 export const pollOrderStatus = async (
   orderNo: string,
   maxAttempts: number = 60,
@@ -234,30 +298,24 @@ export const pollOrderStatus = async (
       console.log(`📊 Attempt ${attempt}/${maxAttempts} - Status:`, status);
 
       if (status === 1) {
-        // Payment successful
         console.log('✅ Payment confirmed!');
         return true;
       }
 
       if (status === 2) {
-        // Payment cancelled
         console.log('❌ Payment cancelled');
         return false;
       }
 
-      // Status is 0 (pending), continue polling
-      // Wait before next poll
       await new Promise(resolve => setTimeout(resolve, intervalMs));
 
     } catch (error) {
       console.error(`⚠️ Polling error on attempt ${attempt}:`, error);
-      // Continue polling even if there's an error
-      // (maybe temporary network issue)
       await new Promise(resolve => setTimeout(resolve, intervalMs));
     }
   }
 
-  console.log('⏱️ Polling timeout - payment not confirmed within time limit');
+  console.log('⏱️ Polling timeout');
   return false;
 };
 
@@ -265,11 +323,6 @@ export const pollOrderStatus = async (
 // HELPER FUNCTIONS
 // ============================================================================
 
-/**
- * Get plan details by ID
- * @param planId - The plan ID
- * @returns Plan details
- */
 export const getPlanDetails = (planId: string): { 
   name: string; 
   price: number; 
@@ -306,16 +359,17 @@ export const getPlanDetails = (planId: string): {
   return plans[planId] || plans['month'];
 };
 
-/**
- * Validate if plan ID is valid
- */
 export const isValidPlanId = (planId: string): boolean => {
   return ['week', 'month', 'season', 'year'].includes(planId);
 };
 
-// ============================================================================
-// EXPORTS
-// ============================================================================
+export const isLoggedIn = (): boolean => {
+  const token = localStorage.getItem('token') || 
+                localStorage.getItem('authToken') ||
+                localStorage.getItem('custom_auth_token') ||
+                sessionStorage.getItem('token');
+  return !!token;
+};
 
 export {
   VIP_TYPE_CODE_MAPPING,

@@ -31,7 +31,7 @@ interface AuthContextType {
   registerWithEmail: (email: string, password: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   loginWithSms: (phone: string, code: string) => Promise<void>;
-  registerWithSms: (phone: string, code: string, password: string) => Promise<void>; // NEW
+  registerWithSms: (phone: string, code: string, password: string) => Promise<void>;
   loginWithEmailCode: (email: string, code: string) => Promise<void>;
   loginWithAlipay: () => Promise<void>;
   loginWithWeChat: () => Promise<void>;
@@ -70,35 +70,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!firebaseUser && !customUser) throw new Error('No user');
       try {
         if (firebaseUser) {
-          // Try to get ID token to ensure user is fully authenticated
           await firebaseUser.getIdToken(false);
         }
-        // For both Firebase and custom auth, fetch from backend
         return await apiClient.getUserInfo();
       } catch (error) {
         console.error('Failed to fetch user profile:', error);
-        // Return basic profile from user as fallback
         const user = firebaseUser || customUser;
         if (user) {
           return {
-            userId: parseInt(user.uid, 10), // Convert uid to number for backend compatibility
+            userId: parseInt(user.uid, 10),
             email: user.email || undefined,
             nickname: user.displayName || undefined,
-            imageurl: firebaseUser?.photoURL || undefined, // Note: backend uses 'imageurl'
+            imageurl: firebaseUser?.photoURL || undefined,
           };
         }
         throw error;
       }
     },
-    enabled: !!(firebaseUser || customUser), // Fetch if either user exists
-    retry: false, // Don't retry on profile fetch failure
+    enabled: !!(firebaseUser || customUser),
+    retry: false,
   });
 
-  // Ensure userProfile is never undefined
   const userProfile = userProfileData || null;
 
   useEffect(() => {
-    // Only initialize Firebase auth for non-Chinese versions
     const isChineseVersion = import.meta.env.VITE_IS_CHINESE_VERSION === 'true';
 
     if (!isChineseVersion) {
@@ -110,12 +105,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       return unsubscribe;
     } else {
-      // For Chinese version, skip Firebase and set loading to false
       setAuthLoading(false);
     }
   }, []);
 
-  // Restore custom auth state on app initialization
   useEffect(() => {
     const isChineseVersion = import.meta.env.VITE_IS_CHINESE_VERSION === 'true';
 
@@ -131,12 +124,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.log('Restored custom auth state for Chinese user:', parsedUser.displayName || parsedUser.phone || parsedUser.email);
           } catch (error) {
             console.error('Failed to parse stored custom user data:', error);
-            // Clear invalid data
             localStorage.removeItem('custom_auth_token');
             localStorage.removeItem('custom_user_data');
           }
         } else {
-          // No stored user data, fetch from backend
           (async () => {
             try {
               const userInfo = await apiClient.getUserInfo();
@@ -150,7 +141,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   isCustomAuth: true
                 };
                 setCustomUser(mockCustomUser);
-                // Store for future use
                 localStorage.setItem('custom_user_data', JSON.stringify(mockCustomUser));
                 console.log('Fetched and restored custom auth state for Chinese user:', mockCustomUser.displayName || mockCustomUser.phone || mockCustomUser.email);
               } else {
@@ -158,8 +148,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               }
             } catch (error) {
               console.error('Failed to fetch user info for restoration:', error);
-              // Only clear token if it's clearly an authentication error
-              // Avoid logging out users due to temporary backend issues or permission problems
               if (error instanceof Error && (error.message.includes('401') || error.message.includes('Unauthorized'))) {
                 console.warn('Clearing invalid auth token due to authentication error');
                 localStorage.removeItem('custom_auth_token');
@@ -187,70 +175,110 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loginWithSms = async (phone: string, code: string) => {
     try {
+      console.log('🔐 Starting SMS login...');
       const response = await apiClient.verifySmsCode(phone, code);
+      
+      console.log('📱 API Response:', response);
+      console.log('Response code:', response.code);
+      console.log('Response data:', response.data);
 
-      if (response.code === 200 && response.data) {
-        // Store the custom JWT token
-        localStorage.setItem('custom_auth_token', response.data.token);
-
-        // Create a mock Firebase user for compatibility
-        const mockCustomUser: CustomUser = {
-          uid: response.data.userId.toString(),
-          phone: response.data.phone,
-          displayName: response.data.nickname,
-          emailVerified: true,
-          isCustomAuth: true
-        };
-
-        // Store user data for persistence
-        localStorage.setItem('custom_user_data', JSON.stringify(mockCustomUser));
-
-        setCustomUser(mockCustomUser);
-
-        // Update user profile with the new user info
-        await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.user.profile(response.data.userId.toString()) });
-      } else {
+      // ✅ CHECK IF RESPONSE IS SUCCESSFUL
+      if (response.code !== 200) {
         throw new Error(response.message || response.msg || 'SMS verification failed');
       }
+
+      // ✅ CHECK IF DATA EXISTS
+      if (!response.data) {
+        console.error('❌ No data in response!');
+        throw new Error('Invalid response from server - missing data');
+      }
+
+      // ✅ CHECK IF TOKEN EXISTS
+      if (!response.data.token) {
+        console.error('❌ No token in response.data!');
+        console.error('Response.data contents:', JSON.stringify(response.data, null, 2));
+        throw new Error('Invalid response from server - missing token');
+      }
+
+      // ✅ CHECK IF USERID EXISTS
+      if (!response.data.userId) {
+        console.error('❌ No userId in response.data!');
+        console.error('Response.data contents:', JSON.stringify(response.data, null, 2));
+        throw new Error('Invalid response from server - missing userId');
+      }
+
+      console.log('✅ Valid response received');
+      console.log('Token:', response.data.token.substring(0, 30) + '...');
+      console.log('User ID:', response.data.userId);
+
+      // Store the custom JWT token
+      localStorage.setItem('custom_auth_token', response.data.token);
+
+      // Create a mock Firebase user for compatibility
+      const mockCustomUser: CustomUser = {
+        uid: response.data.userId.toString(),
+        phone: response.data.phone || phone,
+        displayName: response.data.nickname || phone,
+        emailVerified: true,
+        isCustomAuth: true
+      };
+
+      // Store user data for persistence
+      localStorage.setItem('custom_user_data', JSON.stringify(mockCustomUser));
+
+      setCustomUser(mockCustomUser);
+
+      // Update user profile with the new user info
+      await queryClient.invalidateQueries({ 
+        queryKey: QUERY_KEYS.user.profile(response.data.userId.toString()) 
+      });
+
+      console.log('✅ SMS login successful!');
+
     } catch (error) {
-      console.error('SMS login error:', error);
+      console.error('❌ SMS login error:', error);
       throw error;
     }
   };
 
-  // NEW: Register with SMS
   const registerWithSms = async (phone: string, code: string, password: string) => {
     try {
       const response = await apiClient.registerWithSms(phone, code, password);
 
-      if (response.code === 200 && response.data) {
-        // Store the custom JWT token
-        localStorage.setItem('custom_auth_token', response.data.token);
-
-        // Create a custom user
-        const mockCustomUser: CustomUser = {
-          uid: response.data.userId.toString(),
-          phone: response.data.phone || phone,
-          displayName: response.data.nickname,
-          emailVerified: true,
-          isCustomAuth: true,
-          metadata: {
-            creationTime: new Date().toISOString(),
-          }
-        };
-
-        // Store user data for persistence
-        localStorage.setItem('custom_user_data', JSON.stringify(mockCustomUser));
-
-        setCustomUser(mockCustomUser);
-
-        // Fetch user profile
-        await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.user.profile(response.data.userId.toString()) });
-
-        console.log('SMS registration successful:', mockCustomUser.phone);
-      } else {
+      if (response.code !== 200) {
         throw new Error(response.message || response.msg || 'SMS registration failed');
       }
+
+      if (!response.data || !response.data.token || !response.data.userId) {
+        throw new Error('Invalid response from server - missing required data');
+      }
+
+      // Store the custom JWT token
+      localStorage.setItem('custom_auth_token', response.data.token);
+
+      // Create a custom user
+      const mockCustomUser: CustomUser = {
+        uid: response.data.userId.toString(),
+        phone: response.data.phone || phone,
+        displayName: response.data.nickname || phone,
+        emailVerified: true,
+        isCustomAuth: true,
+        metadata: {
+          creationTime: new Date().toISOString(),
+        }
+      };
+
+      // Store user data for persistence
+      localStorage.setItem('custom_user_data', JSON.stringify(mockCustomUser));
+
+      setCustomUser(mockCustomUser);
+
+      // Fetch user profile
+      await queryClient.invalidateQueries({ 
+        queryKey: QUERY_KEYS.user.profile(response.data.userId.toString()) 
+      });
+
+      console.log('SMS registration successful:', mockCustomUser.phone);
     } catch (error) {
       console.error('SMS registration error:', error);
       throw error;
@@ -261,29 +289,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const response = await apiClient.verifyEmailCode(email, code);
 
-      if (response.code === 200 && response.data) {
-        // Store the custom JWT token
-        localStorage.setItem('custom_auth_token', response.data.token);
-
-        // Create a mock Firebase user for compatibility
-        const mockCustomUser: CustomUser = {
-          uid: response.data.userId.toString(),
-          email: response.data.email,
-          displayName: response.data.nickname,
-          emailVerified: true,
-          isCustomAuth: true
-        };
-
-        // Store user data for persistence
-        localStorage.setItem('custom_user_data', JSON.stringify(mockCustomUser));
-
-        setCustomUser(mockCustomUser);
-
-        // Update user profile with the new user info
-        await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.user.profile(response.data.userId.toString()) });
-      } else {
+      if (response.code !== 200) {
         throw new Error(response.message || response.msg || 'Email verification failed');
       }
+
+      if (!response.data || !response.data.token || !response.data.userId) {
+        throw new Error('Invalid response from server - missing required data');
+      }
+
+      // Store the custom JWT token
+      localStorage.setItem('custom_auth_token', response.data.token);
+
+      // Create a mock Firebase user for compatibility
+      const mockCustomUser: CustomUser = {
+        uid: response.data.userId.toString(),
+        email: response.data.email || email,
+        displayName: response.data.nickname || email,
+        emailVerified: true,
+        isCustomAuth: true
+      };
+
+      // Store user data for persistence
+      localStorage.setItem('custom_user_data', JSON.stringify(mockCustomUser));
+
+      setCustomUser(mockCustomUser);
+
+      // Update user profile with the new user info
+      await queryClient.invalidateQueries({ 
+        queryKey: QUERY_KEYS.user.profile(response.data.userId.toString()) 
+      });
+
     } catch (error) {
       console.error('Email login error:', error);
       throw error;
@@ -291,19 +326,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const loginWithAlipay = async () => {
-    // Placeholder for Alipay login - will call backend API later
     console.log('Alipay login initiated');
     throw new Error('Alipay login not yet implemented');
   };
 
   const loginWithWeChat = async () => {
-    // Placeholder for WeChat login - will call backend API later
     console.log('WeChat login initiated');
     throw new Error('WeChat login not yet implemented');
   };
 
   const logout = async () => {
-    // Clear both Firebase and custom auth
     try {
       if (firebaseUser) {
         await signOut(auth);
@@ -325,7 +357,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const user = firebaseUser || customUser;
     if (!user) return;
 
-    // Use React Query to invalidate and refetch
     await queryClient.invalidateQueries({
       queryKey: QUERY_KEYS.user.profile(user.uid)
     });
@@ -339,12 +370,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     birthDate?: string;
   }) => {
     try {
-      // Transform the data to match UserDto interface (nickname is required)
       const userDto = {
-        nickname: profileData.nickname || '', // Default to empty string if not provided
+        nickname: profileData.nickname || '',
         gender: profileData.gender,
         phone: profileData.phone,
-        imageurl: profileData.imageUrl, // Note: backend expects 'imageurl'
+        imageurl: profileData.imageUrl,
         birthDate: profileData.birthDate,
       };
 
@@ -352,7 +382,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const response = await apiClient.updateUserProfile(userDto);
       if (response) {
-        // Refresh user profile after successful update using React Query
         await refreshUserProfile();
       } else {
         throw new Error('Failed to update profile');
@@ -363,10 +392,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Combined loading state
   const loading = authLoading || (!!firebaseUser && isProfileLoading);
-
-  // Determine current user - prioritize custom auth for Chinese users
   const user = customUser || firebaseUser;
   const isCustomAuth = !!customUser;
 
@@ -379,7 +405,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     registerWithEmail,
     loginWithGoogle,
     loginWithSms,
-    registerWithSms, // NEW
+    registerWithSms,
     loginWithEmailCode,
     loginWithAlipay,
     loginWithWeChat,

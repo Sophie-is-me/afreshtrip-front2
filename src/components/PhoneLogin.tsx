@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { apiClient, ApiError } from '../services/apiClient';
+import { saveChineseLoginData } from '../utils/chineseLoginStorage';
 
 interface PhoneLoginProps {
   onSwitchToSignup?: () => void;
@@ -15,10 +16,8 @@ const PhoneLogin: React.FC<PhoneLoginProps> = ({ onSwitchToSignup }) => {
   const [error, setError] = useState('');
   const [step, setStep] = useState<'phone' | 'verify'>('phone');
   
-  const { loginWithSms } = useAuth();
   const navigate = useNavigate();
 
-  // Countdown timer for resend button
   useEffect(() => {
     if (countdown > 0) {
       const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
@@ -26,12 +25,10 @@ const PhoneLogin: React.FC<PhoneLoginProps> = ({ onSwitchToSignup }) => {
     }
   }, [countdown]);
 
-  // Validate Chinese phone number
   const isValidPhone = (phone: string): boolean => {
     return /^1[3-9]\d{9}$/.test(phone);
   };
 
-  // Send verification code
   const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -64,7 +61,6 @@ const PhoneLogin: React.FC<PhoneLoginProps> = ({ onSwitchToSignup }) => {
     }
   };
 
-  // Resend verification code
   const handleResendCode = async () => {
     if (countdown > 0) return;
     
@@ -92,7 +88,6 @@ const PhoneLogin: React.FC<PhoneLoginProps> = ({ onSwitchToSignup }) => {
     }
   };
 
-  // Verify code and login
   const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -104,9 +99,59 @@ const PhoneLogin: React.FC<PhoneLoginProps> = ({ onSwitchToSignup }) => {
 
     setLoading(true);
     try {
-      await loginWithSms(phone, code);
-      // loginWithSms will handle setting the user state and token
-      navigate('/');
+      console.log('📱 Verifying SMS code...');
+      
+      // ✅ Call API ONCE to verify code
+      const apiResponse = await apiClient.verifySmsCode(phone, code);
+      
+      console.log('API Response:', apiResponse);
+
+      if (apiResponse.code === 200 && apiResponse.data) {
+        const userData = apiResponse.data;
+        
+        // ✅ Validate required fields
+        if (!userData.token) {
+          throw new Error('Invalid response: missing token');
+        }
+        if (!userData.userId) {
+          throw new Error('Invalid response: missing userId');
+        }
+
+        console.log('✅ Verification successful!');
+        console.log('Token:', userData.token.substring(0, 30) + '...');
+        console.log('User ID:', userData.userId);
+
+        // ✅ Save to localStorage for AuthContext
+        localStorage.setItem('custom_auth_token', userData.token);
+        
+        const customUserData = {
+          uid: userData.userId.toString(),
+          phone: userData.phone || phone,
+          displayName: userData.nickname || phone,
+          emailVerified: true,
+          isCustomAuth: true as const
+        };
+        localStorage.setItem('custom_user_data', JSON.stringify(customUserData));
+
+        // ✅ Save for payment system
+        console.log('💾 Saving data for payment system...');
+        saveChineseLoginData({
+          token: userData.token,
+          userId: userData.userId,
+          phone: userData.phone || phone,
+          nickname: userData.nickname || phone
+        });
+
+        console.log('✅ All data saved successfully!');
+        
+        // ✅ Reload page to trigger AuthContext restoration
+        // This will make AuthContext pick up the saved tokens
+        window.location.href = '/';
+        
+      } else {
+        throw new Error(apiResponse.msg || apiResponse.message || 'Verification failed');
+      }
+      
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message || '验证码错误，请重试');
@@ -121,14 +166,12 @@ const PhoneLogin: React.FC<PhoneLoginProps> = ({ onSwitchToSignup }) => {
     }
   };
 
-  // Go back to phone input
   const handleBack = () => {
     setStep('phone');
     setCode('');
     setError('');
   };
 
-  // Format phone number for display
   const formatPhoneDisplay = (phone: string): string => {
     if (phone.length !== 11) return phone;
     return `${phone.slice(0, 3)}****${phone.slice(7)}`;
@@ -139,14 +182,12 @@ const PhoneLogin: React.FC<PhoneLoginProps> = ({ onSwitchToSignup }) => {
       {/* Phone Number Input Step */}
       {step === 'phone' && (
         <form onSubmit={handleSendCode} className="space-y-6">
-          {/* Error Message */}
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
               {error}
             </div>
           )}
 
-          {/* Phone Input */}
           <div>
             <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
               手机号码
@@ -168,7 +209,6 @@ const PhoneLogin: React.FC<PhoneLoginProps> = ({ onSwitchToSignup }) => {
             </div>
           </div>
 
-          {/* Get Code Button */}
           <button
             type="submit"
             disabled={loading || phone.length !== 11}
@@ -177,7 +217,6 @@ const PhoneLogin: React.FC<PhoneLoginProps> = ({ onSwitchToSignup }) => {
             {loading ? '发送中...' : '获取验证码'}
           </button>
 
-          {/* Signup Link */}
           <div className="text-center text-sm text-gray-600">
             还没有账号？
             <button
@@ -194,19 +233,16 @@ const PhoneLogin: React.FC<PhoneLoginProps> = ({ onSwitchToSignup }) => {
       {/* Verification Code Input Step */}
       {step === 'verify' && (
         <form onSubmit={handleVerifyCode} className="space-y-6">
-          {/* Error Message */}
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
               {error}
             </div>
           )}
 
-          {/* Info Message */}
           <div className="bg-teal-50 border border-teal-200 text-teal-700 px-4 py-3 rounded-lg text-sm">
             验证码已发送至 +86 {formatPhoneDisplay(phone)}
           </div>
 
-          {/* Code Input */}
           <div>
             <label htmlFor="code" className="block text-sm font-medium text-gray-700 mb-2">
               验证码
@@ -225,7 +261,6 @@ const PhoneLogin: React.FC<PhoneLoginProps> = ({ onSwitchToSignup }) => {
             />
           </div>
 
-          {/* Resend Code */}
           <div className="text-center text-sm">
             {countdown > 0 ? (
               <span className="text-gray-500">
@@ -243,7 +278,6 @@ const PhoneLogin: React.FC<PhoneLoginProps> = ({ onSwitchToSignup }) => {
             )}
           </div>
 
-          {/* Login Button */}
           <button
             type="submit"
             disabled={loading || code.length !== 6}
@@ -252,7 +286,6 @@ const PhoneLogin: React.FC<PhoneLoginProps> = ({ onSwitchToSignup }) => {
             {loading ? '登录中...' : '登录'}
           </button>
 
-          {/* Back Button */}
           <button
             type="button"
             onClick={handleBack}

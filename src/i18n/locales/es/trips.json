@@ -160,7 +160,29 @@
   "pricing": "Precios",
   "photos": "Fotos",
    "chooseInsurance": "Elegir plan de seguro",
-  "photosTip": "Consejo sobre fotos"
+  "photosTip": "Consejo sobre fotos",
+    "myProfile": "Mi perfil",
+  "subscription": "Suscripción",
+  "notifications": "Notificaciones",
+  "logout": "Cerrar sesión",
+  "mobileNumber": "Número de móvil",
+  "dateOfBirth": "Fecha de nacimiento",
+  "password": "Contraseña",
+  "confirmedPassword": "Confirmar contraseña",
+  "week": "Semana",
+  "month": "Mes",
+  "season": "Temporada",
+  "upgrade": "Mejorar",
+  "planNew": "Planear nuevo",
+  "viewDetails": "Ver detalles",
+  "upcoming": "Próximos",
+  "completed": "Completados",
+  "markAllRead": "Marcar todo como leído",
+  "deleteAll": "Eliminar todo",
+  "changesInServices": "Cambios en los servicios",
+  "changesMsg": "Mensaje de cambios",
+  "choosePlan": "Elige tu plan de suscripción",
+  "youAreHere": "¡Estás aquí!"
     
 
     

@@ -160,7 +160,29 @@
   "pricing": "Pricing",
   "photos": "Photos",
   "chooseInsurance": "Choose your insurance plan",
-  "photosTip": "Photos Tip"
-
-
+  "photosTip": "Photos Tip",
+  "editProfileInfo": "Edit Profile",
+  "myProfile": "My Profile",
+  "subscription": "Subscription",
+  "notifications": "Notifications",
+  "logout": "Logout",
+  "mobileNumber": "Mobile Number",
+  "dateOfBirth": "Date of Birth",
+  "password": "Password",
+  "confirmedPassword": "Confirmed Password",
+  "week": "Week",
+  "month": "Month",
+  "season": "Season",
+  "upgrade": "Upgrade",
+  "planNew": "Plan New",
+  "viewDetails": "View Details",
+  "upcoming": "Upcoming",
+  "completed": "Completed",
+  "markAllRead": "Mark all as read",
+  "deleteAll": "Delete all",
+  "changesInServices": "Changes in services",
+  "changesMsg": "Changes message",
+  "choosePlan": "Choose Your Subscription Plan",
+  "youAreHere": "You are here!"
+  
 }

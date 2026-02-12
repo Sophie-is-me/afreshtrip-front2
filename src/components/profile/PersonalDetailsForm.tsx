@@ -72,7 +72,7 @@ const PersonalDetailsForm: React.FC<PersonalDetailsFormProps> = ({
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-xl font-bold text-gray-900">{t('profile.editProfile')}</h2>
+          <h2 className="text-xl font-bold text-gray-900">{t('trips.editProfile')}</h2>
           <p className="text-sm text-gray-500 mt-1">
             {t('profile.subtitle', 'Manage your personal information')}
           </p>

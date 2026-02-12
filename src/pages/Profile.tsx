@@ -1,6 +1,16 @@
+// src/pages/Profile.tsx
+// ✅ UPDATED: Tabbed interface matching the design
+
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import {
+  UserCircleIcon,
+  CreditCardIcon,
+  MapPinIcon,
+  BellIcon,
+  ArrowRightOnRectangleIcon
+} from '@heroicons/react/24/outline';
 
 // Layout & Context
 import Header from '../components/Header';
@@ -11,27 +21,29 @@ import { useSnackbar } from '../contexts/SnackbarContext';
 import { i18nErrorHandler } from '../utils/i18nErrorHandler';
 import { apiClient } from '../services/apiClient';
 
-// New Components
-import ProfileHeader from '../components/profile/ProfileHeader';
-import PersonalDetailsForm, { type ProfileFormData } from '../components/profile/PersonalDetailsForm';
-import SecuritySettings from '../components/profile/SecuritySettings';
-import SubscriptionSummary from '../components/profile/SubscriptionSummary';
-import PaymentMethodSelection from '../components/PaymentMethodSelection'; // Kept for subscription logic
+// Tab Content Components
+import ProfileTab from '../components/profile/ProfileTab';
+import SubscriptionTab from '../components/profile/SubscriptionTab';
+import MyTripsTab from '../components/profile/MyTripsTab';
+import NotificationTab from '../components/profile/NotificationTab';
 
 // Hooks
 import { useSubscription } from '../hooks/useSubscription';
 
+type TabId = 'profile' | 'subscription' | 'trips' | 'notification';
+
 const Profile: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { user, userProfile, updateUserProfile } = useAuth();
+  const { user, userProfile, updateUserProfile, logout } = useAuth();
   const { showSuccess, showError } = useSnackbar();
   
   // State
+  const [activeTab, setActiveTab] = useState<TabId>('profile');
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
-  // Subscription Hook (for Payment Modal logic)
+  // Subscription Hook
   const {
     plans,
     isUpdating: isUpdatingSubscription,
@@ -41,6 +53,30 @@ const Profile: React.FC = () => {
     closePaymentMethodSelection,
   } = useSubscription();
 
+  // Tab configuration
+  const tabs = [
+    {
+      id: 'profile' as TabId,
+      label: t('trips.myProfile') || 'My Profile',
+      icon: UserCircleIcon
+    },
+    {
+      id: 'subscription' as TabId,
+      label: t('trips.subscription') || 'Subscription',
+      icon: CreditCardIcon
+    },
+    {
+      id: 'trips' as TabId,
+      label: t('trips.myTrips') || 'My trips',
+      icon: MapPinIcon
+    },
+    {
+      id: 'notification' as TabId,
+      label: t('trips.notifications') || 'Notification',
+      icon: BellIcon
+    }
+  ];
+
   // --- Handlers ---
 
   const handleAvatarUpdate = async (file: File) => {
@@ -48,16 +84,12 @@ const Profile: React.FC = () => {
     setIsUploadingAvatar(true);
 
     try {
-      // 1. Upload file to storage
       const imageUrl = await apiClient.uploadFile(file);
-
-      // 2. Update user profile with new URL
       await updateUserProfile({
         nickname: userProfile?.nickname || user.displayName || '',
         imageUrl: imageUrl
       });
-      
-      showSuccess(t('profile.updateSuccess'));
+      showSuccess(t('trips.updateSuccess'));
     } catch (error) {
       console.error('Avatar upload failed:', error);
       showError(t('common.error.imageLoadError'));
@@ -66,18 +98,18 @@ const Profile: React.FC = () => {
     }
   };
 
-  const handleProfileUpdate = async (formData: ProfileFormData) => {
+  const handleProfileUpdate = async (formData: any) => {
     if (!user) return;
     setIsUpdatingProfile(true);
 
     try {
       await updateUserProfile({
         nickname: formData.username,
-        phone: formData.mobile?.replace(/\s+/g, ''), // Remove spaces for backend validation
+        phone: formData.mobile?.replace(/\s+/g, ''),
         gender: formData.gender?.toLowerCase(),
         birthDate: formData.dob ? new Date(formData.dob).toISOString() : undefined,
       });
-      showSuccess(t('profile.updateSuccess'));
+      showSuccess(t('trips.updateSuccess'));
     } catch (error) {
       const errorMessage = i18nErrorHandler.handleError(error, { component: 'Profile', action: 'update' }, t);
       showError(errorMessage.description);
@@ -87,30 +119,59 @@ const Profile: React.FC = () => {
   };
 
   const handlePasswordUpdate = async (current: string, newPass: string) => {
-    // Note: Implementation depends on specific Auth provider capabilities exposed in AuthContext
-    // This is a placeholder for where the updatePassword logic would go
     console.log('Password update requested', { current, newPass });
-    
-    // Simulate API call
     return new Promise<void>((resolve) => {
       setTimeout(() => {
-        showSuccess(t('profile.updateSuccess'));
+        showSuccess(t('trips.updateSuccess'));
         resolve();
       }, 1000);
     });
   };
 
-  // --- Data Preparation ---
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/');
+    } catch (error) {
+      showError(t('common.error.logoutFailed'));
+    }
+  };
 
-  const initialFormData = useMemo<ProfileFormData>(() => ({
+  // Initial form data
+  const initialFormData = useMemo(() => ({
     username: userProfile?.nickname || user?.displayName || '',
     email: userProfile?.email || user?.email || '',
     mobile: userProfile?.phone || (user && 'phone' in user ? user.phone : '') || '',
     dob: userProfile?.birthDate ? userProfile.birthDate.split('T')[0] : '',
-    gender: userProfile?.gender && typeof userProfile.gender === 'string' ? userProfile.gender.charAt(0).toUpperCase() + userProfile.gender.slice(1).toLowerCase() : '',
+    gender: userProfile?.gender && typeof userProfile.gender === 'string' 
+      ? userProfile.gender.charAt(0).toUpperCase() + userProfile.gender.slice(1).toLowerCase() 
+      : '',
   }), [userProfile, user]);
 
-  // --- Render ---
+  // Render tab content
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'profile':
+        return (
+          <ProfileTab
+            initialData={initialFormData}
+            onSubmit={handleProfileUpdate}
+            onAvatarUpdate={handleAvatarUpdate}
+            onPasswordUpdate={handlePasswordUpdate}
+            isLoading={isUpdatingProfile}
+            isUploadingAvatar={isUploadingAvatar}
+          />
+        );
+      case 'subscription':
+        return <SubscriptionTab />;
+      case 'trips':
+        return <MyTripsTab />;
+      case 'notification':
+        return <NotificationTab />;
+      default:
+        return null;
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50/50">
@@ -125,66 +186,47 @@ const Profile: React.FC = () => {
           className="mb-8"
         />
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          
-          {/* Left Sidebar - Navigation */}
-          <div className="lg:col-span-3 sticky top-24">
-            {/* Optional: Tiny promo or help box below nav */}
-            <div className="p-4 bg-teal-50 rounded-xl border border-teal-100 hidden lg:block">
-              <h4 className="font-semibold text-teal-900 text-sm mb-1">{t('common.contactSupport')}</h4>
-              <p className="text-xs text-teal-700 mb-3">Need help with your account? We are here 24/7.</p>
-              <button onClick={() => navigate('/support')} className="text-xs font-bold text-teal-600 hover:text-teal-800">
-                Contact Us &rarr;
+        <div className="max-w-7xl mx-auto">
+          {/* Tabbed Navigation */}
+          <div className="bg-white rounded-t-2xl border-b border-gray-200 shadow-sm">
+            <div className="flex items-center gap-2 px-6 overflow-x-auto">
+              {tabs.map((tab) => {
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`flex items-center gap-2 px-6 py-4 text-sm font-medium transition-all whitespace-nowrap ${
+                      activeTab === tab.id
+                        ? 'text-white bg-teal-600 rounded-t-lg -mb-px'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-t-lg'
+                    }`}
+                  >
+                    <Icon className="w-5 h-5" />
+                    {tab.label}
+                  </button>
+                );
+              })}
+              
+              {/* Logout Button */}
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 px-6 py-4 text-sm font-medium text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-t-lg transition-all whitespace-nowrap ml-auto"
+              >
+                <ArrowRightOnRectangleIcon className="w-5 h-5" />
+                {t('trips.logout') || 'Logout'}
               </button>
             </div>
           </div>
 
-          {/* Right Content Area */}
-          <div className="lg:col-span-9 space-y-6">
-            <div className="animate-fadeIn">
-                <ProfileHeader 
-                  onAvatarUpdate={handleAvatarUpdate}
-                  isUpdatingAvatar={isUploadingAvatar}
-                />
-
-                {/* Subscription Widget */}
-                <SubscriptionSummary />
-
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                  {/* Left Column: Personal Details */}
-                  <div className="xl:col-span-2">
-                    <PersonalDetailsForm 
-                      initialData={initialFormData}
-                      onSubmit={handleProfileUpdate}
-                      isLoading={isUpdatingProfile}
-                    />
-                  </div>
-
-                  {/* Security Settings (Full width or split depending on design preference, using full for clarity) */}
-                  <div className="xl:col-span-2">
-                    <SecuritySettings 
-                      onUpdatePassword={handlePasswordUpdate}
-                      isLoading={false}
-                    />
-                  </div>
-                </div>
-              </div>
+          {/* Tab Content */}
+          <div className="bg-white rounded-b-2xl shadow-sm p-8">
+            {renderTabContent()}
           </div>
         </div>
       </main>
       
       <Footer />
-
-      {/* Payment Method Selection Modal (Preserved for logic) */}
-      {showPaymentMethodSelection && pendingPlanId && (
-        <PaymentMethodSelection
-          plan={plans.find(p => p.planId === pendingPlanId)!}
-          isOpen={showPaymentMethodSelection}
-          onClose={closePaymentMethodSelection}
-          onSelectPaymentMethod={(paymentMethod) => handlePaymentMethodSelect(pendingPlanId, paymentMethod)}
-          isLoading={isUpdatingSubscription}
-        />
-      )}
     </div>
   );
 };

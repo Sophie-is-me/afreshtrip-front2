@@ -1,5 +1,5 @@
 // src/components/trip/LeafletTripMap.tsx
-// ✅ UPDATED: CARTO tiles (clean design like original)
+// ✅ FULL UPDATED VERSION — Smooth + Animated + Zoomed Out
 
 import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
@@ -16,213 +16,234 @@ interface LeafletTripMapProps {
 // Fix Leaflet default marker icons
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+  iconRetinaUrl:
+    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl:
+    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl:
+    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
 const LeafletTripMap: React.FC<LeafletTripMapProps> = ({
   departureCoords,
   destinationCoords,
   transport,
-  onRouteCalculated
+  onRouteCalculated,
 }) => {
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const [routeLayer, setRouteLayer] = useState<L.Polyline | null>(null);
-  const [departureMarker, setDepartureMarker] = useState<L.Marker | null>(null);
-  const [destinationMarker, setDestinationMarker] = useState<L.Marker | null>(null);
-  
-  // Track last calculated route to prevent infinite loop
+  const routeLayerRef = useRef<L.Polyline | null>(null);
+  const departureMarkerRef = useRef<L.Marker | null>(null);
+  const destinationMarkerRef = useRef<L.Marker | null>(null);
   const lastCalculatedRef = useRef<string>('');
 
-  // Initialize map
+  // ===============================
+  // Initialize Map
+  // ===============================
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
-    const center = departureCoords || { lat: 30.2741, lng: 120.1551 }; // Hangzhou default
-    
-    const map = L.map(mapContainerRef.current).setView([center.lat, center.lng], 13);
+    const center = departureCoords || { lat: 30.2741, lng: 120.1551 };
 
-    // ✅ CARTO Voyager tiles (clean design, no Chinese labels)
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
-      subdomains: 'abcd',
-      maxZoom: 20
-    }).addTo(map);
+    const map = L.map(mapContainerRef.current, {
+      zoomControl: false,
+    }).setView([center.lat, center.lng], 11); // ⬅ slightly zoomed out
+
+    L.tileLayer(
+      'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+      {
+        attribution:
+          '© OpenStreetMap contributors © CARTO',
+        subdomains: 'abcd',
+        maxZoom: 20,
+      }
+    ).addTo(map);
 
     mapRef.current = map;
 
     return () => {
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-      }
+      map.remove();
+      mapRef.current = null;
     };
   }, []);
 
-  // Update map center when departure changes
-  useEffect(() => {
-    if (mapRef.current && departureCoords) {
-      mapRef.current.setView([departureCoords.lat, departureCoords.lng], 13);
-    }
-  }, [departureCoords]);
-
-  // Add departure marker
+  // ===============================
+  // Smooth fly to departure
+  // ===============================
   useEffect(() => {
     if (!mapRef.current || !departureCoords) return;
 
-    if (departureMarker) {
-      departureMarker.setLatLng([departureCoords.lat, departureCoords.lng]);
-    } else {
-      // ✅ Create custom teal marker icon for departure
-      const tealIcon = L.divIcon({
-        className: 'custom-div-icon',
-        html: `
-          <div style="
-            background-color: #0d9488;
-            width: 40px;
-            height: 40px;
-            border-radius: 50% 50% 50% 0;
-            transform: rotate(-45deg);
-            border: 3px solid white;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-          ">
-            <div style="
-              transform: rotate(45deg);
-              color: white;
-              font-weight: bold;
-              font-size: 18px;
-              text-align: center;
-              line-height: 34px;
-            ">📍</div>
-          </div>
-        `,
-        iconSize: [40, 40],
-        iconAnchor: [20, 40],
-        popupAnchor: [0, -40]
-      });
+    mapRef.current.flyTo(
+      [departureCoords.lat, departureCoords.lng],
+      12,
+      {
+        duration: 1.5,
+        easeLinearity: 0.25,
+      }
+    );
+  }, [departureCoords]);
 
-      const marker = L.marker([departureCoords.lat, departureCoords.lng], { icon: tealIcon })
-        .addTo(mapRef.current)
-        .bindPopup('Departure');
-      
-      setDepartureMarker(marker);
-    }
-  }, [departureCoords, departureMarker]);
-
-  // Add destination marker
+  // ===============================
+  // Departure Marker
+  // ===============================
   useEffect(() => {
-    if (!mapRef.current || !destinationCoords) return;
+    if (!mapRef.current || !departureCoords) return;
 
-    if (destinationMarker) {
-      destinationMarker.setLatLng([destinationCoords.lat, destinationCoords.lng]);
-    } else {
-      // ✅ Create custom red marker icon for destination
-      const redIcon = L.divIcon({
-        className: 'custom-div-icon',
-        html: `
-          <div style="
-            background-color: #ef4444;
-            width: 40px;
-            height: 40px;
-            border-radius: 50% 50% 50% 0;
-            transform: rotate(-45deg);
-            border: 3px solid white;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-          ">
-            <div style="
-              transform: rotate(45deg);
-              color: white;
-              font-weight: bold;
-              font-size: 18px;
-              text-align: center;
-              line-height: 34px;
-            ">🎯</div>
-          </div>
-        `,
-        iconSize: [40, 40],
-        iconAnchor: [20, 40],
-        popupAnchor: [0, -40]
-      });
-
-      const marker = L.marker([destinationCoords.lat, destinationCoords.lng], { icon: redIcon })
-        .addTo(mapRef.current)
-        .bindPopup('Destination');
-      
-      setDestinationMarker(marker);
-    }
-  }, [destinationCoords, destinationMarker]);
-
-  // Draw route
-  useEffect(() => {
-    if (!mapRef.current || !departureCoords || !destinationCoords) return;
-
-    // Create unique key for this route
-    const routeKey = `${departureCoords.lat},${departureCoords.lng}-${destinationCoords.lat},${destinationCoords.lng}-${transport}`;
-    
-    // Skip if already calculated this exact route
-    if (lastCalculatedRef.current === routeKey) {
-      console.log('⏭️ Route already calculated, skipping');
+    if (departureMarkerRef.current) {
+      departureMarkerRef.current.setLatLng([
+        departureCoords.lat,
+        departureCoords.lng,
+      ]);
       return;
     }
 
-    console.log('🗺️ Calculating new route...');
-    
-    // Update ref BEFORE calling callback
+    const tealIcon = L.divIcon({
+      className: '',
+      html: `
+        <div style="
+          background-color:#0d9488;
+          width:28px;
+          height:28px;
+          border-radius:50%;
+          border:3px solid white;
+          box-shadow:0 4px 10px rgba(0,0,0,0.3);
+        "></div>
+      `,
+      iconSize: [30, 30],
+      iconAnchor: [15, 15],
+    });
+
+    departureMarkerRef.current = L.marker(
+      [departureCoords.lat, departureCoords.lng],
+      { icon: tealIcon }
+    )
+      .addTo(mapRef.current)
+      .bindPopup('Departure');
+  }, [departureCoords]);
+
+  // ===============================
+  // Destination Marker
+  // ===============================
+  useEffect(() => {
+    if (!mapRef.current || !destinationCoords) return;
+
+    if (destinationMarkerRef.current) {
+      destinationMarkerRef.current.setLatLng([
+        destinationCoords.lat,
+        destinationCoords.lng,
+      ]);
+      return;
+    }
+
+    const redIcon = L.divIcon({
+      className: '',
+      html: `
+        <div style="
+          background-color:#ef4444;
+          width:32px;
+          height:32px;
+          border-radius:50%;
+          border:3px solid white;
+          box-shadow:0 4px 10px rgba(0,0,0,0.3);
+          animation:pulse 1.5s infinite;
+        "></div>
+      `,
+      iconSize: [34, 34],
+      iconAnchor: [17, 17],
+    });
+
+    destinationMarkerRef.current = L.marker(
+      [destinationCoords.lat, destinationCoords.lng],
+      { icon: redIcon }
+    )
+      .addTo(mapRef.current)
+      .bindPopup('Destination');
+  }, [destinationCoords]);
+
+  // ===============================
+  // Animated Route Drawing
+  // ===============================
+  useEffect(() => {
+    if (!mapRef.current || !departureCoords || !destinationCoords) return;
+
+    const routeKey = `${departureCoords.lat},${departureCoords.lng}-${destinationCoords.lat},${destinationCoords.lng}-${transport}`;
+    if (lastCalculatedRef.current === routeKey) return;
     lastCalculatedRef.current = routeKey;
 
     // Remove old route
-    if (routeLayer) {
-      routeLayer.remove();
+    if (routeLayerRef.current) {
+      routeLayerRef.current.remove();
     }
 
-    // Simple straight line route (for basic visualization)
-    const latlngs: [number, number][] = [
-      [departureCoords.lat, departureCoords.lng],
-      [destinationCoords.lat, destinationCoords.lng]
-    ];
-
-    const polyline = L.polyline(latlngs, {
-      color: '#0d9488', // Teal
+    const animatedLine = L.polyline([], {
+      color: '#0d9488',
       weight: 5,
-      opacity: 0.8
+      opacity: 0.9,
     }).addTo(mapRef.current);
 
-    setRouteLayer(polyline);
+    routeLayerRef.current = animatedLine;
 
-    // Fit bounds to show entire route
-    mapRef.current.fitBounds(polyline.getBounds(), { padding: [50, 50] });
+    // Animate drawing
+    let progress = 0;
+    const steps = 60;
 
-    // Calculate approximate distance
-    const distance = mapRef.current.distance(
-      [departureCoords.lat, departureCoords.lng],
-      [destinationCoords.lat, destinationCoords.lng]
-    ) / 1000; // Convert to km
+    const interval = setInterval(() => {
+      progress++;
 
-    // Estimate duration (assuming 60 km/h for car, 20 km/h for bike)
+      const lat =
+        departureCoords.lat +
+        (destinationCoords.lat - departureCoords.lat) *
+          (progress / steps);
+
+      const lng =
+        departureCoords.lng +
+        (destinationCoords.lng - departureCoords.lng) *
+          (progress / steps);
+
+      animatedLine.addLatLng([lat, lng]);
+
+      if (progress >= steps) {
+        clearInterval(interval);
+
+        // Smooth fit bounds
+        mapRef.current?.flyToBounds(animatedLine.getBounds(), {
+          padding: [80, 80],
+          duration: 1.5,
+        });
+      }
+    }, 16);
+
+    // Distance calculation
+    const distance =
+      mapRef.current.distance(
+        [departureCoords.lat, departureCoords.lng],
+        [destinationCoords.lat, destinationCoords.lng]
+      ) / 1000;
+
     const speed = transport === 'car' ? 60 : 20;
-    const duration = Math.round((distance / speed) * 60); // Minutes
+    const duration = Math.round((distance / speed) * 60);
 
     const routeInfo: RouteInfo = {
       distance,
       duration,
       distanceText: `${distance.toFixed(1)} km`,
-      durationText: duration > 60 
-        ? `${Math.floor(duration / 60)}h ${duration % 60}min`
-        : `${duration}min`
+      durationText:
+        duration > 60
+          ? `${Math.floor(duration / 60)}h ${duration % 60}min`
+          : `${duration}min`,
     };
 
-    console.log('✅ Leaflet route calculated:', routeInfo);
-
-    // Call callback only once
     if (onRouteCalculated) {
       onRouteCalculated(routeInfo, []);
     }
   }, [departureCoords, destinationCoords, transport]);
 
   return (
-    <div ref={mapContainerRef} className="w-full h-full" />
+    <div
+      ref={mapContainerRef}
+      className="w-full h-full"
+      style={{ borderRadius: '16px' }}
+    />
   );
 };
 

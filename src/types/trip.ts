@@ -7,6 +7,39 @@ export interface TripSettings {
   vehicle: 'car' | 'bike';
 }
 
+export interface RouteInfo {
+  distance: number; // in km
+  duration: number; // in minutes
+  distanceText: string; // e.g., "150 km"
+  durationText: string; // e.g., "2h 30min"
+}
+
+export interface TripStop {
+  name: string;
+  lat: number;
+  lng: number;
+  type: string; // e.g., "museum", "park", "restaurant"
+  rating?: number;
+  photos?: string[];
+  description?: string;
+}
+
+export interface GeneratedTrip {
+  route: RouteInfo;
+  stops: TripStop[];
+  departure: {
+    city: string;
+    lat: number;
+    lng: number;
+  };
+  destination: {
+    city: string;
+    lat: number;
+    lng: number;
+  };
+}
+
+
 export interface Place {
   id: string;
   name: string;

@@ -1,9 +1,9 @@
 // src/components/trip/TripPlanner.tsx
-// ✅ FINAL: Conditional Google Maps or Leaflet, fixed coordinates
+// ✅ UPDATED: Mobile bottom sheet opens by default + toggle button
 
 import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { SparklesIcon } from '@heroicons/react/24/outline';
+import { SparklesIcon, AdjustmentsHorizontalIcon } from '@heroicons/react/24/outline';
 import BottomSheet from '../BottomSheet';
 import TripSettingsPanel from './TripSettingsPanel';
 import TripGenerationPanel from './TripGenerationPanel';
@@ -41,7 +41,7 @@ const TripPlanner = () => {
   const [destinationLat, setDestinationLat] = useState<number | null>(null);
   const [destinationLng, setDestinationLng] = useState<number | null>(null);
   const [interests, setInterests] = useState<string[]>(['outdoorsSport']);
-  const [isMobilePanelOpen, setMobilePanelOpen] = useState(false);
+  const [isMobilePanelOpen, setMobilePanelOpen] = useState(true); // ✅ Open by default
   
   // Route state
   const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(null);
@@ -55,7 +55,7 @@ const TripPlanner = () => {
 
     console.log('🌍 Current location detected:', currentLocation);
     
-    // ✅ FIX: currentLocation has 'latitude' and 'longitude', not 'lat' and 'lng'
+    // Fix: currentLocation has 'latitude' and 'longitude', not 'lat' and 'lng'
     const lat = currentLocation.latitude || currentLocation.lat;
     const lng = currentLocation.longitude || currentLocation.lng;
     
@@ -114,6 +114,11 @@ const TripPlanner = () => {
 
     console.log('🚀 Generating trip...');
     setIsGenerating(true);
+    
+    // ✅ Close mobile panel when generating trip
+    if (window.innerWidth < 768) {
+      setMobilePanelOpen(false);
+    }
   };
 
   const handleRouteCalculated = (info: RouteInfo, stops: TripStop[]) => {
@@ -122,6 +127,7 @@ const TripPlanner = () => {
     setGeneratedStops(stops);
     setIsGenerating(false);
     
+    // ✅ Open panel to show results
     if (window.innerWidth < 768) {
       setMobilePanelOpen(true);
     }
@@ -154,6 +160,11 @@ const TripPlanner = () => {
     setDestinationCity('');
     setDestinationLat(null);
     setDestinationLng(null);
+    
+    // ✅ Open panel to show trip settings again
+    if (window.innerWidth < 768) {
+      setMobilePanelOpen(true);
+    }
   };
 
   // Show error if Google Maps failed to load (when using Google Maps)
@@ -229,7 +240,7 @@ const TripPlanner = () => {
       <div className="absolute inset-0 z-0 md:relative md:flex-1 md:p-1 md:pl-0">
         <div className="relative w-full h-full md:rounded-xl md:border md:border-white md:overflow-hidden md:shadow-sm bg-blue-50 md:h-[calc(100vh-90px)] md:sticky md:top-20">
           
-          {/* ✅ CONDITIONAL MAP RENDERING */}
+          {/* Conditional Map Rendering */}
           {USE_GOOGLE_MAPS ? (
             <GoogleTripMap
               departureCoords={departureLat && departureLng ? { lat: departureLat, lng: departureLng } : null}
@@ -256,6 +267,17 @@ const TripPlanner = () => {
               className="origin-top-right transform scale-90 md:scale-100"
             />
           </div>
+
+          {/* ✅ MOBILE: Floating Toggle Button */}
+          <button
+            onClick={() => setMobilePanelOpen(!isMobilePanelOpen)}
+            className="md:hidden fixed bottom-6 left-1/2 transform -translate-x-1/2 z-[999] bg-teal-600 text-white px-6 py-3 rounded-full shadow-lg flex items-center gap-2 hover:bg-teal-700 transition-colors"
+          >
+            <AdjustmentsHorizontalIcon className="w-5 h-5" />
+            <span className="font-medium">
+              {!routeInfo ? 'Trip Options' : 'Trip Details'}
+            </span>
+          </button>
         </div>
       </div>
 
@@ -264,7 +286,7 @@ const TripPlanner = () => {
         <BottomSheet
           isOpen={isMobilePanelOpen}
           onClose={() => setMobilePanelOpen(false)}
-          title={routeInfo ? "Trip Details" : "Trip Settings"}
+          title={routeInfo ? "Trip Details" : "Trip Options"}
         >
           <div className="flex-1 p-0 pb-24">
             {!routeInfo ? (

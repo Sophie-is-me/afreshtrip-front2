@@ -1,5 +1,5 @@
 // src/components/trip/LeafletTripMap.tsx
-// ✅ FIXED: Prevent infinite loop in route calculation
+// ✅ UPDATED: CARTO tiles (clean design like original)
 
 import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
@@ -33,7 +33,7 @@ const LeafletTripMap: React.FC<LeafletTripMapProps> = ({
   const [departureMarker, setDepartureMarker] = useState<L.Marker | null>(null);
   const [destinationMarker, setDestinationMarker] = useState<L.Marker | null>(null);
   
-  // ✅ FIX: Track last calculated route to prevent infinite loop
+  // Track last calculated route to prevent infinite loop
   const lastCalculatedRef = useRef<string>('');
 
   // Initialize map
@@ -44,9 +44,11 @@ const LeafletTripMap: React.FC<LeafletTripMapProps> = ({
     
     const map = L.map(mapContainerRef.current).setView([center.lat, center.lng], 13);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors',
-      maxZoom: 19,
+    // ✅ CARTO Voyager tiles (clean design, no Chinese labels)
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
+      subdomains: 'abcd',
+      maxZoom: 20
     }).addTo(map);
 
     mapRef.current = map;
@@ -73,16 +75,35 @@ const LeafletTripMap: React.FC<LeafletTripMapProps> = ({
     if (departureMarker) {
       departureMarker.setLatLng([departureCoords.lat, departureCoords.lng]);
     } else {
-      const greenIcon = L.icon({
-        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
-        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-        iconSize: [25, 41],
-        iconAnchor: [12, 41],
-        popupAnchor: [1, -34],
-        shadowSize: [41, 41]
+      // ✅ Create custom teal marker icon for departure
+      const tealIcon = L.divIcon({
+        className: 'custom-div-icon',
+        html: `
+          <div style="
+            background-color: #0d9488;
+            width: 40px;
+            height: 40px;
+            border-radius: 50% 50% 50% 0;
+            transform: rotate(-45deg);
+            border: 3px solid white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+          ">
+            <div style="
+              transform: rotate(45deg);
+              color: white;
+              font-weight: bold;
+              font-size: 18px;
+              text-align: center;
+              line-height: 34px;
+            ">📍</div>
+          </div>
+        `,
+        iconSize: [40, 40],
+        iconAnchor: [20, 40],
+        popupAnchor: [0, -40]
       });
 
-      const marker = L.marker([departureCoords.lat, departureCoords.lng], { icon: greenIcon })
+      const marker = L.marker([departureCoords.lat, departureCoords.lng], { icon: tealIcon })
         .addTo(mapRef.current)
         .bindPopup('Departure');
       
@@ -97,13 +118,32 @@ const LeafletTripMap: React.FC<LeafletTripMapProps> = ({
     if (destinationMarker) {
       destinationMarker.setLatLng([destinationCoords.lat, destinationCoords.lng]);
     } else {
-      const redIcon = L.icon({
-        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-        iconSize: [25, 41],
-        iconAnchor: [12, 41],
-        popupAnchor: [1, -34],
-        shadowSize: [41, 41]
+      // ✅ Create custom red marker icon for destination
+      const redIcon = L.divIcon({
+        className: 'custom-div-icon',
+        html: `
+          <div style="
+            background-color: #ef4444;
+            width: 40px;
+            height: 40px;
+            border-radius: 50% 50% 50% 0;
+            transform: rotate(-45deg);
+            border: 3px solid white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+          ">
+            <div style="
+              transform: rotate(45deg);
+              color: white;
+              font-weight: bold;
+              font-size: 18px;
+              text-align: center;
+              line-height: 34px;
+            ">🎯</div>
+          </div>
+        `,
+        iconSize: [40, 40],
+        iconAnchor: [20, 40],
+        popupAnchor: [0, -40]
       });
 
       const marker = L.marker([destinationCoords.lat, destinationCoords.lng], { icon: redIcon })
@@ -118,10 +158,10 @@ const LeafletTripMap: React.FC<LeafletTripMapProps> = ({
   useEffect(() => {
     if (!mapRef.current || !departureCoords || !destinationCoords) return;
 
-    // ✅ FIX: Create unique key for this route
+    // Create unique key for this route
     const routeKey = `${departureCoords.lat},${departureCoords.lng}-${destinationCoords.lat},${destinationCoords.lng}-${transport}`;
     
-    // ✅ FIX: Skip if already calculated this exact route
+    // Skip if already calculated this exact route
     if (lastCalculatedRef.current === routeKey) {
       console.log('⏭️ Route already calculated, skipping');
       return;
@@ -175,11 +215,11 @@ const LeafletTripMap: React.FC<LeafletTripMapProps> = ({
 
     console.log('✅ Leaflet route calculated:', routeInfo);
 
-    // ✅ FIX: Call callback only once
+    // Call callback only once
     if (onRouteCalculated) {
       onRouteCalculated(routeInfo, []);
     }
-  }, [departureCoords, destinationCoords, transport]); // ✅ REMOVED onRouteCalculated from dependencies
+  }, [departureCoords, destinationCoords, transport]);
 
   return (
     <div ref={mapContainerRef} className="w-full h-full" />

@@ -101,7 +101,7 @@ const PhoneLogin: React.FC<PhoneLoginProps> = ({ onSwitchToSignup }) => {
     try {
       console.log('📱 Verifying SMS code...');
       
-      // ✅ Call API ONCE to verify code
+      // Call API to verify code
       const apiResponse = await apiClient.verifySmsCode(phone, code);
       
       console.log('API Response:', apiResponse);
@@ -109,7 +109,7 @@ const PhoneLogin: React.FC<PhoneLoginProps> = ({ onSwitchToSignup }) => {
       if (apiResponse.code === 200 && apiResponse.data) {
         const userData = apiResponse.data;
         
-        // ✅ Validate required fields
+        // Validate required fields
         if (!userData.token) {
           throw new Error('Invalid response: missing token');
         }
@@ -120,8 +120,9 @@ const PhoneLogin: React.FC<PhoneLoginProps> = ({ onSwitchToSignup }) => {
         console.log('✅ Verification successful!');
         console.log('Token:', userData.token.substring(0, 30) + '...');
         console.log('User ID:', userData.userId);
+        console.log('PayType:', userData.payType); // ✅ NEW: Log payType
 
-        // ✅ Save to localStorage for AuthContext
+        // ✅ Save to localStorage for AuthContext (including payType)
         localStorage.setItem('custom_auth_token', userData.token);
         
         const customUserData = {
@@ -129,23 +130,34 @@ const PhoneLogin: React.FC<PhoneLoginProps> = ({ onSwitchToSignup }) => {
           phone: userData.phone || phone,
           displayName: userData.nickname || phone,
           emailVerified: true,
-          isCustomAuth: true as const
+          isCustomAuth: true as const,
+          payType: userData.payType || 0 // ✅ NEW: Include payType
         };
         localStorage.setItem('custom_user_data', JSON.stringify(customUserData));
 
-        // ✅ Save for payment system
+        // ✅ Save payType separately for easy access
+        localStorage.setItem('payType', String(userData.payType || 0));
+
+        // ✅ Save for payment system (now includes payType)
         console.log('💾 Saving data for payment system...');
         saveChineseLoginData({
           token: userData.token,
           userId: userData.userId,
           phone: userData.phone || phone,
-          nickname: userData.nickname || phone
+          nickname: userData.nickname || phone,
+          payType: userData.payType || 0 // ✅ NEW: Include payType
         });
 
         console.log('✅ All data saved successfully!');
+        console.log('PayType:', userData.payType, '(', 
+          userData.payType === 0 ? 'Free' :
+          userData.payType === 1 ? 'VIP Week' :
+          userData.payType === 2 ? 'VIP Month' :
+          userData.payType === 3 ? 'VIP Quarter' :
+          userData.payType === 4 ? 'VIP Year' : 'Unknown', 
+        ')');
         
         // ✅ Reload page to trigger AuthContext restoration
-        // This will make AuthContext pick up the saved tokens
         window.location.href = '/';
         
       } else {

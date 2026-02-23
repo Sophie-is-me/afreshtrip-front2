@@ -184,5 +184,9 @@
   "changesInServices": "服务变更",
   "changesMsg": "变更消息",
     "choosePlan": "选择您的订阅计划",
-  "youAreHere": "您在这里！"
+  "youAreHere": "您在这里！",
+  "currentPlan": "当前计划",
+  "freeTitle": "免费计划 - 有限访问",
+  "freeDescription": "您当前处于免费计划，功能有限。升级到 VIP 以解锁高级功能！",
+  "benefitsTitle": "为什么升级到 VIP？"
 }

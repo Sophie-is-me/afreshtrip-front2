@@ -14,6 +14,7 @@ interface CustomUser {
   photoURL?: string;
   emailVerified: boolean;
   isCustomAuth: true;
+  payType?: number; // ✅ NEW: 0=Free, 1=Week, 2=Month, 3=Quarter, 4=Year
   metadata?: {
     creationTime: string;
   };
@@ -27,6 +28,8 @@ interface AuthContextType {
   userProfile: UserInfo | null;
   loading: boolean;
   isCustomAuth: boolean;
+  payType: number; // ✅ NEW: Expose payType directly
+  isPremium: boolean; // ✅ NEW: Quick check for premium status
   loginWithEmail: (email: string, password: string) => Promise<void>;
   registerWithEmail: (email: string, password: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
@@ -44,6 +47,7 @@ interface AuthContextType {
     birthDate?: string;
   }) => Promise<void>;
   refreshUserProfile: () => Promise<void>;
+  updatePayType: (payType: number) => void; // ✅ NEW: Update subscription status
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -61,6 +65,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [customUser, setCustomUser] = useState<CustomUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [payType, setPayType] = useState<number>(0); // ✅ NEW: Track payType in state
   const queryClient = useQueryClient();
 
   // React Query for User Profile
@@ -115,17 +120,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (isChineseVersion) {
       const customToken = localStorage.getItem('custom_auth_token');
       const customUserData = localStorage.getItem('custom_user_data');
+      const storedPayType = localStorage.getItem('payType'); // ✅ NEW: Restore payType
 
       if (customToken) {
         if (customUserData) {
           try {
             const parsedUser: CustomUser = JSON.parse(customUserData);
             setCustomUser(parsedUser);
+            
+            // ✅ NEW: Restore payType
+            if (storedPayType) {
+              const payTypeNum = parseInt(storedPayType, 10);
+              setPayType(payTypeNum);
+              parsedUser.payType = payTypeNum;
+            } else if (parsedUser.payType !== undefined) {
+              setPayType(parsedUser.payType);
+            }
+            
             console.log('Restored custom auth state for Chinese user:', parsedUser.displayName || parsedUser.phone || parsedUser.email);
+            console.log('PayType:', parsedUser.payType);
           } catch (error) {
             console.error('Failed to parse stored custom user data:', error);
             localStorage.removeItem('custom_auth_token');
             localStorage.removeItem('custom_user_data');
+            localStorage.removeItem('payType');
           }
         } else {
           (async () => {
@@ -138,11 +156,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   phone: userInfo.phone || undefined,
                   displayName: userInfo.nickname || undefined,
                   emailVerified: true,
-                  isCustomAuth: true
+                  isCustomAuth: true,
+                  payType: storedPayType ? parseInt(storedPayType, 10) : 0 // ✅ NEW
                 };
                 setCustomUser(mockCustomUser);
+                
+                // ✅ NEW: Set payType from storage or default to 0
+                if (storedPayType) {
+                  setPayType(parseInt(storedPayType, 10));
+                }
+                
                 localStorage.setItem('custom_user_data', JSON.stringify(mockCustomUser));
                 console.log('Fetched and restored custom auth state for Chinese user:', mockCustomUser.displayName || mockCustomUser.phone || mockCustomUser.email);
+                console.log('PayType:', mockCustomUser.payType);
               } else {
                 throw new Error('Invalid user info');
               }
@@ -151,6 +177,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               if (error instanceof Error && (error.message.includes('401') || error.message.includes('Unauthorized'))) {
                 console.warn('Clearing invalid auth token due to authentication error');
                 localStorage.removeItem('custom_auth_token');
+                localStorage.removeItem('payType');
               } else {
                 console.warn('Keeping auth token despite restoration failure - may be temporary issue');
               }
@@ -179,40 +206,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await apiClient.verifySmsCode(phone, code);
       
       console.log('📱 API Response:', response);
-      console.log('Response code:', response.code);
-      console.log('Response data:', response.data);
 
-      // ✅ CHECK IF RESPONSE IS SUCCESSFUL
       if (response.code !== 200) {
         throw new Error(response.message || response.msg || 'SMS verification failed');
       }
 
-      // ✅ CHECK IF DATA EXISTS
-      if (!response.data) {
-        console.error('❌ No data in response!');
-        throw new Error('Invalid response from server - missing data');
-      }
-
-      // ✅ CHECK IF TOKEN EXISTS
-      if (!response.data.token) {
-        console.error('❌ No token in response.data!');
-        console.error('Response.data contents:', JSON.stringify(response.data, null, 2));
-        throw new Error('Invalid response from server - missing token');
-      }
-
-      // ✅ CHECK IF USERID EXISTS
-      if (!response.data.userId) {
-        console.error('❌ No userId in response.data!');
-        console.error('Response.data contents:', JSON.stringify(response.data, null, 2));
-        throw new Error('Invalid response from server - missing userId');
+      if (!response.data || !response.data.token || !response.data.userId) {
+        throw new Error('Invalid response from server - missing required data');
       }
 
       console.log('✅ Valid response received');
       console.log('Token:', response.data.token.substring(0, 30) + '...');
       console.log('User ID:', response.data.userId);
+      console.log('PayType:', response.data.payType); // ✅ NEW
 
       // Store the custom JWT token
       localStorage.setItem('custom_auth_token', response.data.token);
+
+      // ✅ NEW: Store payType
+      const userPayType = response.data.payType || 0;
+      localStorage.setItem('payType', String(userPayType));
+      setPayType(userPayType);
 
       // Create a mock Firebase user for compatibility
       const mockCustomUser: CustomUser = {
@@ -220,7 +234,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         phone: response.data.phone || phone,
         displayName: response.data.nickname || phone,
         emailVerified: true,
-        isCustomAuth: true
+        isCustomAuth: true,
+        payType: userPayType // ✅ NEW
       };
 
       // Store user data for persistence
@@ -256,6 +271,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Store the custom JWT token
       localStorage.setItem('custom_auth_token', response.data.token);
 
+      // ✅ NEW: Store payType (default 0 for new users)
+      /*const userPayType = response.data.payType || 0;
+      localStorage.setItem('payType', String(userPayType));
+      setPayType(userPayType);
+*/
       // Create a custom user
       const mockCustomUser: CustomUser = {
         uid: response.data.userId.toString(),
@@ -263,6 +283,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         displayName: response.data.nickname || phone,
         emailVerified: true,
         isCustomAuth: true,
+       // payType: userPayType, // ✅ NEW
         metadata: {
           creationTime: new Date().toISOString(),
         }
@@ -300,6 +321,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Store the custom JWT token
       localStorage.setItem('custom_auth_token', response.data.token);
 
+      // ✅ NEW: Store payType
+      /*const userPayType = response.data.payType || 0;
+      localStorage.setItem('payType', String(userPayType));
+      setPayType(userPayType);
+*/
       // Create a mock Firebase user for compatibility
       const mockCustomUser: CustomUser = {
         uid: response.data.userId.toString(),
@@ -307,6 +333,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         displayName: response.data.nickname || email,
         emailVerified: true,
         isCustomAuth: true
+       // payType: userPayType // ✅ NEW
       };
 
       // Store user data for persistence
@@ -347,7 +374,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Clear custom auth
     localStorage.removeItem('custom_auth_token');
     localStorage.removeItem('custom_user_data');
+    localStorage.removeItem('payType'); // ✅ NEW
     setCustomUser(null);
+    setPayType(0); // ✅ NEW: Reset payType
 
     // Clear user profile cache
     queryClient.clear();
@@ -392,15 +421,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // ✅ NEW: Update payType after subscription change
+  const updatePayType = (newPayType: number) => {
+    console.log('📝 Updating payType to:', newPayType);
+    
+    setPayType(newPayType);
+    localStorage.setItem('payType', String(newPayType));
+    sessionStorage.setItem('payType', String(newPayType));
+    
+    // Update in customUser
+    if (customUser) {
+      const updatedUser = { ...customUser, payType: newPayType };
+      setCustomUser(updatedUser);
+      localStorage.setItem('custom_user_data', JSON.stringify(updatedUser));
+    }
+    
+    console.log('✅ PayType updated successfully');
+  };
+
   const loading = authLoading || (!!firebaseUser && isProfileLoading);
   const user = customUser || firebaseUser;
   const isCustomAuth = !!customUser;
+  const isPremium = payType > 0; // ✅ NEW: Quick premium check
 
   const value = {
     user,
     userProfile,
     loading,
     isCustomAuth,
+    payType, // ✅ NEW
+    isPremium, // ✅ NEW
     loginWithEmail,
     registerWithEmail,
     loginWithGoogle,
@@ -412,6 +462,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     logout,
     updateUserProfile,
     refreshUserProfile,
+    updatePayType, // ✅ NEW
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

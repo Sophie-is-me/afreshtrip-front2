@@ -183,6 +183,10 @@
   "changesInServices": "Changes in services",
   "changesMsg": "Changes message",
   "choosePlan": "Choose Your Subscription Plan",
-  "youAreHere": "You are here!"
+  "youAreHere": "You are here!",
+  "currentPlan": "Current Plan",
+  "freeTitle": "Free Plan - Limited Access",
+  "freeDescription": "You are currently on the free plan with limited features. Upgrade to VIP to unlock premium benefits!",
+  "benefitsTitle": "Why Upgrade to VIP?"
   
 }

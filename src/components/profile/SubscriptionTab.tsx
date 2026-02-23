@@ -1,13 +1,38 @@
 // src/components/profile/SubscriptionTab.tsx
+// ✅ UPDATED: Shows subscription status based on payType from AuthContext
 
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { CheckIcon } from '@heroicons/react/24/solid';
-import { useSubscription } from '../../hooks/useSubscription';
+import { CheckIcon, SparklesIcon } from '@heroicons/react/24/solid';
+import { useAuth } from '../../contexts/AuthContext';
 
 const SubscriptionTab: React.FC = () => {
   const { t } = useTranslation();
-  const { plans, currentPlan, isUpdating, selectPlan } = useSubscription();
+  const { payType, isPremium } = useAuth(); // ✅ Get payType from context
+
+  // Map payType to plan ID
+  const getCurrentPlanId = (payType: number): string => {
+    switch (payType) {
+      case 1: return 'week';
+      case 2: return 'month';
+      case 3: return 'season';
+      case 4: return 'year';
+      default: return 'free';
+    }
+  };
+
+  // Get plan name from payType
+  const getPlanName = (payType: number): string => {
+    switch (payType) {
+      case 1: return 'VIP Week';
+      case 2: return 'VIP Month';
+      case 3: return 'VIP Quarter';
+      case 4: return 'VIP Year';
+      default: return 'Free';
+    }
+  };
+
+  const currentPlanId = getCurrentPlanId(payType);
 
   const subscriptionPlans = [
     {
@@ -15,39 +40,90 @@ const SubscriptionTab: React.FC = () => {
       name: t('trips.week') || 'Week',
       price: '$19',
       duration: t('trips.perWeek') || 'per week',
-      isCurrent: currentPlan?.id === 'week'
+      isCurrent: currentPlanId === 'week',
+      payType: 1
     },
     {
       id: 'month',
       name: t('trips.month') || 'Month',
       price: '$39',
       duration: t('trips.perMonth') || 'per month',
-      isCurrent: currentPlan?.id === 'month'
+      isCurrent: currentPlanId === 'month',
+      payType: 2
     },
     {
       id: 'season',
-      name: t('trips.season') || 'Season',
+      name: t('trips.season') || 'Season (3 months)',
       price: '$89',
-      duration: t('trips.perSeason') || 'per season',
-      isCurrent: currentPlan?.id === 'season'
+      duration: t('trips.perSeason') || 'per quarter',
+      isCurrent: currentPlanId === 'season',
+      payType: 3
     },
     {
       id: 'year',
       name: t('trips.year') || 'Year',
       price: '$199',
       duration: t('trips.perYear') || 'per year',
-      isCurrent: currentPlan?.id === 'year'
+      isCurrent: currentPlanId === 'year',
+      payType: 4
     }
   ];
 
-  const handleSelectPlan = (planId: string) => {
-    if (selectPlan) {
-      selectPlan(planId);
-    }
+  const handleSelectPlan = (planId: string, planPayType: number) => {
+    console.log('Selected plan:', planId, 'PayType:', planPayType);
+    // TODO: Navigate to payment page with selected plan
+    alert(`Payment integration coming soon for ${planId} plan`);
   };
 
   return (
     <div>
+      {/* Current Subscription Status Banner */}
+      {!isPremium ? (
+        <div className="mb-8 p-6 bg-gradient-to-r from-gray-600 to-gray-700 rounded-2xl text-white">
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0">
+              <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                <SparklesIcon className="w-6 h-6" />
+              </div>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-xl font-bold mb-2">
+                {t('trips.freeTitle') || 'Free Plan - Limited Access'}
+              </h3>
+              <p className="text-white/90 text-sm mb-4">
+                {t('trips.freeDescription') || 'You are currently on the free plan with limited features. Upgrade to VIP to unlock premium benefits!'}
+              </p>
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/20 rounded-full text-sm font-medium">
+                <span></span>
+                <span>{t('trips.currentPlan') || 'Current Plan'}: <strong>Free</strong></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="mb-8 p-6 bg-gradient-to-r from-teal-600 to-teal-700 rounded-2xl text-white">
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0">
+              <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                <CheckIcon className="w-6 h-6" />
+              </div>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-xl font-bold mb-2">
+                {t('subscription.premiumTitle') || 'VIP Member - Premium Access'}
+              </h3>
+              <p className="text-white/90 text-sm mb-4">
+                {t('subscription.premiumDescription') || 'You have full access to all premium features. Thank you for being a valued VIP member!'}
+              </p>
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/20 rounded-full text-sm font-medium">
+                <span>⭐</span>
+                <span>{t('subscription.currentPlan') || 'Current Plan'}: <strong>{getPlanName(payType)}</strong></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <h2 className="text-2xl font-bold text-gray-900 mb-8 text-center">
         {t('trips.choosePlan') || 'Choose Your Subscription Plan'}
       </h2>
@@ -58,14 +134,14 @@ const SubscriptionTab: React.FC = () => {
             key={plan.id}
             className={`relative rounded-2xl border-2 p-6 transition-all ${
               plan.isCurrent
-                ? 'border-teal-600 bg-teal-50 shadow-lg'
+                ? 'border-teal-600 bg-teal-50 shadow-lg scale-105'
                 : 'border-gray-200 bg-white hover:border-teal-300 hover:shadow-md'
             }`}
           >
             {/* Current Plan Badge */}
             {plan.isCurrent && (
-              <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 px-4 py-1 bg-teal-600 text-white text-xs font-bold rounded-full">
-                {t('trips.youAreHere') || 'You are here!'}
+              <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 px-4 py-1 bg-teal-600 text-white text-xs font-bold rounded-full shadow-md">
+                ✨ {t('trips.youAreHere') || 'Active Plan'}
               </div>
             )}
 
@@ -87,49 +163,111 @@ const SubscriptionTab: React.FC = () => {
             {/* Features */}
             <ul className="space-y-3 mb-6">
               <li className="flex items-center gap-2 text-sm text-gray-700">
-                <CheckIcon className="w-5 h-5 text-teal-600" />
-                {t('subscription.feature1') || 'Unlimited access'}
+                <CheckIcon className="w-5 h-5 text-teal-600 flex-shrink-0" />
+                <span>{t('subscription.feature1') || 'Unlimited trip planning'}</span>
               </li>
               <li className="flex items-center gap-2 text-sm text-gray-700">
-                <CheckIcon className="w-5 h-5 text-teal-600" />
-                {t('subscription.feature2') || 'Priority support'}
+                <CheckIcon className="w-5 h-5 text-teal-600 flex-shrink-0" />
+                <span>{t('subscription.feature2') || 'AI-powered recommendations'}</span>
               </li>
               <li className="flex items-center gap-2 text-sm text-gray-700">
-                <CheckIcon className="w-5 h-5 text-teal-600" />
-                {t('subscription.feature3') || 'Exclusive deals'}
+                <CheckIcon className="w-5 h-5 text-teal-600 flex-shrink-0" />
+                <span>{t('subscription.feature3') || 'Priority customer support'}</span>
+              </li>
+              <li className="flex items-center gap-2 text-sm text-gray-700">
+                <CheckIcon className="w-5 h-5 text-teal-600 flex-shrink-0" />
+                <span>{t('subscription.feature4') || 'Exclusive travel deals'}</span>
               </li>
             </ul>
 
             {/* Action Button */}
             <button
-              onClick={() => handleSelectPlan(plan.id)}
-              disabled={plan.isCurrent || isUpdating}
-              className={`w-full py-3 px-4 rounded-xl font-semibold transition-colors ${
+              onClick={() => handleSelectPlan(plan.id, plan.payType)}
+              disabled={plan.isCurrent}
+              className={`w-full py-3 px-4 rounded-xl font-semibold transition-all ${
                 plan.isCurrent
-                  ? 'bg-gray-800 text-white cursor-default'
-                  : 'bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50'
+                  ? 'bg-gray-800 text-white cursor-default opacity-75'
+                  : 'bg-teal-600 text-white hover:bg-teal-700 hover:shadow-lg active:scale-95'
               }`}
             >
               {plan.isCurrent
-                ? t('trips.currentPlan') || 'Current Plan'
-                : t('trips.upgrade') || 'Update'}
+                ? `✓ ${t('trips.currentPlan') || 'Current Plan'}`
+                : t('trips.upgrade') || 'Upgrade Now'}
             </button>
           </div>
         ))}
       </div>
 
-      {/* Additional Info */}
-      <div className="mt-12 p-6 bg-gray-50 rounded-xl max-w-3xl mx-auto">
-        <h3 className="font-semibold text-gray-900 mb-2">
-          {t('subscription.infoTitle') || 'Subscription Information'}
+      {/* Benefits Comparison */}
+      <div className="mt-12 p-8 bg-gray-50 rounded-2xl max-w-4xl mx-auto">
+        <h3 className="text-xl font-bold text-gray-900 mb-6 text-center">
+          {t('trips.benefitsTitle') || 'Why Upgrade to VIP?'}
         </h3>
-        <ul className="space-y-2 text-sm text-gray-600">
-          <li>• {t('subscription.info1') || 'All plans include access to premium features'}</li>
-          <li>• {t('subscription.info2') || 'Cancel anytime without any penalties'}</li>
-          <li>• {t('subscription.info3') || 'Automatic renewal unless cancelled'}</li>
-          <li>• {t('subscription.info4') || 'Secure payment processing'}</li>
-        </ul>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Free Plan */}
+          <div className="bg-white p-6 rounded-xl border-2 border-gray-200">
+            <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+             
+              <span>Free Plan</span>
+            </h4>
+            <ul className="space-y-2 text-sm text-gray-600">
+              <li className="flex items-start gap-2">
+                <span className="text-red-500 mt-0.5">✗</span>
+                <span>Limited to 3 trips per month</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-red-500 mt-0.5">✗</span>
+                <span>Basic route planning only</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-red-500 mt-0.5">✗</span>
+                <span>No AI recommendations</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-red-500 mt-0.5">✗</span>
+                <span>Standard support</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* VIP Plan */}
+          <div className="bg-gradient-to-br from-teal-50 to-teal-100 p-6 rounded-xl border-2 border-teal-500">
+            <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+             
+              <span>VIP Plans</span>
+            </h4>
+            <ul className="space-y-2 text-sm text-gray-700">
+              <li className="flex items-start gap-2">
+                <span className="text-teal-600 mt-0.5">✓</span>
+                <span><strong>Unlimited</strong> trip planning</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-teal-600 mt-0.5">✓</span>
+                <span>Advanced route optimization</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-teal-600 mt-0.5">✓</span>
+                <span>AI-powered personalized recommendations</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-teal-600 mt-0.5">✓</span>
+                <span>24/7 priority customer support</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-teal-600 mt-0.5">✓</span>
+                <span>Exclusive travel discounts & deals</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-teal-600 mt-0.5">✓</span>
+                <span>Offline maps & navigation</span>
+              </li>
+            </ul>
+          </div>
+        </div>
       </div>
+
+  
     </div>
   );
 };

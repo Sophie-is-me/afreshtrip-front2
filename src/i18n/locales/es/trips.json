@@ -182,7 +182,11 @@
   "changesInServices": "Cambios en los servicios",
   "changesMsg": "Mensaje de cambios",
   "choosePlan": "Elige tu plan de suscripción",
-  "youAreHere": "¡Estás aquí!"
+  "youAreHere": "¡Estás aquí!",
+  "currentPlan": "Plan actual",
+  "freeTitle": "Plan gratuito - Acceso limitado",
+  "freeDescription": "Actualmente estás en el plan gratuito con funciones limitadas. ¡Actualiza a VIP para desbloquear beneficios premium!",
+  "benefitsTitle": "¿Por qué actualizar a VIP?"
     
 
     

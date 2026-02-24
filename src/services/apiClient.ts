@@ -167,7 +167,7 @@ const COLLECTIONS = {
 // HTTP CLIENT CONFIGURATION (for SMS Auth)
 // ============================================================================
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://47.94.202.5:9000/web';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://192.168.10.243:9000/web';
 
 // ============================================================================
 // HELPER FUNCTIONS

@@ -246,15 +246,7 @@ const PaymentResult: React.FC = () => {
             </ul>
           </div>
 
-          {/* Debug Info (Remove in production) */}
-          {process.env.NODE_ENV === 'development' && orderData && (
-            <div className="bg-slate-900 text-white rounded-xl p-6 mb-8 font-mono text-xs">
-              <p className="text-slate-400 mb-2">Backend Response (Dev Only):</p>
-              <pre className="whitespace-pre-wrap break-all">
-                {JSON.stringify(orderData, null, 2)}
-              </pre>
-            </div>
-          )}
+
 
           {/* Action Buttons */}
           <div className="space-y-4">

@@ -1,7 +1,7 @@
 // src/services/paymentApi.ts
 // Payment API Service - Fixed for actual backend response structure
 
-const API_BASE_URL = 'http://47.94.202.5:9000/web';
+const API_BASE_URL = 'http://192.168.10.243:9000/web';
 
 const VIP_TYPE_CODE_MAPPING: Record<string, string> = {
   'week': 'VIP_WEEK',
@@ -77,7 +77,7 @@ const getUserId = (): number | null => {
 // ============================================================================
 
 interface CreateOrderRequest {
-  vipTypeCode: string;
+  levelId: number;
 }
 
 interface OrderData {
@@ -124,11 +124,11 @@ export const createAlipayOrder = async (planId: string): Promise<OrderData> => {
     throw new Error(error.message || 'Authentication failed. Please login.');
   }
   
-  const vipTypeCode = VIP_TYPE_CODE_MAPPING[planId] || 'MONTH';
+  const levelId = VIP_TYPE_ID_MAPPING[planId] || 2;
 
   console.log('🛒 Creating Alipay order...');
   console.log('Plan ID:', planId);
-  console.log('VIP Type Code:', vipTypeCode);
+  console.log('Level ID:', levelId);
   console.log('API URL:', `${API_BASE_URL}/order/createOrder`);
 
   try {
@@ -139,7 +139,7 @@ export const createAlipayOrder = async (planId: string): Promise<OrderData> => {
         'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify({
-        vipTypeCode: vipTypeCode
+        levelId: levelId
       } as CreateOrderRequest)
     });
 

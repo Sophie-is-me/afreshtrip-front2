@@ -36,7 +36,7 @@ interface BlogContextType {
     isLiked?: boolean; 
     isSaved?: boolean;
   }) => void;
-  toggleLike: (postId: string) => Promise<boolean>;
+  toggleLike: (postId: string, currentIsLiked: boolean) => Promise<{ likes: number; isLiked: boolean }>;
   uploadImage: (file: File) => Promise<string>;
   getUserMediaLibrary: (page?: number, size?: number) => Promise<{
     images: string[];
@@ -44,7 +44,7 @@ interface BlogContextType {
     hasMore: boolean;
   }>;
   toggleCommentLike: (commentId: string) => Promise<boolean>;
-  addComment: (blogId: string, content: string, replyToId?: string) => Promise<Comment>;
+  addComment: (blId: string, content: string, replyToId?: string) => Promise<Comment>;
   refreshBlogPosts: () => Promise<void>;
   canUserEdit: (post: BlogPost) => boolean;
 }
@@ -117,11 +117,14 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('Post not found');
       }
 
-      // ✅ Use comments from post if available
-      const comments: Comment[] = (post as any).comments || [];
+      // ✅ Get comments from post
+      const flatComments: Comment[] = (post as any).comments || [];
       
-      console.log('✅ Fetched blog details');
-      return { post, comments };
+      // ✅ Nest comments so replies group under parents
+      const nestedComments = blogApi.nestCommentReplies(flatComments);
+      
+      console.log('✅ Fetched blog details with', nestedComments.length, 'comments');
+      return { post, comments: nestedComments };
     } catch (err) {
       console.error('❌ Error fetching blog details:', err);
       throw err;
@@ -344,23 +347,28 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setBlogPosts(prev => prev.map(p => p.id === id ? { ...p, ...stats } : p));
   }, []);
 
-  const toggleLike = useCallback(async (postId: string): Promise<boolean> => {
+  const toggleLike = useCallback(async (postId: string, currentIsLiked: boolean): Promise<{ likes: number; isLiked: boolean }> => {
     if (!user) {
       throw new Error('User must be logged in to like posts');
     }
 
     try {
-      console.log('❤️ Toggling like for post:', postId);
-      const isLiked = await blogApi.toggleLike(postId);
+      console.log('❤️ Toggling like for post:', postId, 'Current isLiked:', currentIsLiked);
+      
+      // ✅ Pass currentIsLiked state to togglePostLike
+      // This ensures backend sends correct type: 1 for like, 0 for unlike
+      const result = await blogApi.togglePostLike(postId, currentIsLiked);
+      
+      console.log('✅ Like toggled! New state:', result);
       
       // Update local state
       setBlogPosts(prev => prev.map(p => {
         if (p.id === postId) {
           return {
             ...p,
-            likes: isLiked ? (p.likes || 0) + 1 : (p.likes || 0) - 1,
-            isLiked: isLiked,
-            likedBy: isLiked 
+            likes: result.likes,
+            isLiked: result.isLiked,
+            likedBy: result.isLiked 
               ? [...(p.likedBy || []), user.uid]
               : (p.likedBy || []).filter((id: string) => id !== user.uid)
           };
@@ -368,8 +376,7 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return p;
       }));
       
-      console.log(isLiked ? '✅ Liked!' : '✅ Unliked!');
-      return isLiked;
+      return result;
     } catch (err) {
       console.error('❌ Error toggling like:', err);
       throw err;
@@ -377,18 +384,40 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [user]);
 
   const toggleCommentLike = useCallback(async (commentId: string): Promise<boolean> => {
-    console.log('Mock: Toggle comment like', commentId);
-    return true;
+    try {
+      console.log('❤️ Toggling like for comment:', commentId);
+      
+      // ✅ Call actual API instead of mock
+      const isLiked = await blogApi.toggleCommentLike(commentId);
+      
+      console.log('✅ Comment like toggled! isLiked:', isLiked);
+      return isLiked;
+    } catch (err) {
+      console.error('❌ Error toggling comment like:', err);
+      throw err;
+    }
   }, []);
 
-  const addComment = useCallback(async (blogId: string, content: string, replyToId?: string): Promise<Comment> => {
+  const addComment = useCallback(async (blId: string, content: string, replyToId?: string): Promise<Comment> => {
     if (!user) {
       throw new Error('User must be logged in');
     }
 
-    // ✅ Use real API
-    const newComment = await blogApi.addComment(blogId, content, replyToId);
-    return newComment;
+    try {
+      console.log('💬 Adding comment to blog:', blId);
+      if (replyToId) {
+        console.log('💬 Reply to comment:', replyToId);
+      }
+
+      // ✅ Use real API
+      const newComment = await blogApi.addComment(blId, content, replyToId);
+      
+      console.log('✅ Comment added successfully!');
+      return newComment;
+    } catch (err) {
+      console.error('❌ Error adding comment:', err);
+      throw err;
+    }
   }, [user]);
 
   // ✅ Helper function to check if user can edit post

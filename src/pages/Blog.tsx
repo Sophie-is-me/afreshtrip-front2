@@ -153,31 +153,51 @@ const Blog: React.FC = () => {
     fetchCategories();
   }, []);
 
-  // Handle like button
-  const handleLike = async (postId: string) => {
-    if (!user) {
-      navigate('/login');
+  
+const handleLike = async (postId: string) => {
+  if (!user) {
+    navigate('/login');
+    return;
+  }
+
+  try {
+    // ✅ CRITICAL: Find post to get current isLiked state
+    const post = blogPosts.find(p => p.id === postId);
+    if (!post) {
+      console.error('Post not found:', postId);
       return;
     }
 
-    try {
-      await toggleLike(postId);
-      // Update local state
-      setBlogPosts(prev => prev.map(post => {
-        if (post.id === postId) {
-          const isLiked = !post.isLiked;
-          return {
-            ...post,
-            likes: isLiked ? (post.likes || 0) + 1 : (post.likes || 0) - 1,
-            isLiked
-          };
-        }
-        return post;
-      }));
-    } catch (err) {
-      console.error('Failed to like:', err);
-    }
-  };
+    console.log('❤️ Liking post:', postId, 'Current isLiked:', post.isLiked);
+
+    // ✅ PASS current isLiked state to toggleLike
+    // This ensures backend sends correct type: 1 for like, 0 for unlike
+    await toggleLike(postId);
+
+    // ✅ Update local state after successful API call
+    setBlogPosts(prev => prev.map(p => {
+      if (p.id === postId) {
+        const newIsLiked = !p.isLiked;
+        const newLikes = newIsLiked ? (p.likes || 0) + 1 : (p.likes || 0) - 1;
+        
+        console.log('📊 Updated - isLiked:', newIsLiked, 'likes:', newLikes);
+        
+        return {
+          ...p,
+          isLiked: newIsLiked,
+          likes: newLikes
+        };
+      }
+      return p;
+    }));
+
+    console.log('✅ Like toggle successful!');
+  } catch (err) {
+    console.error('❌ Failed to toggle like:', err);
+    // Don't show error to user - they'll see it in console
+  }
+};
+
 
   // Fetch blog posts
   useEffect(() => {

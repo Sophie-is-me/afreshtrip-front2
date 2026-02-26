@@ -355,7 +355,7 @@ export interface BlogCommentVo extends BlogVo {
 
 export interface Comment {
   id?: number;
-  blogId?: number;
+  blId?: number;
   userId?: number;
   content: string;
   replyToCommentId?: number;

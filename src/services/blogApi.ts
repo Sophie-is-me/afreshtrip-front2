@@ -168,6 +168,43 @@ const timestampToString = (timestamp: any): string => {
 // HELPER FUNCTIONS
 // ============================================================================
 
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+// ✅ Extract images from TipTap JSON content
+const extractImagesFromContent = (content: string | undefined): string[] => {
+  if (!content) return [];
+
+  try {
+    const json = JSON.parse(content);
+    const images: string[] = [];
+
+    const extractFromNode = (node: any) => {
+      if (!node) return;
+
+      // Check if this is an image node
+      if (node.type === 'image' && node.attrs?.src) {
+        images.push(node.attrs.src);
+      }
+
+      // Recursively check child nodes
+      if (node.content && Array.isArray(node.content)) {
+        node.content.forEach(extractFromNode);
+      }
+    };
+
+    // Start extraction from root
+    extractFromNode(json);
+    
+    console.log('📸 Extracted', images.length, 'images from content');
+    return images;
+  } catch (err) {
+    console.warn('⚠️ Could not extract images from content:', err);
+    return [];
+  }
+};
+
 // ✅ Check if user can edit post
 export const canEditPost = (post: BlogPost, currentUserId?: string): boolean => {
   if (!currentUserId) return false;
@@ -241,6 +278,238 @@ export const uploadBlogMedia = async (file: File): Promise<string> => {
   }
 };
 
+
+
+// Add these functions to your blogApi.ts file
+
+// ============================================================================
+// LIKE FUNCTIONALITY
+// ============================================================================
+
+/**
+ * Toggle like on a blog post
+ * POST /blog/likeBlog with type parameter
+ */
+export const togglePostLike = async (
+  blId: string,
+  currentIsLiked: boolean
+): Promise<{ likes: number; isLiked: boolean }> => {
+  console.log('❤️ Toggling like for blog:', blId, 'Current isLiked:', currentIsLiked);
+
+  if (IS_CHINESE_VERSION) {
+    try {
+      interface LikeResponse {
+        code: number;
+        msg: string;
+        data?: {
+          likes?: number;
+          like?: number;
+          isLiked?: boolean;
+        };
+      }
+
+      // ✅ IMPORTANT: Send correct type based on current state
+      // If already liked (currentIsLiked=true), send type:0 to UNLIKE
+      // If not liked (currentIsLiked=false), send type:1 to LIKE
+      const typeValue = currentIsLiked ? '0' : '1';
+
+      console.log('📤 Sending type:', typeValue, '(', currentIsLiked ? 'unlike' : 'like', ')');
+
+      const response = await httpClient.post<LikeResponse>('/blog/likeBlog', {
+        blId: blId,
+        type: typeValue  // ✅ 1=like, 0=unlike
+      });
+
+      if (response.code === 200) {
+        console.log('✅ Like toggled successfully');
+        const likes = response.data?.likes || response.data?.like || 0;
+        const isLiked = response.data?.isLiked ?? !currentIsLiked;  // Toggle state
+        
+        console.log('📊 New state - Likes:', likes, 'IsLiked:', isLiked);
+        
+        return {
+          likes: likes,
+          isLiked: isLiked
+        };
+      }
+
+      throw new Error(response.msg || 'Failed to toggle like');
+    } catch (error: any) {
+      console.error('❌ Error toggling like:', error);
+      console.error('   Message:', error.message);
+      throw error;
+    }
+  } else {
+    // Firebase fallback
+    throw new Error('Like functionality not implemented for Firebase');
+  }
+};
+
+// ============================================================================
+// VIEW TRACKING
+// ============================================================================
+
+/**
+ * Increment view count for a blog post
+ * POST /blog/viewBlog
+ */
+export const incrementPostViews = async (blId: string): Promise<{ views: number }> => {
+  console.log('👀 Incrementing views for blog:', blId);
+
+  if (IS_CHINESE_VERSION) {
+    try {
+      interface ViewResponse {
+        code: number;
+        msg: string;
+        data?: {
+          play?: number;
+          views?: number;
+        };
+      }
+
+      const response = await httpClient.post<ViewResponse>('/blog/viewBlog', {
+        blId: blId
+      });
+
+      if (response.code === 200) {
+        console.log('✅ View recorded successfully');
+        // Backend returns "play" field which is views
+        const views = response.data?.play || response.data?.views || 0;
+        return { views };
+      }
+
+      throw new Error(response.msg || 'Failed to record view');
+    } catch (error: any) {
+      console.error('❌ Error recording view:', error);
+      // Don't throw - view tracking should not break the page
+      return { views: 0 };
+    }
+  } else {
+    // Firebase fallback
+    return { views: 0 };
+  }
+};
+
+// ============================================================================
+// COMMENT NESTING - Organize flat comments into nested structure
+// ============================================================================
+
+/**
+ * Convert flat comment array from API into nested reply structure
+ * 
+ * Backend returns comments as flat list with replyToCommentId field
+ * This function organizes them into a nested structure where replies 
+ * are grouped under their parent comments
+ */
+export const nestCommentReplies = (comments: any[]): Comment[] => {
+  if (!comments || comments.length === 0) {
+    console.log('📝 No comments to organize');
+    return [];
+  }
+
+  console.log('📝 Organizing', comments.length, 'comments into nested structure');
+
+  try {
+    // Step 1: Map to proper Comment objects with all required fields
+    const mappedComments: Comment[] = comments.map((c: any) => ({
+      id: String(c.id || c.commentId),
+      content: c.content || '',
+      author: {
+        name: c.author?.nickname || 'Anonymous',
+        avatar: c.author?.avatar || DEFAULT_AVATAR
+      },
+      date: c.createdAt || new Date().toISOString(),
+      likes: c.likes || 0,
+      isLiked: c.isLiked || false,
+      replies: [] as Comment[]
+    }));
+
+    // Step 2: Separate top-level comments and replies
+    const topLevelComments = mappedComments.filter(c => {
+      const replyToId = (comments.find(raw => String(raw.id || raw.commentId) === c.id) as any)?.replyToCommentId;
+      return !replyToId;
+    });
+
+    const replies = mappedComments.filter(c => {
+      const replyToId = (comments.find(raw => String(raw.id || raw.commentId) === c.id) as any)?.replyToCommentId;
+      return replyToId;
+    });
+
+    console.log('📊 Found', topLevelComments.length, 'top-level comments and', replies.length, 'replies');
+
+    // Step 3: Build nested structure by grouping replies under their parent comments
+    const result: Comment[] = topLevelComments.map(topLevel => {
+      const nestedReplies = replies
+        .filter(reply => {
+          // Find original comment to get replyToCommentId
+          const original = comments.find(c => String(c.id || c.commentId) === reply.id);
+          return original?.replyToCommentId === topLevel.id;
+        })
+        .map(reply => ({
+          ...reply,
+          replies: [] as Comment[]
+        }));
+
+      console.log('✅ Comment', topLevel.id, 'has', nestedReplies.length, 'replies');
+
+      return {
+        ...topLevel,
+        replies: nestedReplies
+      };
+    });
+
+    console.log('✅ Successfully organized comments into', result.length, 'top-level comments with nested replies');
+    return result;
+  } catch (error) {
+    console.error('❌ Error nesting comments:', error);
+    // Return flat structure as fallback
+    return mappedComments;
+  }
+};
+
+// ============================================================================
+// COMMENT LIKES
+// ============================================================================
+
+/**
+ * Toggle like on a comment
+ * POST /comment/like or /comment/unlike
+ */
+export const toggleCommentLike = async (commentId: string): Promise<boolean> => {
+  console.log('❤️ Toggling like for comment:', commentId);
+
+  if (IS_CHINESE_VERSION) {
+    try {
+      interface CommentLikeResponse {
+        code: number;
+        msg: string;
+        data?: {
+          isLiked?: boolean;
+          likes?: number;
+        };
+      }
+
+      const response = await httpClient.post<CommentLikeResponse>('/comment/like', {
+        commentId: commentId
+      });
+
+      if (response.code === 200) {
+        console.log('✅ Comment like toggled');
+        return response.data?.isLiked || true;
+      }
+
+      throw new Error(response.msg || 'Failed to toggle comment like');
+    } catch (error: any) {
+      console.error('❌ Error toggling comment like:', error);
+      throw error;
+    }
+  } else {
+    // Firebase fallback
+    return true;
+  }
+};
+
+
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
@@ -294,25 +563,25 @@ const processImageUrls = (images: any[]): string[] => {
 
 export const createBlogPost = async (input: CreateBlogPostInput): Promise<string> => {
   console.log('✨ Creating blog post...');
+  console.log('📝 Title:', input.title);
+  console.log('🖼️ Images:', input.images?.length || 0);
 
   if (IS_CHINESE_VERSION) {
     try {
       interface SaveBlogResponse {
         code: number;
         msg: string;
-        data?: { blId: string; [key: string]: any };  // ✅ String type
+        data?: { blId: string; [key: string]: any };
       }
 
-      const imageUrl = (input.images || []).map(url => ({ imgUrl: url }));
-      const videoUrl = (input.videos || []).map(url => ({ viUrl: url }));
-
+      // ✅ CRITICAL: Send imageUrl and videoUrl as plain string arrays
       const requestBody = {
         title: input.title,
         content: input.content,
         excerpt: input.excerpt || '',
         categoryId: input.categoryId,
-        imageUrl: imageUrl,
-        videoUrl: videoUrl,
+        imageUrl: input.images || [],           // ✅ Plain array of strings
+        videoUrl: input.videos || [],           // ✅ Plain array of strings
         coverUrl: input.images?.[0] || '',
       };
 
@@ -324,13 +593,39 @@ export const createBlogPost = async (input: CreateBlogPostInput): Promise<string
         throw new Error(response.msg || 'Failed to create post');
       }
 
+      // ✅ Case 1: Backend returns blId in response (ideal case)
       if (response.data && response.data.blId) {
-        const postId = String(response.data.blId);  // ✅ Already string from parser
-        console.log('✅ Post created with ID:', postId);
+        const postId = String(response.data.blId);
+        console.log('✅ Post created with ID (from response):', postId);
+        console.log('   Response blId:', response.data.blId);
         return postId;
       }
 
-      throw new Error('No blog ID in response');
+      // ✅ Case 2: Backend returns 200 but no blId
+      // Refetch the latest posts - new post should be first in list
+      console.log('⚠️ No blId in response, fetching latest posts...');
+      
+      interface FetchResponse {
+        code: number;
+        msg: string;
+        data: any[];
+      }
+
+      const fetchResponse = await httpClient.get<FetchResponse>('/blog/my?current=1&size=100');
+
+      if (fetchResponse.code === 200 && fetchResponse.data && fetchResponse.data.length > 0) {
+        // First post in list should be the newly created one (most recent)
+        const firstPost = fetchResponse.data[0];
+        const postId = String(firstPost.blId || firstPost.id);
+        
+        console.log('✅ Post created with ID (from refetch):', postId);
+        console.log('   Post title:', firstPost.title);
+        console.log('   Post images:', firstPost.imageUrl?.length || 0);
+        
+        return postId;
+      }
+
+      throw new Error('Failed to retrieve created post ID');
     } catch (error: any) {
       console.error('❌ Create post error:', error);
       throw error;
@@ -492,8 +787,60 @@ export const deleteBlogPost = async (postId: string): Promise<void> => {
 // GET ALL BLOG POSTS (✅ WORKS WITHOUT AUTH!)
 // ============================================================================
 
-export const getAllBlogPosts = async (): Promise<BlogPost[]> => {
-  console.log('📖 Fetching all published blog posts...');
+// ============================================================================
+// GET BLOG CATEGORIES
+// ============================================================================
+
+export const getBlogCategories = async (): Promise<Array<{ id: number; name: string }>> => {
+  console.log('📂 Fetching blog categories...');
+
+  if (IS_CHINESE_VERSION) {
+    try {
+      interface CategoryResponse {
+        code: number;
+        msg: string;
+        data: Array<{ id: number; name: string }>;
+      }
+
+      const response = await httpClient.post<CategoryResponse>('/blog/categoryList', {});
+
+      if (response.code !== 200) {
+        console.error('❌ Failed to fetch categories:', response.msg);
+        return [];
+      }
+
+      if (response.data && Array.isArray(response.data)) {
+        console.log('✅ Fetched', response.data.length, 'categories');
+        return response.data;
+      }
+
+      return [];
+    } catch (error: any) {
+      console.error('❌ Error fetching categories:', error);
+      return [];
+    }
+  } else {
+    // Firebase fallback
+    return [
+      { id: 0, name: 'ALL blogs' },
+      { id: 1, name: 'Adventure' },
+      { id: 2, name: 'Culture' },
+      { id: 3, name: 'Food' }
+    ];
+  }
+};
+
+// ============================================================================
+// SEARCH/FILTER BLOG POSTS (POST /blog/my)
+// ============================================================================
+
+export const searchBlogPosts = async (
+  current: number = 1,
+  size: number = 10,
+  categoryId: number = 0,
+  title: string = ''
+): Promise<{ posts: BlogPost[]; total: number }> => {
+  console.log('🔍 Searching blog posts...', { current, size, categoryId, title });
 
   if (IS_CHINESE_VERSION) {
     try {
@@ -506,41 +853,60 @@ export const getAllBlogPosts = async (): Promise<BlogPost[]> => {
         };
       }
 
-      // ✅ Use /blog/my for authenticated, /blog/list for public
       const token = localStorage.getItem('custom_auth_token');
-      const endpoint = token ? '/blog/my?current=1&size=100' : '/blog/list?current=1&size=100';
-      
-      console.log('📡 Fetching from:', endpoint, token ? '(authenticated)' : '(public)');
 
-      const response = await httpClient.get<BlogListResponse>(endpoint);
+      // ✅ Use POST with body for /blog/my (now supports search/filter)
+      const requestBody = {
+        current,
+        size,
+        categoryId: categoryId === 0 ? null : categoryId,  // 0 means "all"
+        title: title || null
+      };
+
+      console.log('📤 POST /blog/my:', requestBody);
+
+      const response = await httpClient.post<BlogListResponse>('/blog/my', requestBody);
 
       if (response.code !== 200) {
         console.error('❌ Failed to fetch blogs:', response.msg);
-        return [];
+        return { posts: [], total: 0 };
       }
 
       if (response.data && response.data.records) {
         const posts: BlogPost[] = response.data.records.map((record: any) => {
-          // ✅ Log to verify IDs are preserved
           console.log('🔍 Mapping post - blId:', record.blId, 'Type:', typeof record.blId);
           
+          // ✅ Get images from imageUrl OR extract from content
+          let images: string[] = [];
+          
+          if (Array.isArray(record.imageUrl) && record.imageUrl.length > 0) {
+            images = record.imageUrl.map((img: any) =>
+              typeof img === 'object' && img.imgUrl ? img.imgUrl : img
+            );
+          }
+          
+          if (images.length === 0 && record.content) {
+            const contentImages = extractImagesFromContent(record.content);
+            if (contentImages.length > 0) {
+              images = contentImages;
+            }
+          }
+
+          let videos: string[] = [];
+          if (Array.isArray(record.videoUrl) && record.videoUrl.length > 0) {
+            videos = record.videoUrl.map((vid: any) =>
+              typeof vid === 'object' && vid.viUrl ? vid.viUrl : vid
+            );
+          }
+          
           return {
-            // ✅ IDs are already strings from transformResponse!
             id: String(record.blId),
             userId: record.userId ? String(record.userId) : undefined,
             title: record.title || '',
             content: record.content || '',
             excerpt: record.excerpt || '',
-            images: Array.isArray(record.imageUrl)
-              ? record.imageUrl.map((img: any) =>
-                  typeof img === 'object' && img.imgUrl ? img.imgUrl : img
-                )
-              : [],
-            videos: Array.isArray(record.videoUrl)
-              ? record.videoUrl.map((vid: any) =>
-                  typeof vid === 'object' && vid.viUrl ? vid.viUrl : vid
-                )
-              : [],
+            images: images,
+            videos: videos,
             author: {
               id: record.userId ? String(record.userId) : '',
               name: record.author?.nickname || 'Anonymous',
@@ -562,20 +928,33 @@ export const getAllBlogPosts = async (): Promise<BlogPost[]> => {
           };
         });
 
-        console.log('✅ Fetched', posts.length, 'posts');
-        
-        // ✅ Debug first post
-        if (posts.length > 0) {
-          console.log('🔍 First post ID:', posts[0].id);
-          console.log('🔍 ID length:', posts[0].id.length, 'characters');
-          console.log('🔍 ID type:', typeof posts[0].id);
-          console.log('🔍 Category:', posts[0].category, '(from categoryId:', posts[0].categoryId, ')');
-        }
-        
-        return posts;
+        console.log('✅ Fetched', posts.length, 'posts, Total:', response.data.total);
+        return { posts, total: response.data.total };
       }
 
-      return [];
+      return { posts: [], total: 0 };
+    } catch (error: any) {
+      console.error('❌ Search posts error:', error);
+      return { posts: [], total: 0 };
+    }
+  } else {
+    // Firebase fallback
+    return { posts: [], total: 0 };
+  }
+};
+
+// ============================================================================
+// GET ALL BLOG POSTS (wrapper for backward compatibility)
+// ============================================================================
+
+export const getAllBlogPosts = async (): Promise<BlogPost[]> => {
+  console.log('📖 Fetching all published blog posts...');
+
+  if (IS_CHINESE_VERSION) {
+    try {
+      // ✅ Use searchBlogPosts with default params to get all posts
+      const { posts } = await searchBlogPosts(1, 100, 0, '');
+      return posts;
     } catch (error: any) {
       console.error('❌ Fetch posts error:', error);
       return [];
@@ -592,7 +971,7 @@ export const getAllBlogPosts = async (): Promise<BlogPost[]> => {
     const snapshot = await getDocs(q);
     const currentUserId = auth.currentUser?.uid;
 
-    const posts: BlogPost[] = snapshot.docs.map((doc) => {
+    return snapshot.docs.map((doc) => {
       const data = doc.data();
       return {
         id: doc.id,
@@ -618,11 +997,9 @@ export const getAllBlogPosts = async (): Promise<BlogPost[]> => {
         updatedAt: timestampToString(data.updatedAt)
       };
     });
-
-    console.log('✅ Found', posts.length, 'published posts');
-    return posts;
   }
 };
+;
 
 // ============================================================================
 // GET BLOG POST BY ID
@@ -651,6 +1028,33 @@ export const getBlogPostById = async (postId: string): Promise<BlogPost> => {
       console.log('✅ Post fetched:', record.title);
       console.log('🔍 Received blId:', record.blId, 'Type:', typeof record.blId);
 
+      // ✅ Get images from imageUrl OR extract from content
+      let images: string[] = [];
+      
+      if (Array.isArray(record.imageUrl) && record.imageUrl.length > 0) {
+        images = record.imageUrl.map((img: any) =>
+          typeof img === 'object' && img.imgUrl ? img.imgUrl : img
+        );
+        console.log('✅ Got images from imageUrl field:', images.length);
+      }
+      
+      // If imageUrl is empty/null, extract from content
+      if (images.length === 0 && record.content) {
+        const contentImages = extractImagesFromContent(record.content);
+        if (contentImages.length > 0) {
+          images = contentImages;
+          console.log('✅ Extracted images from content:', images.length);
+        }
+      }
+
+      // Get videos similarly
+      let videos: string[] = [];
+      if (Array.isArray(record.videoUrl) && record.videoUrl.length > 0) {
+        videos = record.videoUrl.map((vid: any) =>
+          typeof vid === 'object' && vid.viUrl ? vid.viUrl : vid
+        );
+      }
+
       return {
         // ✅ ID is already a string from transformResponse!
         id: String(record.blId),
@@ -658,16 +1062,8 @@ export const getBlogPostById = async (postId: string): Promise<BlogPost> => {
         title: record.title || '',
         content: record.content || '',
         excerpt: record.excerpt || '',
-        images: Array.isArray(record.imageUrl)
-          ? record.imageUrl.map((img: any) =>
-              typeof img === 'object' && img.imgUrl ? img.imgUrl : img
-            )
-          : [],
-        videos: Array.isArray(record.videoUrl)
-          ? record.videoUrl.map((vid: any) =>
-              typeof vid === 'object' && vid.viUrl ? vid.viUrl : vid
-            )
-          : [],
+        images: images,  // ✅ Now includes both imageUrl field AND extracted content
+        videos: videos,
         author: {
           id: record.userId ? String(record.userId) : '',
           name: record.author?.nickname || 'Anonymous',
@@ -846,8 +1242,8 @@ export const toggleLike = async (postId: string): Promise<boolean> => {
 // ADD COMMENT
 // ============================================================================
 
-export const addComment = async (blogId: string, content: string, replyToId?: string): Promise<Comment> => {
-  console.log('💬 Adding comment to blog ID:', blogId, '(type:', typeof blogId, ')');
+export const addComment = async (blId: string, content: string, replyToId?: string): Promise<Comment> => {
+  console.log('💬 Adding comment to blog ID:', blId, '(type:', typeof blId, ')');
 
   if (IS_CHINESE_VERSION) {
     try {
@@ -858,7 +1254,7 @@ export const addComment = async (blogId: string, content: string, replyToId?: st
       }
 
       const requestBody = {
-        blId: blogId,  // ✅ Send as string (already is)
+        blId: blId,  // ✅ Send as string (already is)
         content: content,
         replyToCommentId: replyToId || undefined
       };

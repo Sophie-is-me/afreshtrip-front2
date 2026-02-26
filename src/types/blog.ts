@@ -22,6 +22,7 @@ export interface BlogPost {
   views: number;
   likes: number;
   isLiked?: boolean; // User-specific like status
+  likedBy: string[]; // User-specific like status
   isSaved?: boolean; // User-specific save status
   category: string;
   categoryId?: number; // Category ID for API operations

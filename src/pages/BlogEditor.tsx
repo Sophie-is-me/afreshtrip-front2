@@ -142,15 +142,28 @@ const BlogEditor: React.FC = () => {
         try {
           const post = await getBlogPostById(editId);
           if (post) {
+            console.log('📸 Post loaded:', {
+              title: post.title,
+              images: post.images,
+              imagesLength: post.images?.length || 0,
+              firstImage: post.images?.[0]
+            });
+
+            // ✅ FIX: Properly extract featured image from post
+            const featuredImageUrl = post.images?.[0] || null;
+            
             reset({
               title: post.title,
               content: post.content,
               excerpt: post.excerpt || '',
               categoryId: post.categoryId || 1,
               tags: post.tags || [],
-              featuredImage: post.images?.[0] || null,
+              featuredImage: featuredImageUrl,  // ✅ Store first image as featured
               isPublished: post.isPublished
             });
+
+            console.log('✅ Featured image set to:', featuredImageUrl);
+
             if (post.content) {
               try {
                 editor?.commands.setContent(JSON.parse(post.content));
@@ -299,15 +312,30 @@ const BlogEditor: React.FC = () => {
   }, [debouncedValues, postId, isDirty]);
 
   // --- HANDLERS ---
-  const handlePhotoInsert = (src: string, file?: File) => {
+  const handlePhotoInsert = async (src: string, file?: File) => {
+    console.log('📸 Photo insert:', { src, target: photoTarget, hasFile: !!file });
+    
     if (photoTarget === 'cover') {
+      console.log('🖼️ Setting cover image:', src);
       setValue('featuredImage', src, { shouldDirty: true });
+      
+      // If file was provided and using delayUpload, upload it now
+      if (file) {
+        try {
+          console.log('📤 Uploading cover image file...');
+          const uploadedUrl = await uploadImage(file);
+          console.log('✅ Cover uploaded, updating to:', uploadedUrl);
+          setValue('featuredImage', uploadedUrl, { shouldDirty: true });
+        } catch (err) {
+          console.error('❌ Failed to upload cover:', err);
+          showError(t('common.errorUploading', 'Failed to upload cover image'));
+        }
+      }
     } else {
+      console.log('🖼️ Inserting image into editor:', src);
       editor?.chain().focus().setImage({ src }).run();
     }
-    if (file) {
-      pendingUploadsRef.current.set(src, file);
-    }
+    
     setIsPhotoLibraryOpen(false);
   };
 
@@ -355,49 +383,62 @@ const handlePublishNow = async () => {
 };
 
 const onSave = async (data: BlogFormValues) => {
-  // ❌ REMOVE THIS - Don't block with subscription modal immediately
-  // if (!hasFeatureAccess) {
-  //   setShowUpgradeModal(true);
-  //   return;
-  // }
-
   setSaveStatus('saving');
   try {
     // ✅ Extract media from TipTap content
     const { images: contentImages, videos: contentVideos } = extractMediaFromContent(data.content);
     
-    // ✅ Combine featured image with content images
-    const allImages = data.featuredImage 
-      ? [data.featuredImage, ...contentImages.filter(img => img !== data.featuredImage)]
-      : contentImages;
+    // ✅ IMPORTANT: Always preserve featured image as FIRST in array
+    // If user has a featured image, ensure it's first
+    // Then add any other images from content (excluding the featured image to avoid dupes)
+    let allImages: string[] = [];
+    
+    if (data.featuredImage) {
+      // Featured image is first
+      allImages = [data.featuredImage];
+      // Add other content images (but not the featured image again)
+      const otherImages = contentImages.filter(img => img !== data.featuredImage);
+      allImages.push(...otherImages);
+    } else {
+      // No featured image, use all content images
+      allImages = contentImages;
+    }
     
     console.log('📦 Preparing blog post data:');
-    console.log('  Images:', allImages);
+    console.log('  Featured image:', data.featuredImage);
+    console.log('  Content images:', contentImages);
+    console.log('  All images (final):', allImages);
     console.log('  Videos:', contentVideos);
 
     if (postId) {
       // Update existing post
+      console.log('🔄 Updating post:', postId);
+      console.log('  With images:', allImages);
+      
       await updateBlogPost(postId, {
         title: data.title,
         content: data.content,
         excerpt: data.excerpt || generateExcerpt(data.content, 150),
         tags: data.tags,
         categoryId: data.categoryId,
-        images: allImages,  // ✅ All images from content
-        videos: contentVideos,  // ✅ All videos from content
+        images: allImages,  // ✅ Featured image will be first
+        videos: contentVideos,
         isPublished: data.isPublished
       });
       showSuccess(t('blog.updated', 'Post updated successfully!'));
     } else {
       // Create new post
+      console.log('✨ Creating new post');
+      console.log('  With images:', allImages);
+      
       const newId = await createBlogPost({
         title: data.title,
         content: data.content,
         excerpt: data.excerpt || generateExcerpt(data.content, 150),
         tags: data.tags,
         categoryId: data.categoryId,
-        images: allImages,  // ✅ All images from content
-        videos: contentVideos,  // ✅ All videos from content
+        images: allImages,  // ✅ Featured image will be first
+        videos: contentVideos,
         isPublished: data.isPublished
       });
       setPostId(newId);
@@ -506,22 +547,30 @@ const onSave = async (data: BlogFormValues) => {
         {/* Cover Image Area (Document-based) */}
         <div className="group relative mb-8">
           {watch('featuredImage') ? (
-            <div className="relative w-full aspect-video sm:aspect-21/9 rounded-xl overflow-hidden shadow-sm bg-gray-50">
+            <div className="relative w-full aspect-video sm:aspect-21/9 rounded-xl overflow-hidden shadow-sm bg-gray-100 flex items-center justify-center">
               <img 
                 src={watch('featuredImage')!} 
                 alt="Cover" 
                 className="w-full h-full object-cover"
+                onError={() => console.error('❌ Failed to load featured image:', watch('featuredImage'))}
               />
               {/* Hover Actions */}
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-start justify-end p-2 opacity-0 group-hover:opacity-100">
                 <button
-                  onClick={() => { setPhotoTarget('cover'); setIsPhotoLibraryOpen(true); }}
+                  onClick={() => { 
+                    console.log('🔄 Opening photo library for cover update');
+                    setPhotoTarget('cover'); 
+                    setIsPhotoLibraryOpen(true); 
+                  }}
                   className="bg-white/90 text-gray-700 px-3 py-1.5 rounded-md text-xs font-medium shadow-sm mr-2 hover:bg-white"
                 >
                   {t('blog.changeCover', 'Change Cover')}
                 </button>
                 <button 
-                  onClick={() => setValue('featuredImage', null, { shouldDirty: true })}
+                  onClick={() => {
+                    console.log('🗑️ Removing featured image');
+                    setValue('featuredImage', null, { shouldDirty: true });
+                  }}
                   className="bg-white/90 text-red-600 p-1.5 rounded-md shadow-sm hover:bg-white"
                 >
                   <FiX className="w-4 h-4" />
@@ -530,7 +579,11 @@ const onSave = async (data: BlogFormValues) => {
             </div>
           ) : (
             <button
-              onClick={() => { setPhotoTarget('cover'); setIsPhotoLibraryOpen(true); }}
+              onClick={() => { 
+                console.log('➕ Opening photo library to add cover');
+                setPhotoTarget('cover'); 
+                setIsPhotoLibraryOpen(true); 
+              }}
               className="group flex items-center gap-2 text-gray-400 hover:text-gray-600 transition-colors py-2 px-0 mb-4 text-sm font-medium"
             >
               <FiImage className="w-4 h-4" />

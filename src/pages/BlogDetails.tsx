@@ -1,5 +1,5 @@
-// src/pages/BlogDetails.tsx
-// ✅ COMPLETE FIX: SEO URLs + String IDs + Default Avatar
+// src/pages/BlogDetails.tsx - UPDATED VERSION
+// ✅ Includes: View tracking + Post likes + Comment replies
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -24,35 +24,39 @@ import { useSnackbar } from '../contexts/SnackbarContext';
 import { createSanitizedHtml } from '../utils/sanitizeHtml';
 import { commentSchema, sanitizeText } from '../utils/validationSchemas';
 import { i18nErrorHandler } from '../utils/i18nErrorHandler';
+import { incrementPostViews, togglePostLike } from '../services/blogApi';
 import type { BlogPost, Comment } from '../types/blog';
 
-// TipTap imports for HTML generation
+// TipTap imports
 import { generateHTML } from '@tiptap/html';
 import StarterKit from '@tiptap/starter-kit';
 import ImageExtension from '@tiptap/extension-image';
 import LinkExtension from '@tiptap/extension-link';
 
 const BlogDetails: React.FC = () => {
-  // ✅ Get both ID and slug from URL params
   const { id, slug } = useParams<{ id: string; slug?: string }>();
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const { updatePostStatistics, getRelatedPosts, getBlogDetails, toggleCommentLike, addComment } = useBlog();
+  const { getBlogDetails, getRelatedPosts, toggleCommentLike, addComment } = useBlog();
   const { user } = useAuth();
   const { showSuccess } = useSnackbar();
+  
   const [loading, setLoading] = useState(true);
   const [post, setPost] = useState<BlogPost | null>(null);
   const [relatedPosts, setRelatedPosts] = useState<BlogPost[]>([]);
   const [isLiked, setIsLiked] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [likes, setLikes] = useState(0);
+  const [views, setViews] = useState(0);
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [headings, setHeadings] = useState<{ id: string; text: string; level: number }[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [isTogglingLike, setIsTogglingLike] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const [showTableOfContents, setShowTableOfContents] = useState(false);
+  const hasRecordedView = useRef(false);
 
-  // Calculate reading time
   const calculateReadingTime = (html: string) => {
     const wordsPerMinute = 200;
     const text = html.replace(/<[^>]*>/g, '').trim();
@@ -60,7 +64,7 @@ const BlogDetails: React.FC = () => {
     return Math.ceil(words / wordsPerMinute);
   };
 
-  // Fetch blog post
+  // ✅ FETCH BLOG POST
   useEffect(() => {
     const fetchPost = async () => {
       if (!id) {
@@ -70,27 +74,23 @@ const BlogDetails: React.FC = () => {
       }
 
       console.log('🔍 BlogDetails - Fetching post with ID:', id);
-      console.log('🔍 ID type:', typeof id);
-      console.log('🔍 ID length:', id.length, 'characters');
-      console.log('🔍 URL slug:', slug);
 
       try {
         setLoading(true);
 
-        // ✅ Fetch using string ID
         const { post: fetchedPost, comments: fetchedComments } = await getBlogDetails(id);
         
         console.log('✅ Post fetched:', fetchedPost.title);
-        console.log('✅ Post ID from API:', fetchedPost.id);
-        console.log('✅ Post slug:', fetchedPost.slug);
+        console.log('📊 Post stats - Views:', fetchedPost.views, 'Likes:', fetchedPost.likes);
         
         setPost(fetchedPost);
+        setLikes(fetchedPost.likes || 0);
+        setViews(fetchedPost.views || 0);
         setIsLiked(fetchedPost.isLiked || false);
         setIsSaved(fetchedPost.isSaved || false);
 
-        // ✅ Update URL with slug if missing (SEO optimization)
+        // ✅ Update URL with slug if missing
         if (fetchedPost.slug && slug !== fetchedPost.slug) {
-          console.log('🔄 Updating URL with correct slug:', fetchedPost.slug);
           navigate(`/blog/${id}/${fetchedPost.slug}`, { replace: true });
         }
 
@@ -98,7 +98,7 @@ const BlogDetails: React.FC = () => {
         const related = getRelatedPosts(fetchedPost.id, fetchedPost.category);
         setRelatedPosts(related);
 
-        // Set comments from API
+        // Set comments
         setComments(fetchedComments);
         
         console.log('✅ Page fully loaded!');
@@ -107,13 +107,11 @@ const BlogDetails: React.FC = () => {
         i18nErrorHandler.showErrorToUser(
           err,
           { component: 'BlogDetails', action: 'fetchPost' },
-          [
-            {
-              label: t('common.retry'),
-              onClick: () => window.location.reload(),
-              style: 'primary'
-            }
-          ],
+          [{
+            label: t('common.retry'),
+            onClick: () => window.location.reload(),
+            style: 'primary'
+          }],
           t.bind(t)
         );
       } finally {
@@ -124,7 +122,30 @@ const BlogDetails: React.FC = () => {
     fetchPost();
   }, [id, slug, navigate, t, getBlogDetails, getRelatedPosts]);
 
-  // Extract headings for table of contents after content is rendered
+  // ✅ RECORD VIEW ONCE ON PAGE LOAD
+  useEffect(() => {
+    const recordView = async () => {
+      if (!id || hasRecordedView.current) {
+        return;
+      }
+
+      hasRecordedView.current = true;
+
+      try {
+        console.log('👀 Recording page view for blog:', id);
+        const { views: newViews } = await incrementPostViews(id);
+        setViews(newViews);
+        console.log('✅ View recorded! Total views:', newViews);
+      } catch (error) {
+        console.error('❌ Failed to record view:', error);
+        // Don't fail - view tracking should not break the page
+      }
+    };
+
+    recordView();
+  }, [id]);
+
+  // Extract headings for table of contents
   useEffect(() => {
     if (post && contentRef.current) {
       const headingElements = contentRef.current.querySelectorAll('h2, h3, h4');
@@ -136,7 +157,6 @@ const BlogDetails: React.FC = () => {
       setHeadings(extractedHeadings);
       setShowTableOfContents(extractedHeadings.length > 0);
 
-      // Add IDs to headings
       headingElements.forEach((heading, index) => {
         heading.id = `heading-${index}`;
       });
@@ -153,17 +173,37 @@ const BlogDetails: React.FC = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Handle like
-  const handleLike = () => {
+  // ✅ HANDLE LIKE POST
+  const handleLike = async () => {
     if (!post || !id) return;
-    
-    console.log('❤️ Toggling like for post:', id);
-    setIsLiked(!isLiked);
-    updatePostStatistics(id, { 
-      likes: isLiked ? post.likes - 1 : post.likes + 1,
-      isLiked: !isLiked
-    });
+
+    setIsTogglingLike(true);
+    console.log('❤️ Toggling like for post:', id, 'Current isLiked:', isLiked);
+
+    try {
+      // ✅ CRITICAL: Pass currentIsLiked state so backend knows if we're liking or unliking
+      const result = await togglePostLike(id, isLiked);
+      
+      console.log('📊 Like result - isLiked:', result.isLiked, 'likes:', result.likes);
+      
+      setIsLiked(result.isLiked);
+      setLikes(result.likes);
+      
+      console.log('✅ Like toggled! New count:', result.likes);
+      showSuccess(result.isLiked ? t('blog.liked') : t('blog.unliked'));
+    } catch (error) {
+      console.error('❌ Failed to toggle like:', error);
+      i18nErrorHandler.showErrorToUser(
+        error,
+        { component: 'BlogDetails', action: 'toggleLike' },
+        [],
+        t.bind(t)
+      );
+    } finally {
+      setIsTogglingLike(false);
+    }
   };
+
 
   // Handle save
   const handleSave = () => {
@@ -171,12 +211,10 @@ const BlogDetails: React.FC = () => {
     
     console.log('📌 Toggling save for post:', id);
     setIsSaved(!isSaved);
-    updatePostStatistics(id, { 
-      isSaved: !isSaved
-    });
+    // TODO: Implement save API if available
   };
 
-  // Handle add comment
+  // ✅ HANDLE ADD COMMENT
   const handleAddComment = async (comment: string, replyToId?: string) => {
     if (!user) {
       navigate('/login');
@@ -188,26 +226,39 @@ const BlogDetails: React.FC = () => {
       return;
     }
 
-    console.log('💬 Adding comment to blog ID:', id, '(type:', typeof id, ')');
-    console.log('💬 Reply to:', replyToId);
+    console.log('💬 Adding comment to blog ID:', id);
+    console.log('💬 Reply to:', replyToId || 'parent');
 
     try {
-      // Validate and sanitize comment
       const sanitizedComment = sanitizeText(comment);
       commentSchema.parse(sanitizedComment);
 
-      // ✅ Call API with STRING ID
       const newComment = await addComment(id, sanitizedComment, replyToId);
 
-      // Add the new comment to the list
-      setComments(prevComments => [newComment, ...prevComments]);
+      // ✅ Add comment or reply to the list
+      if (replyToId) {
+        // Add reply to parent comment
+        setComments(prevComments => {
+          return prevComments.map(c => {
+            if (c.id === replyToId) {
+              return {
+                ...c,
+                replies: [...(c.replies || []), newComment]
+              };
+            }
+            return c;
+          });
+        });
+        console.log('✅ Reply added successfully!');
+      } else {
+        // Add new top-level comment
+        setComments(prevComments => [newComment, ...prevComments]);
+        console.log('✅ Comment added successfully!');
+      }
+
       showSuccess(t('blog.commentAdded', 'Comment added successfully!'));
-      
-      console.log('✅ Comment added successfully!');
     } catch (err: any) {
       console.error('❌ Failed to add comment:', err);
-      console.error('   Error message:', err.message);
-      
       i18nErrorHandler.showErrorToUser(
         err,
         { component: 'BlogDetails', action: 'addComment' },
@@ -217,13 +268,16 @@ const BlogDetails: React.FC = () => {
     }
   };
 
-  // Handle like comment
+  // ✅ HANDLE LIKE COMMENT
   const handleLikeComment = async (commentId: string) => {
     try {
+      console.log('❤️ Toggling like for comment:', commentId);
       const isLiked = await toggleCommentLike(commentId);
+      
       setComments(prevComments => updateCommentLikes(prevComments, commentId, isLiked));
+      console.log('✅ Comment like toggled');
     } catch (err) {
-      console.error('Error liking comment:', err);
+      console.error('❌ Error liking comment:', err);
       i18nErrorHandler.showErrorToUser(
         err,
         { component: 'BlogDetails', action: 'likeComment' },
@@ -253,15 +307,10 @@ const BlogDetails: React.FC = () => {
     });
   };
 
-  // Scroll to top
   const scrollToTop = () => {
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth'
-    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Handle print
   const handlePrint = () => {
     window.print();
   };
@@ -271,7 +320,7 @@ const BlogDetails: React.FC = () => {
 
   const currentUrl = window.location.href;
 
-  // Generate HTML from TipTap JSON or use existing HTML
+  // Generate HTML from TipTap JSON
   const contentHtml = (() => {
     try {
       const json = JSON.parse(post.content);
@@ -307,12 +356,15 @@ const BlogDetails: React.FC = () => {
             onSave={handleSave}
             isLiked={isLiked}
             isSaved={isSaved}
+            disabled={isTogglingLike}
           />
 
           <BlogPostMeta
             post={post}
             readingTime={readingTime}
             isLiked={isLiked}
+            views={views}
+            likes={likes}
           />
 
           {/* Images */}
@@ -351,7 +403,7 @@ const BlogDetails: React.FC = () => {
 
           <AuthorBio author={post.author} />
 
-          {/* Comments Section */}
+          {/* Comments Section with replies */}
           <CommentSection
             comments={comments}
             onAddComment={(comment, replyToId) => handleAddComment(comment, replyToId)}

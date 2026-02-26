@@ -573,7 +573,7 @@ class FirebaseApiClient {
   /**
    * Get single blog by ID with comments
    */
-  async getBlogById(blogId: number): Promise<BlogVo> {
+  async getBlogById(blId: number): Promise<BlogVo> {
     try {
       // Search for blog by numeric ID (stored in blId field or derived from doc ID)
       const blogsRef = collection(db, COLLECTIONS.BLOGS);
@@ -584,7 +584,7 @@ class FirebaseApiClient {
 
       snapshot.forEach((doc) => {
         const numericId = parseInt(doc.id.slice(-8), 16);
-        if (numericId === blogId) {
+        if (numericId === blId) {
           blogDoc = doc.data();
           blogDocId = doc.id;
         }
@@ -603,7 +603,7 @@ class FirebaseApiClient {
       const comments: Comment[] = [];
 
       return {
-        blId: blogId,
+        blId: blId,
         title: blogDoc.title,
         content: blogDoc.content,
         excerpt: blogDoc.excerpt,
@@ -677,7 +677,7 @@ class FirebaseApiClient {
   /**
    * Update blog post (PATCH - partial update)
    */
-  async patchBlog(blogId: number, updates: Partial<BlogDto>): Promise<boolean> {
+  async patchBlog(blId: number, updates: Partial<BlogDto>): Promise<boolean> {
     try {
       // Find blog by numeric ID
       const blogsRef = collection(db, COLLECTIONS.BLOGS);
@@ -687,7 +687,7 @@ class FirebaseApiClient {
 
       snapshot.forEach((doc) => {
         const numericId = parseInt(doc.id.slice(-8), 16);
-        if (numericId === blogId) {
+        if (numericId === blId) {
           blogDocId = doc.id;
         }
       });
@@ -805,9 +805,9 @@ class FirebaseApiClient {
     return true;
   }
 
-  async addComment(blogId: number, content: string, replyToId?: number): Promise<Comment> {
+  async addComment(blId: number, content: string, replyToId?: number): Promise<Comment> {
     // Mock implementation
-    console.log('Mock: Add comment to blog', blogId, content, replyToId);
+    console.log('Mock: Add comment to blog', blId, content, replyToId);
     return {
       id: Date.now(),
       content,

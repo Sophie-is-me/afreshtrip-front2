@@ -30,7 +30,7 @@ const AlipayPayment: React.FC = () => {
   const [lastStatus, setLastStatus] = useState<number | null>(null);
   
   const initRef = useRef(false);
-  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Redirect if no plan selected
   useEffect(() => {

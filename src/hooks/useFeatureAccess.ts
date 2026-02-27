@@ -74,8 +74,8 @@ export const useFeatureAccess = () => {
     }
 
     // Use API to get accessible features
-    const features = await apiClient.getAccessibleFeatures(user.uid);
-    return features;
+   const features = await apiClient.getAccessibleFeatures(user.uid);
+return features as FeatureId[];
   }, [user]);
 
   const getUpgradeSuggestions = useCallback(async (featureIds: FeatureId[]): Promise<Partial<Record<FeatureId, { recommendedPlan: string; features: FeatureId[]; price: number; period: string }>>> => {

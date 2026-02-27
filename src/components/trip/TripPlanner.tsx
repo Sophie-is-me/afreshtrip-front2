@@ -1,5 +1,5 @@
 // src/components/trip/TripPlanner.tsx
-// ✅ UPDATED: Mobile bottom sheet opens by default + toggle button
+// ✅ UPDATED: Simplified to remove input fields and interests
 
 import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
@@ -19,9 +19,6 @@ const TripPlanner = () => {
   const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
   const IS_CHINESE_VERSION = import.meta.env.VITE_IS_CHINESE_VERSION === 'true';
   
-  // Use Google Maps only if:
-  // 1. API key exists
-  // 2. NOT Chinese version
   const USE_GOOGLE_MAPS = Boolean(GOOGLE_MAPS_API_KEY) && !IS_CHINESE_VERSION;
 
   console.log('🗺️ Map Mode:', USE_GOOGLE_MAPS ? 'Google Maps' : 'Leaflet.js');
@@ -34,14 +31,15 @@ const TripPlanner = () => {
   // --- LOCAL STATE ---
   const [transport, setTransport] = useState<'car' | 'bike'>('car');
   const [tripType, setTripType] = useState<'one' | 'return'>('one');
-  const [departureCity, setDepartureCity] = useState('');
-  const [destinationCity, setDestinationCity] = useState('');
+  
+  // ✅ REMOVED: departureCity, destinationCity inputs
+  // ✅ REMOVED: interests state
+  
   const [departureLat, setDepartureLat] = useState<number | null>(null);
   const [departureLng, setDepartureLng] = useState<number | null>(null);
   const [destinationLat, setDestinationLat] = useState<number | null>(null);
   const [destinationLng, setDestinationLng] = useState<number | null>(null);
-  const [interests, setInterests] = useState<string[]>(['outdoorsSport']);
-  const [isMobilePanelOpen, setMobilePanelOpen] = useState(true); // ✅ Open by default
+  const [isMobilePanelOpen, setMobilePanelOpen] = useState(true);
   
   // Route state
   const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(null);
@@ -49,15 +47,13 @@ const TripPlanner = () => {
   const [isGenerating, setIsGenerating] = useState(false);
 
   // --- EFFECTS ---
-  // Auto-detect and geocode current location
   useEffect(() => {
     if (!currentLocation || locationLoading) return;
 
     console.log('🌍 Current location detected:', currentLocation);
     
-    // Fix: currentLocation has 'latitude' and 'longitude', not 'lat' and 'lng'
-    const lat = currentLocation.latitude || currentLocation.lat;
-    const lng = currentLocation.longitude || currentLocation.lng;
+    const lat = currentLocation.latitude;
+    const lng = currentLocation.longitude;
     
     if (!lat || !lng) {
       console.warn('⚠️ Invalid coordinates:', currentLocation);
@@ -67,18 +63,15 @@ const TripPlanner = () => {
     // Set coordinates immediately
     setDepartureLat(lat);
     setDepartureLng(lng);
-    setDepartureCity(currentLocation.city || currentLocation.address);
     
-    // Reverse geocode to get full address (only if using Google Maps)
+    // Reverse geocode (only if using Google Maps)
     if (USE_GOOGLE_MAPS && mapsLoaded && window.google) {
       const geocoder = new google.maps.Geocoder();
       geocoder.geocode(
         { location: { lat, lng } },
         (results, status) => {
           if (status === 'OK' && results && results[0]) {
-            const address = results[0].formatted_address;
-            console.log('✅ Geocoded address:', address);
-            setDepartureCity(address);
+            console.log('✅ Current location geocoded');
           }
         }
       );
@@ -86,36 +79,15 @@ const TripPlanner = () => {
   }, [currentLocation, locationLoading, USE_GOOGLE_MAPS, mapsLoaded]);
 
   // --- HANDLERS ---
-  const handleToggleInterest = (interest: string) => {
-    setInterests(prev =>
-      prev.includes(interest) ? prev.filter(i => i !== interest) : [...prev, interest]
-    );
-  };
-
-  const handleDepartureSelect = (city: string, lat: number, lng: number) => {
-    console.log('📍 Departure selected:', city, lat, lng);
-    setDepartureCity(city);
-    setDepartureLat(lat);
-    setDepartureLng(lng);
-  };
-
-  const handleDestinationSelect = (city: string, lat: number, lng: number) => {
-    console.log('📍 Destination selected:', city, lat, lng);
-    setDestinationCity(city);
-    setDestinationLat(lat);
-    setDestinationLng(lng);
-  };
-
   const handleGenerateTrip = () => {
     if (!departureLat || !departureLng || !destinationLat || !destinationLng) {
-      alert('Please select both departure and destination cities from the dropdown suggestions');
+      alert('Please select both departure and destination from the map');
       return;
     }
 
     console.log('🚀 Generating trip...');
     setIsGenerating(true);
     
-    // ✅ Close mobile panel when generating trip
     if (window.innerWidth < 768) {
       setMobilePanelOpen(false);
     }
@@ -127,7 +99,6 @@ const TripPlanner = () => {
     setGeneratedStops(stops);
     setIsGenerating(false);
     
-    // ✅ Open panel to show results
     if (window.innerWidth < 768) {
       setMobilePanelOpen(true);
     }
@@ -157,17 +128,15 @@ const TripPlanner = () => {
   const handleResetTrip = () => {
     setRouteInfo(null);
     setGeneratedStops([]);
-    setDestinationCity('');
     setDestinationLat(null);
     setDestinationLng(null);
     
-    // ✅ Open panel to show trip settings again
     if (window.innerWidth < 768) {
       setMobilePanelOpen(true);
     }
   };
 
-  // Show error if Google Maps failed to load (when using Google Maps)
+  // Show error if Google Maps failed to load
   if (USE_GOOGLE_MAPS && mapsError) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -179,7 +148,7 @@ const TripPlanner = () => {
     );
   }
 
-  // Show loading state (only for Google Maps)
+  // Show loading state
   if (USE_GOOGLE_MAPS && !mapsLoaded) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -212,14 +181,6 @@ const TripPlanner = () => {
               setTransport={setTransport}
               tripType={tripType}
               setTripType={setTripType}
-              departureCity={departureCity}
-              setDepartureCity={setDepartureCity}
-              destinationCity={destinationCity}
-              setDestinationCity={setDestinationCity}
-              onDepartureSelect={handleDepartureSelect}
-              onDestinationSelect={handleDestinationSelect}
-              interests={interests}
-              onToggleInterest={handleToggleInterest}
               onGenerateTrip={handleGenerateTrip}
               isGenerating={isGenerating}
               useGoogleMaps={USE_GOOGLE_MAPS}
@@ -247,7 +208,7 @@ const TripPlanner = () => {
               destinationCoords={destinationLat && destinationLng ? { lat: destinationLat, lng: destinationLng } : null}
               transport={transport}
               tripType={tripType}
-              interests={interests}
+              interests={[]} // ✅ CHANGED: Empty array since interests removed
               isGenerating={isGenerating}
               onRouteCalculated={handleRouteCalculated}
             />
@@ -268,7 +229,7 @@ const TripPlanner = () => {
             />
           </div>
 
-          {/* ✅ MOBILE: Floating Toggle Button */}
+          {/* MOBILE: Floating Toggle Button */}
           <button
             onClick={() => setMobilePanelOpen(!isMobilePanelOpen)}
             className="md:hidden fixed bottom-6 left-1/2 transform -translate-x-1/2 z-[999] bg-teal-600 text-white px-6 py-3 rounded-full shadow-lg flex items-center gap-2 hover:bg-teal-700 transition-colors"
@@ -295,14 +256,6 @@ const TripPlanner = () => {
                 setTransport={setTransport}
                 tripType={tripType}
                 setTripType={setTripType}
-                departureCity={departureCity}
-                setDepartureCity={setDepartureCity}
-                destinationCity={destinationCity}
-                setDestinationCity={setDestinationCity}
-                onDepartureSelect={handleDepartureSelect}
-                onDestinationSelect={handleDestinationSelect}
-                interests={interests}
-                onToggleInterest={handleToggleInterest}
                 onGenerateTrip={handleGenerateTrip}
                 isGenerating={isGenerating}
                 useGoogleMaps={USE_GOOGLE_MAPS}

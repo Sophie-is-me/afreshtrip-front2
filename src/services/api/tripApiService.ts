@@ -68,6 +68,8 @@ export class TripApiService {
   /**
    * Get all trips for the current user
    */
+/*
+
   async getTrips(page: number = 1, size: number = 10): Promise<TripListResponse> {
     try {
       console.log('TripApiService.getTrips called with page:', page, 'size:', size);
@@ -101,10 +103,12 @@ export class TripApiService {
       throw error;
     }
   }
-
+*/
   /**
    * Get a specific trip by ID
    */
+
+  /*
   async getTrip(tripId: string): Promise<ApiTrip> {
     try {
       const response = await this.getTrips();
@@ -121,10 +125,11 @@ export class TripApiService {
       throw error;
     }
   }
-
+*/
   /**
    * Create a new trip
    */
+  /*
   async createTrip(tripData: CreateTripRequest): Promise<ApiTrip> {
     try {
       // For now, we'll store trip data in collected addresses
@@ -150,27 +155,17 @@ export class TripApiService {
         updatedAt: new Date().toISOString()
       };
 
-      // Store places as collected addresses
-      if (tripData.places && tripData.places.length > 0) {
-        for (const place of tripData.places) {
-          await apiClient.addCollectedAddress({
-            caName: `${trip.name} - ${place.name}`,
-            latitude: place.lat,
-            longitude: place.lng
-          });
-        }
-      }
-
-      return this.enhanceTripWithWeather(trip);
+      //return this.enhanceTripWithWeather(trip);
     } catch (error) {
       console.error('Failed to create trip:', error);
       throw error;
     }
   }
-
+*/
   /**
    * Update an existing trip
    */
+  /*
   async updateTrip(tripId: string, updates: Partial<CreateTripRequest>): Promise<ApiTrip> {
     try {
       const existingTrip = await this.getTrip(tripId);
@@ -199,6 +194,7 @@ export class TripApiService {
       throw error;
     }
   }
+    */
 
   /**
    * Delete a trip
@@ -289,6 +285,8 @@ export class TripApiService {
   /**
    * Enhance trip with weather data
    */
+
+  /*
   private async enhanceTripWithWeather(trip: ApiTrip): Promise<ApiTrip> {
     try {
       // Get weather for the destination
@@ -304,9 +302,12 @@ export class TripApiService {
     }
   }
 
+  */
+
   /**
    * Get weather data for a destination
    */
+  /*
   private async getWeatherForDestination(destination: string): Promise<ApiTrip['weather']> {
     try {
       // Try to get weather using city code (simplified mapping)
@@ -359,6 +360,9 @@ export class TripApiService {
       };
     }
   }
+
+*/
+
 }
 
 // Export singleton instance

@@ -245,21 +245,24 @@ export const getBlogPosts = async (
     console.log('✅ Found', total, 'posts');
     
     // Pagination
-    const startIndex = (page - 1) * pageSize;
-    const posts: BlogPost[] = [];
+
     
-    allDocs.forEach((doc, index) => {
-      if (index >= startIndex && index < startIndex + pageSize) {
-        const data = doc.data();
-        posts.push({
-          ...data,
-          id: doc.id,
-          date: timestampToString(data.date || data.createdAt),
-          createdAt: timestampToString(data.createdAt),
-          updatedAt: timestampToString(data.updatedAt)
-        } as BlogPost);
-      }
-    });
+  const allDocsArray = allDocs.docs;
+const startIndex = (page - 1) * pageSize;
+const endIndex = startIndex + pageSize;
+const posts: BlogPost[] = [];
+
+for (let i = startIndex; i < endIndex && i < allDocsArray.length; i++) {
+  const doc = allDocsArray[i];
+  const data = doc.data();
+  posts.push({
+    ...data,
+    id: doc.id,
+    date: timestampToString(data.date || data.createdAt),
+    createdAt: timestampToString(data.createdAt),
+    updatedAt: timestampToString(data.updatedAt)
+  } as BlogPost);
+}
     
     return { posts, total };
   } catch (error) {

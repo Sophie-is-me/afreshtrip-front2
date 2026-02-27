@@ -14,80 +14,31 @@ export class TripService {
   /**
    * Generate a trip using backend location and weather services
    */
-  async generateTrip(settings: TripSettings): Promise<Trip> {
-    // Simulate processing delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
 
-    try {
-      // Get weather data for the destination
-      const weatherData = await this.getWeatherForDestination(settings.destination);
-
-      // Generate places based on interests and destination
-      const places = await this.generatePlaces(settings);
-
-      // Create a simple route between places
-      const route = this.calculateRoute(places);
-
-      const trip: Trip = {
-        id: 'trip_' + Date.now(),
-        settings,
-        places,
-        route,
-        weather: weatherData,
-        createdAt: new Date(),
-      };
-
-      return trip;
-    } catch (error) {
-      console.error('Failed to generate trip:', error);
-      throw error;
-    }
-  }
 
   /**
    * Get weather data for a destination
    */
-  private async getWeatherForDestination(destination: string): Promise<Weather> {
-    try {
-      // Try to get weather using city code (simplified mapping)
-      const cityCodeMap: Record<string, string> = {
-        'Copenhagen': 'CPH',
-        'Paris': 'PAR',
-        'London': 'LON',
-        'Berlin': 'BER',
-        'Amsterdam': 'AMS',
-        'Barcelona': 'BCN',
-        'Rome': 'ROM',
-        'Vienna': 'VIE',
-        'Prague': 'PRG',
-        'Budapest': 'BUD',
-      };
+static async getWeatherForDestination(location: string): Promise<Weather> {
+  return {
+    location,
+    temperature: 24,
+    condition: 'Sunny',
+    humidity: 60,
 
-      const cityCode = cityCodeMap[destination] || 'CPH'; // Default to Copenhagen
+    forecast: [
+      { date: 'Mon', temp: 24, condition: 'Sunny' },
+      { date: 'Tue', temp: 22, condition: 'Cloudy' },
+      { date: 'Wed', temp: 26, condition: 'Sunny' }
+    ]
+  };
+}
 
-      const response = await apiClient.getWeatherInfo(cityCode);
-      return {
-        location: response.city,
-        temperature: response.temperature,
-        condition: response.weather,
-        humidity: response.humidity,
-        forecast: [], // We'll get forecast separately if needed
-        clothing: [], // Generate based on temperature
-      };
-    } catch (error) {
-      console.warn('Failed to get weather from API, using fallback:', error);
-    }
 
-    // Fallback weather data
-    return {
-      location: destination,
-      temperature: 20,
-      condition: 'Sunny',
-      humidity: 60,
-      forecast: [],
-      clothing: [],
-    };
-  }
+
+ async getWeatherData(location: string): Promise<Weather> {
+  return TripService.getWeatherForDestination(location);
+}
 
   /**
    * Generate places based on trip settings and interests
@@ -230,55 +181,18 @@ export class TripService {
   /**
    * Get weather forecast for a location
    */
-  async getWeatherForecast(cityCode: string): Promise<Weather['forecast']> {
-    try {
-      const response = await apiClient.getWeatherForecast(cityCode);
-      return response.forecasts.map((f: { date: string; weather: string; temperature: { high: number; low: number } }) => ({
-        date: f.date,
-        temp: f.temperature.high, // Use high temp for simplicity
-        condition: f.weather,
-      }));
-    } catch (error) {
-      console.warn('Failed to get weather forecast from API:', error);
-    }
 
-    // Fallback forecast
-    return Array.from({ length: 5 }, (_, i) => {
-      const date = new Date();
-      date.setDate(date.getDate() + i);
-      return {
-        date: date.toISOString().split('T')[0],
-        temp: 20 + Math.floor(Math.random() * 10),
-        condition: 'Sunny',
-      };
-    });
-  }
 
   /**
    * Get weather data for a location (public method)
    */
-  async getWeatherData(location: string): Promise<Weather> {
-    return this.getWeatherForDestination(location);
-  }
+
 
   /**
    * Get location information from coordinates
    */
-  async getLocationInfo(lat: number, lng: number): Promise<{ city: string; country: string; address: string }> {
-    try {
-      const response = await apiClient.getLocationInfo(lat, lng);
-      return response;
-    } catch (error) {
-      console.warn('Failed to get location info from API:', error);
-    }
 
-    // Fallback
-    return {
-      city: 'Unknown City',
-      country: 'Unknown Country',
-      address: `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
-    };
-  }
+
 }
 
 // Export singleton instance

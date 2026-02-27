@@ -6,6 +6,8 @@ interface BlogPostMetaProps {
   post: BlogPost;
   readingTime: number;
   isLiked: boolean;
+  views: number;
+  likes: number;
 }
 
 const BlogPostMeta: React.FC<BlogPostMetaProps> = ({ post, readingTime, isLiked }) => {

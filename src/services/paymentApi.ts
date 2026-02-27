@@ -1,7 +1,7 @@
 // src/services/paymentApi.ts
 // Payment API Service - Fixed for actual backend response structure
 
-const API_BASE_URL = 'http://192.168.10.243:9000/web';
+const API_BASE_URL = 'https://afreshtrip.cn/web';
 
 const VIP_TYPE_CODE_MAPPING: Record<string, string> = {
   'week': 'VIP_WEEK',

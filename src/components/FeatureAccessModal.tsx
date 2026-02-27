@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { XMarkIcon } from '@heroicons/react/24/outline';
-import { useFeatureAccess } from '../hooks/useFeatureAccess';
+
 import type { FeatureId } from '../types/features';
 import type { UpgradeSuggestion } from '../types/backend';
 import LoadingSpinner from './LoadingSpinner';
@@ -20,25 +20,11 @@ const FeatureAccessModal: React.FC<FeatureAccessModalProps> = ({
   featureName
 }) => {
   const { t } = useTranslation();
-  const { getUpgradeSuggestions } = useFeatureAccess();
+
   const [suggestions, setSuggestions] = useState<UpgradeSuggestion | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    if (isOpen && featureId) {
-      setIsLoading(true);
-      getUpgradeSuggestions([featureId])
-        .then(result => {
-          setSuggestions(result[featureId] || null);
-        })
-        .catch(error => {
-          console.error('Error getting upgrade suggestions:', error);
-        })
-        .finally(() => {
-          setIsLoading(false);
-        });
-    }
-  }, [isOpen, featureId, getUpgradeSuggestions]);
+
 
   if (!isOpen) return null;
 

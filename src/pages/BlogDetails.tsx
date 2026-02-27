@@ -233,17 +233,23 @@ const BlogDetails: React.FC = () => {
       const sanitizedComment = sanitizeText(comment);
       commentSchema.parse(sanitizedComment);
 
+      // ✅ Call API and get backend response with real data
       const newComment = await addComment(id, sanitizedComment, replyToId);
 
-      // ✅ Add comment or reply to the list
+      console.log('✅ Backend response:', newComment);
+      console.log('✅ Author:', newComment.author.name, 'ID:', newComment.id);
+
+      // ✅ Add comment or reply to the list using BACKEND RESPONSE
       if (replyToId) {
         // Add reply to parent comment
         setComments(prevComments => {
           return prevComments.map(c => {
-            if (c.id === replyToId) {
+            // ✅ Convert IDs to strings for safe comparison
+            if (String(c.id) === String(replyToId)) {
+              console.log('✅ Appending reply to comment:', c.id);
               return {
                 ...c,
-                replies: [...(c.replies || []), newComment]
+                replies: [...(c.replies || []), newComment]  // ✅ Use newComment from backend
               };
             }
             return c;
@@ -251,8 +257,9 @@ const BlogDetails: React.FC = () => {
         });
         console.log('✅ Reply added successfully!');
       } else {
-        // Add new top-level comment
-        setComments(prevComments => [newComment, ...prevComments]);
+        // Add new top-level comment using backend response
+        console.log('✅ Adding top-level comment with ID:', newComment.id);
+        setComments(prevComments => [newComment, ...prevComments]);  // ✅ Use newComment from backend
         console.log('✅ Comment added successfully!');
       }
 

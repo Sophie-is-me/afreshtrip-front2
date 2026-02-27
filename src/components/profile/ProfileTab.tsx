@@ -65,7 +65,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
         <div className="text-center">
           <div className="relative inline-block">
             <img
-              src={userProfile?.imageUrl || '/assets/default-avatar.png'}
+              src={userProfile?.imageurl || '/assets/default-avatar.png'}
               alt="Profile"
               className="w-32 h-32 rounded-full object-cover border-4 border-white shadow-lg"
             />

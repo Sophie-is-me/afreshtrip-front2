@@ -13,7 +13,6 @@ import {
 import { useBlog } from '../contexts/BlogContext';
 import { useSnackbar } from '../contexts/SnackbarContext';
 import { useDebounce } from '../hooks/useDebounce';
-import { useFeatureAccess } from '../hooks/useFeatureAccess';
 import FeatureAccessModal from '../components/FeatureAccessModal';
 import { FeatureId } from '../types/features';
 import PhotoLibrary from '../components/PhotoLibrary';
@@ -47,7 +46,7 @@ const BlogEditor: React.FC = () => {
   const { t } = useTranslation();
   const { createBlogPost, updateBlogPost, getBlogPostById, uploadImage } = useBlog();
   const { showError, showSuccess } = useSnackbar();
-  const { checkFeatureAccess } = useFeatureAccess();
+  //const { checkFeatureAccess } = useFeatureAccess();
 
   // UI States
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -91,19 +90,7 @@ const BlogEditor: React.FC = () => {
   const watchedValues = watch();
   const debouncedValues = useDebounce(watchedValues, 1500);
 
-  // --- FEATURE ACCESS ---
-  useEffect(() => {
-    const checkAccess = async () => {
-      try {
-        const access = await checkFeatureAccess(FeatureId.BLOG_PUBLISHING);
-        setHasFeatureAccess(access.hasAccess);
-      } catch (error) {
-        console.error('Error checking feature access:', error);
-        setHasFeatureAccess(false);
-      }
-    };
-    checkAccess();
-  }, [checkFeatureAccess]);
+
 
   // --- TIPTAP SETUP ---
   const editor = useEditor({
@@ -192,7 +179,7 @@ const BlogEditor: React.FC = () => {
 
   // --- CATEGORIES ---
   useEffect(() => {
-    const categoryService = new CategoryService(import.meta.env.VITE_API_BASE_URL || '');
+    const categoryService = new CategoryService();
     categoryService.getCategories().then(cats => {
       setCategories(cats.map(c => ({ id: c.id.toString(), name: c.name })));
     }).catch(() => {

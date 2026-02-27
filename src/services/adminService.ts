@@ -205,15 +205,7 @@ export class AdminService {
   /**
    * Get nation list
    */
-  async getNationList(): Promise<Nation[]> {
-    try {
-      const response = await apiClient.getNations();
-      return response;
-    } catch (error) {
-      console.error('Failed to get nation list:', error);
-      return [];
-    }
-  }
+
 
   // ============================================================================
   // SYSTEM HEALTH & MONITORING

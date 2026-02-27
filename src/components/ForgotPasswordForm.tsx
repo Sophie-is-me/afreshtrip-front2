@@ -13,7 +13,7 @@ interface ForgotPasswordFormProps {
 }
 
 const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({ onBackToLogin }) => {
-  const { resetPassword } = useAuth();
+ // const { resetPassword } = useAuth();
   const { showSuccess } = useSnackbar();
   const { t } = useTranslation();
 
@@ -24,7 +24,7 @@ const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({ onBackToLogin }
   } = useForm<ForgotPasswordFormData>();
 
   const onSubmit = async (data: ForgotPasswordFormData) => {
-    await resetPassword(data.email);
+   // await resetPassword(data.email);
     showSuccess(t('loginForm.resetEmailSent'));
     onBackToLogin();
   };

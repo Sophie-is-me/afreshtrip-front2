@@ -67,7 +67,7 @@ export interface Weather {
   condition: string;
   humidity: number;
   forecast: WeatherDay[];
-  clothing: ClothingSuggestion[];
+  clothing?: ClothingSuggestion[]; // add this line
 }
 
 export interface Route {

@@ -130,74 +130,69 @@ const Blog: React.FC = () => {
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
   // Fetch categories
-  useEffect(() => {
-    const categoryService = new CategoryService(import.meta.env.VITE_API_BASE_URL || '');
-    const fetchCategories = async () => {
-      try {
-        const fetchedCategories = await categoryService.getCategories();
-        setCategories(fetchedCategories);
-      } catch (err) {
-        console.error('Error fetching categories:', err);
-        setCategories([
-          
-          { id: 1, name: 'Adventure', slug: 'Adventure', color: '#F59E0B', icon: 'mountain' },
-          { id: 2, name: 'Culture', slug: 'Culture', color: '#8B5CF6', icon: 'landmark' },
-          { id: 3, name: 'Food', slug: 'food', color: '#EF4444', icon: 'utensils' },
-         
-        
-       
-        ]);
-      }
-    };
+useEffect(() => {
+  const fetchCategories = async () => {
+    try {
+      const categoryService = new CategoryService();
+      const fetchedCategories = await categoryService.getCategories();
+      setCategories(fetchedCategories);
+    } catch (error) {
+      console.error("Error fetching categories:", error);
 
-    fetchCategories();
-  }, []);
+      // Fallback categories
+      setCategories([
+        { id: 1, name: "Adventure", slug: "adventure", color: "#F59E0B", icon: "mountain" },
+        { id: 2, name: "Culture", slug: "culture", color: "#8B5CF6", icon: "landmark" },
+        { id: 3, name: "Food", slug: "food", color: "#EF4444", icon: "utensils" },
+      ]);
+    }
+  };
 
-  
-const handleLike = async (postId: string) => {
-  if (!user) {
-    navigate('/login');
-    return;
-  }
+  fetchCategories();
+}, []);
 
-  try {
-    // ✅ CRITICAL: Find post to get current isLiked state
-    const post = blogPosts.find(p => p.id === postId);
-    if (!post) {
-      console.error('Post not found:', postId);
+  // Handle like button
+  const handleLike = async (postId: string) => {
+    if (!user) {
+      navigate('/login');
       return;
     }
 
-    console.log('❤️ Liking post:', postId, 'Current isLiked:', post.isLiked);
-
-    // ✅ PASS current isLiked state to toggleLike
-    // This ensures backend sends correct type: 1 for like, 0 for unlike
-    await toggleLike(postId);
-
-    // ✅ Update local state after successful API call
-    setBlogPosts(prev => prev.map(p => {
-      if (p.id === postId) {
-        const newIsLiked = !p.isLiked;
-        const newLikes = newIsLiked ? (p.likes || 0) + 1 : (p.likes || 0) - 1;
-        
-        console.log('📊 Updated - isLiked:', newIsLiked, 'likes:', newLikes);
-        
-        return {
-          ...p,
-          isLiked: newIsLiked,
-          likes: newLikes
-        };
+    try {
+      // ✅ CRITICAL FIX: Find post to get current isLiked state
+      const post = blogPosts.find(p => p.id === postId);
+      if (!post) {
+        console.error('❌ Post not found:', postId);
+        return;
       }
-      return p;
-    }));
 
-    console.log('✅ Like toggle successful!');
-  } catch (err) {
-    console.error('❌ Failed to toggle like:', err);
-    // Don't show error to user - they'll see it in console
-  }
-};
+      console.log('❤️ Toggling like for post:', postId, 'Current isLiked:', post.isLiked);
 
+      // ✅ PASS current isLiked state to toggleLike
+      // This ensures backend sends correct type: 1 for like, 0 for unlike
+      await toggleLike(postId, post.isLiked ?? false);
+      // ✅ Update local state after successful API call
+      setBlogPosts(prev => prev.map(p => {
+        if (p.id === postId) {
+          const newIsLiked = !p.isLiked;
+          const newLikes = newIsLiked ? (p.likes || 0) + 1 : (p.likes || 0) - 1;
+          
+          console.log('📊 Updated - isLiked:', newIsLiked, 'likes:', newLikes);
+          
+          return {
+            ...p,
+            isLiked: newIsLiked,
+            likes: newLikes
+          };
+        }
+        return p;
+      }));
+
+      console.log('✅ Like toggle successful!');
+    } catch (err) {
+      console.error('❌ Failed to toggle like:', err);
+    }
+  };
 
   // Fetch blog posts
   useEffect(() => {
@@ -587,131 +582,133 @@ const handleLike = async (postId: string) => {
             {/* List Posts */}
             <section>
                {featuredPost && <h2 className="text-2xl font-bold font-serif mb-8 text-gray-900 animate-fade-in-up">{t('blog.latestStories', 'Latest Stories')}</h2>}
-              {gridPosts.length > 0 ? (
-                <div className="flex flex-col gap-6">
-                  {gridPosts.map((post, index) => (
-                    <div 
-                      key={post.id} 
-                      className="animate-fade-in-up" 
-                      style={{ animationDelay: `${index * 100}ms` }}
-                    >
-                      {/* Horizontal List Card */}
-                      <div className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col sm:flex-row h-full">
-                        {/* Image Section */}
-                        <div className="sm:w-2/5 h-64 sm:h-auto relative overflow-hidden group">
-                          <img 
-                            src={post.images?.[0] || 'https://via.placeholder.com/400x300'} 
-                            alt={post.title}
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                          />
-                          {/* Category Badge */}
-                          <div className="absolute top-4 left-4">
-                            <span className="px-3 py-1 bg-teal-600 text-white text-xs font-semibold rounded-full">
-                              {post.category}
-                            </span>
-                          </div>
-                        </div>
-                        
-                        {/* Content Section */}
-                        <div className="sm:w-3/5 p-6 flex flex-col justify-between">
-                          <div>
-                            {/* Meta Info */}
-                            <div className="flex items-center gap-4 text-sm text-gray-500 mb-3">
-                              <div className="flex items-center gap-1">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                </svg>
-                                <span>{post.views}</span>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                <span>{new Date(post.date).toLocaleDateString()}</span>
-                              </div>
-                            </div>
-                            
-                            {/* Title */}
-                            <h3 className="text-xl font-bold text-gray-900 mb-3 line-clamp-2 hover:text-teal-600 transition-colors cursor-pointer" onClick={() => navigate(`/blog/${post.id}`)}>
-                              {post.title}
-                            </h3>
-                            
-                            {/* Description */}
-                            <p className="text-gray-600 line-clamp-2 mb-4 leading-relaxed">
-                              {post.excerpt || 'No description available'}
-                            </p>
-                          </div>
-                          
-                          {/* Author Info & Actions */}
-                          <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                            <div className="flex items-center gap-3">
-                              <img 
-                                src={post.author.avatar || 'https://via.placeholder.com/40'} 
-                                alt={post.author.name}
-                                className="w-10 h-10 rounded-full object-cover"
-                              />
-                              <div>
-                                <p className="text-sm font-medium text-gray-900">{post.author.name}</p>
-                              </div>
-                            </div>
-                            
-                            {/* Action Buttons */}
-                            <div className="flex items-center gap-2">
-                              {/* Heart Icon - Like Button */}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleLike(post.id);
-                                }}
-                                disabled={!user}
-                                className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                                  post.isLiked
-                                    ? 'text-red-600 bg-red-50 hover:bg-red-100'
-                                    : 'text-gray-600 hover:bg-gray-100'
-                                } ${!user ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                title={!user ? 'Login to like' : post.isLiked ? 'Unlike' : 'Like'}
-                              >
-                                <svg 
-                                  xmlns="http://www.w3.org/2000/svg" 
-                                  className="h-4 w-4" 
-                                  fill={post.isLiked ? 'currentColor' : 'none'}
-                                  viewBox="0 0 24 24" 
-                                  stroke="currentColor"
-                                  strokeWidth={2}
-                                >
-                                  <path 
-                                    strokeLinecap="round" 
-                                    strokeLinejoin="round" 
-                                    d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" 
-                                  />
-                                </svg>
-                                <span>{post.likes || 0}</span>
-                              </button>
-                              {post.author.id === user?.uid && (
-                                <button
-                                  onClick={() => navigate(`/blog-editor?id=${post.id}`)}
-                                  className="px-4 py-2 text-sm font-medium text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
-                                >
-                                  {t('blog.edit', 'Edit')}
-                                </button>
-                              )}
-                              <button
-                                onClick={() => navigate(`/blog/${post.id}`)}
-                                className="px-4 py-2 text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors"
-                              >
-                                {t('blog.read', 'Read')}
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+             
+{gridPosts.length > 0 ? (
+  <div className="flex flex-col gap-6">
+    {gridPosts.map((post, index) => (
+      <div 
+        key={post.id} 
+        className="animate-fade-in-up" 
+        style={{ animationDelay: `${index * 100}ms` }}
+      >
+        <div className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col sm:flex-row h-full">
+          
+          {/* Image Section */}
+          <div className="sm:w-1/3 h-48 max-h-48 relative overflow-hidden group">
+            <img 
+              src={post.images?.[0] || 'https://via.placeholder.com/400x300'} 
+              alt={post.title}
+              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+            />
+            <div className="absolute top-4 left-4">
+              <span className="px-3 py-1 bg-teal-600 text-white text-xs font-semibold rounded-full">
+                {post.category}
+              </span>
+            </div>
+          </div>
+          
+          {/* Content Section */}
+          <div className="sm:w-2/3 p-4 flex flex-col justify-between">
+            
+            {/* Meta Info */}
+            <div>
+              <div className="flex items-center gap-4 text-xs text-gray-500 mb-2">
+                <div className="flex items-center gap-1">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                  <span>{post.views}</span>
                 </div>
-              ) : !featuredPost && (
-                <EmptyState />
-              )}
+                <div className="flex items-center gap-1">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>{new Date(post.date).toLocaleDateString()}</span>
+                </div>
+              </div>
+              
+              {/* Title */}
+              <h3 className="text-lg font-bold text-gray-900 mb-2 line-clamp-2 hover:text-teal-600 transition-colors cursor-pointer" onClick={() => navigate(`/blog/${post.id}`)}>
+                {post.title}
+              </h3>
+              
+              {/* Description */}
+              <p className="text-gray-600 line-clamp-1 mb-3 text-sm leading-relaxed">
+                {post.excerpt}
+              </p>
+            </div>
+            
+            {/* Author & Actions */}
+            <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+              <div className="flex items-center gap-2">
+                <img 
+                  src={post.author.avatar || 'https://via.placeholder.com/40'} 
+                  alt={post.author.name}
+                  className="w-8 h-8 rounded-full object-cover"
+                />
+                <p className="text-xs font-medium text-gray-900">{post.author.name}</p>
+              </div>
+              
+              {/* Action Buttons */}
+              <div className="flex items-center gap-1">
+                {/* Like Button - NO COMMENTS INSIDE TEMPLATE STRING */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleLike(post.id);
+                  }}
+                  disabled={!user}
+                  className={`flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-lg transition-colors ${
+                    post.isLiked
+                      ? 'text-red-600 bg-red-50 hover:bg-red-100'
+                      : 'text-gray-600 hover:bg-gray-100'
+                  } ${!user ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  title={!user ? 'Login to like' : post.isLiked ? 'Unlike' : 'Like'}
+                >
+                  <svg 
+                    xmlns="http://www.w3.org/2000/svg" 
+                    className="h-3 w-3"
+                    fill={post.isLiked ? 'currentColor' : 'none'}
+                    viewBox="0 0 24 24" 
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round" 
+                      d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" 
+                    />
+                  </svg>
+                  <span>{post.likes || 0}</span>
+                </button>
+                
+                {post.author.id === user?.uid && (
+                  <button
+                    onClick={() => navigate(`/blog-editor?id=${post.id}`)}
+                    className="px-3 py-1 text-xs font-medium text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
+                  >
+                    {t('blog.edit', 'Edit')}
+                  </button>
+                )}
+                
+                <button
+                  onClick={() => navigate(`/blog/${post.id}`)}
+                  className="px-3 py-1 text-xs font-medium text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors"
+                >
+                  {t('blog.read', 'Read')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    ))}
+  </div>
+) : !featuredPost && (
+  <EmptyState />
+)}
+
             </section>
 
             {/* Pagination */}

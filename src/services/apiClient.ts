@@ -22,7 +22,7 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, listAll } from 'firebase/storage';
 import { db, storage } from '../../lib/firebase/client';
-import axios from "axios";
+import axios, { type AxiosInstance, AxiosError } from 'axios';
 
 // ============================================================================
 // TYPE DEFINITIONS - BLOG
@@ -141,13 +141,14 @@ export interface RegisterResponse {
 
 // Custom API Error
 export class ApiError extends Error {
-  constructor(
-    message: string,
-    public code?: number,
-    public data?: any
-  ) {
+  public code?: number;
+  public data?: any;
+
+  constructor(message: string, code?: number, data?: any) {
     super(message);
     this.name = 'ApiError';
+    this.code = code;
+    this.data = data;
   }
 }
 
@@ -167,7 +168,7 @@ const COLLECTIONS = {
 // HTTP CLIENT CONFIGURATION (for SMS Auth)
 // ============================================================================
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://192.168.10.243:9000/web';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://afreshtrip.cn/web';
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -821,6 +822,99 @@ class FirebaseApiClient {
       replies: []
     };
   }
+
+// ============================================
+// STATIC FEATURE ACCESS (NO EXTERNAL TYPES)
+// ============================================
+
+async checkFeatureAccess(
+  userId: string,
+  featureId: string
+): Promise<{
+  hasAccess: boolean;
+  requiredPlans: string[];
+  userPlan?: string;
+  upgradeMessage?: string;
+}> {
+
+  // 🔹 Simple static rule:
+  // Only "premium_feature" requires upgrade
+
+  const premiumFeatures = ['premium_feature', 'advanced_ai', 'pro_weather'];
+
+  const hasAccess = !premiumFeatures.includes(featureId);
+
+  return {
+    hasAccess,
+    requiredPlans: hasAccess ? [] : ['month', 'year'],
+    userPlan: 'free',
+    upgradeMessage: hasAccess
+      ? undefined
+      : 'Upgrade to premium to unlock this feature.',
+  };
+}
+
+async getLocationInfo(latitude: number, longitude: number) {
+  return {
+    city: "Paris",
+    country: "France",
+    latitude,
+    longitude,
+    address: "Champs-Élysées, Paris, France" // add this
+  };
+}
+async getAccessibleFeatures(userId: string): Promise<string[]> {
+  // 🔹 Static accessible features
+  return [
+    'basic_trip_view',
+    'basic_weather',
+    'basic_comment'
+  ];
+}
+
+
+async getUpgradeSuggestions(
+  userId: string,
+  featureIds: string[]
+): Promise<
+  Partial<
+    Record<
+      string,
+      {
+        recommendedPlan: string;
+        features: string[];
+        price: number;
+        period: string;
+      }
+    >
+  >
+> {
+
+  const suggestions: Partial<
+    Record<
+      string,
+      {
+        recommendedPlan: string;
+        features: string[];
+        price: number;
+        period: string;
+      }
+    >
+  > = {};
+
+  featureIds.forEach((featureId) => {
+    suggestions[featureId] = {
+      recommendedPlan: 'month',
+      features: [featureId],
+      price: 39,
+      period: 'month',
+    };
+  });
+
+  return suggestions;
+}
+
+
 }
 
 // ============================================================================

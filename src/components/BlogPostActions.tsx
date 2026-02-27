@@ -8,6 +8,7 @@ interface BlogPostActionsProps {
   onSave: () => void;
   isLiked: boolean;
   isSaved: boolean;
+  disabled?: boolean; 
 }
 
 const BlogPostActions: React.FC<BlogPostActionsProps> = ({

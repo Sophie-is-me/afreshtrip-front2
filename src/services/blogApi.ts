@@ -25,7 +25,7 @@ import type { BlogPost, CreateBlogPostInput, Comment } from '../types/blog';
 // ============================================================================
 
 const IS_CHINESE_VERSION = import.meta.env.VITE_IS_CHINESE_VERSION === 'true';
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://192.168.10.243:9000/web';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://afreshtrip.cn/web';
 const DEFAULT_AVATAR = '/assets/default-avatar.png';
 
 console.log('🌍 Blog API Mode:', IS_CHINESE_VERSION ? 'Chinese Backend' : 'Firebase');
@@ -163,6 +163,117 @@ const timestampToString = (timestamp: any): string => {
   if (timestamp.seconds) return new Date(timestamp.seconds * 1000).toISOString();
   return new Date().toISOString();
 };
+
+
+/**
+ * Extract text preview from TipTap JSON or HTML content
+ * @param content - TipTap JSON or HTML string
+ * @returns First 80 characters of text, or "No description available"
+ */
+export const extractContentPreview = (content: string | null): string => {
+  if (!content) return 'No description available';
+
+  try {
+    // Try parsing as TipTap JSON
+    const json = JSON.parse(content);
+    
+    // Extract text from TipTap document
+    let textContent = '';
+    
+    const extractText = (node: any): void => {
+      if (!node) return;
+      
+      if (node.type === 'text' && node.text) {
+        textContent += node.text + ' ';
+      }
+      
+      if (node.content && Array.isArray(node.content)) {
+        for (const child of node.content) {
+          extractText(child);
+          if (textContent.length > 100) break;
+        }
+      }
+    };
+
+    if (json.content && Array.isArray(json.content)) {
+      for (const node of json.content) {
+        extractText(node);
+        if (textContent.length > 100) break;
+      }
+    }
+
+    textContent = textContent.trim();
+    if (textContent.length > 80) {
+      const truncated = textContent.substring(0, 80);
+      const lastSpace = truncated.lastIndexOf(' ');
+      return (lastSpace > 0 ? truncated.substring(0, lastSpace) : truncated) + '...';
+    }
+
+    return textContent || 'No description available';
+  } catch (err) {
+    try {
+      const text = content.replace(/<[^>]*>/g, '').trim();
+      if (text.length > 80) {
+        return text.substring(0, 80) + '...';
+      }
+      return text || 'No description available';
+    } catch {
+      return 'No description available';
+    }
+  }
+};
+
+/**
+ * Map blog list API response to BlogPost type
+ * ✅ Includes ALL required BlogPost properties
+ */
+export const mapBlogListResponse = (records: any[]): BlogPost[] => {
+  return records.map((post: any): BlogPost => {
+    const contentPreview = extractContentPreview(post.content);
+    
+    const images = post.images && Array.isArray(post.images) 
+      ? post.images.map((img: any) => img.imgUrl || img)
+      : (post.coverUrl ? [post.coverUrl] : []);
+    
+    // ✅ Return complete BlogPost object with ALL required fields
+    return {
+      id: String(post.blId),
+      title: post.title || '',
+      excerpt: contentPreview,  // ✅ Extracted preview
+      content: post.content || '',
+      category: String(post.categoryId || post.category || ''),
+      isPublished: post.isPublished || false,
+      slug: post.slug || null,
+      likes: post.like || 0,
+      views: post.play || 0,
+      
+      // ✅ CRITICAL: Map isLike field correctly
+      isLiked: post.isLike === '1' || post.isLike === 1 ? true : false,
+      
+      images: images,
+      videos: post.videos || [],  // ✅ Add videos field
+      
+      author: {
+        id: String(post.userId),
+        name: post.author?.nickname || 'Anonymous',
+        avatar: post.author?.avatar || null
+      },
+      
+      date: post.createdAt || new Date().toISOString(),
+      
+      // ✅ Add timestamp fields
+      createdAt: post.createdAt || new Date().toISOString(),
+      updatedAt: post.updatedAt || new Date().toISOString(),
+      
+      isSaved: false,
+      likedBy: []
+    };
+  });
+};
+
+
+
+
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -408,49 +519,70 @@ export const nestCommentReplies = (comments: any[]): Comment[] => {
   }
 
   console.log('📝 Organizing', comments.length, 'comments into nested structure');
+  console.log('📋 Sample comments:', comments.slice(0, 2).map(c => ({
+    id: c.id,
+    replyToCommentId: c.replyToCommentId
+  })));
+
+  // ✅ Declare mappedComments in outer scope so it can be returned in catch
+  let mappedComments: Comment[] = [];
 
   try {
     // Step 1: Map to proper Comment objects with all required fields
-    const mappedComments: Comment[] = comments.map((c: any) => ({
-      id: String(c.id || c.commentId),
-      content: c.content || '',
-      author: {
-        name: c.author?.nickname || 'Anonymous',
-        avatar: c.author?.avatar || DEFAULT_AVATAR
-      },
-      date: c.createdAt || new Date().toISOString(),
-      likes: c.likes || 0,
-      isLiked: c.isLiked || false,
-      replies: [] as Comment[]
-    }));
+    mappedComments = comments.map((c: any) => {
+      const commentId = String(c.id || c.commentId);
+      return {
+        id: commentId,
+        content: c.content || '',
+        author: {
+          name: c.author?.nickname || 'Anonymous',
+          avatar: c.author?.avatar || DEFAULT_AVATAR
+        },
+        date: c.createdAt || new Date().toISOString(),
+        likes: c.likes || 0,
+        isLiked: c.isLiked || false,
+        replyToCommentId: c.replyToCommentId, // Keep original for reference
+        replies: [] as Comment[]
+      };
+    });
 
     // Step 2: Separate top-level comments and replies
     const topLevelComments = mappedComments.filter(c => {
       const replyToId = (comments.find(raw => String(raw.id || raw.commentId) === c.id) as any)?.replyToCommentId;
-      return !replyToId;
+      return replyToId === 0 || replyToId === null || replyToId === undefined;
     });
 
     const replies = mappedComments.filter(c => {
       const replyToId = (comments.find(raw => String(raw.id || raw.commentId) === c.id) as any)?.replyToCommentId;
-      return replyToId;
+      return replyToId && replyToId !== 0 && replyToId !== null && replyToId !== undefined;
     });
 
     console.log('📊 Found', topLevelComments.length, 'top-level comments and', replies.length, 'replies');
+    if (replies.length > 0) {
+      console.log('📋 Sample replies:', replies.slice(0, 2).map(r => ({
+        id: r.id,
+        replyToCommentId: (comments.find(c => String(c.id) === r.id) as any)?.replyToCommentId
+      })));
+    }
 
     // Step 3: Build nested structure by grouping replies under their parent comments
     const result: Comment[] = topLevelComments.map(topLevel => {
+      const topLevelIdAsNumber = parseInt(topLevel.id);
+
       const nestedReplies = replies
         .filter(reply => {
-          // Find original comment to get replyToCommentId
           const original = comments.find(c => String(c.id || c.commentId) === reply.id);
-          return original?.replyToCommentId === topLevel.id;
+          const isReplyToThis = original?.replyToCommentId === topLevelIdAsNumber;
+          return isReplyToThis;
         })
         .map(reply => ({
           ...reply,
           replies: [] as Comment[]
         }));
 
-      console.log('✅ Comment', topLevel.id, 'has', nestedReplies.length, 'replies');
+      if (nestedReplies.length > 0) {
+        console.log('✅ Comment', topLevel.id, 'has', nestedReplies.length, 'replies:', nestedReplies.map(r => r.id).join(', '));
+      }
 
       return {
         ...topLevel,
@@ -462,7 +594,7 @@ export const nestCommentReplies = (comments: any[]): Comment[] => {
     return result;
   } catch (error) {
     console.error('❌ Error nesting comments:', error);
-    // Return flat structure as fallback
+    // Return mappedComments as fallback (empty array if mapping failed)
     return mappedComments;
   }
 };
@@ -489,8 +621,9 @@ export const toggleCommentLike = async (commentId: string): Promise<boolean> => 
         };
       }
 
-      const response = await httpClient.post<CommentLikeResponse>('/comment/like', {
-        commentId: commentId
+      const response = await httpClient.post<CommentLikeResponse>('/blog/commentLikeBlog', {
+        commentId: commentId,
+        type: "1"
       });
 
       if (response.code === 200) {

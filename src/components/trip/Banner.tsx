@@ -45,7 +45,7 @@ const Banner: React.FC<BannerProps> = ({
       {!imageError && (
         <>
           <img
-            src="../../../assets/temporarybanner.jpg" // Placeholder image while loading
+            src="/assets/temporarybanner.jpg" // Placeholder image while loading
             alt={alt}
             onLoad={handleImageLoad}
             onError={handleImageError}

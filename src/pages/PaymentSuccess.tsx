@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '../contexts/AuthContext';
+import { updateUserPayType } from '../utils/chineseLoginStorage';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { CheckCircleIcon } from '@heroicons/react/24/solid';
@@ -19,9 +21,45 @@ const PaymentSuccess: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as LocationState;
+  const { updatePayType } = useAuth(); // ✅ Get updatePayType from context
+
+  // ✅ Map planId to payType
+  const getPlanPayType = (planId: string): number => {
+    const mapping: Record<string, number> = {
+      'week': 1,    // VIP_WEEK
+      'month': 2,   // VIP_MONTH
+      'quarter': 3, // VIP_QUARTER (season)
+      'season': 3,  // VIP_QUARTER
+      'year': 4     // VIP_YEAR
+    };
+    return mapping[planId] || 0;
+  };
+
+  // ✅ Update payType automatically when payment succeeds
+  useEffect(() => {
+    if (state?.planId) {
+      const newPayType = getPlanPayType(state.planId);
+      
+      console.log('💳 Payment successful! Updating subscription...');
+      console.log('Plan ID:', state.planId);
+      console.log('New PayType:', newPayType);
+      
+      // Update localStorage/sessionStorage
+      updateUserPayType(newPayType);
+      
+      // Update context state
+      updatePayType(newPayType);
+      
+      console.log('✅ Subscription updated successfully!');
+      console.log('You are now:', newPayType === 0 ? 'Free' : 
+                                  newPayType === 1 ? 'VIP Week' :
+                                  newPayType === 2 ? 'VIP Month' :
+                                  newPayType === 3 ? 'VIP Quarter' : 'VIP Year');
+    }
+  }, [state?.planId, updatePayType]);
 
   // Redirect if accessed directly without payment
-  React.useEffect(() => {
+  useEffect(() => {
     if (!state?.orderNumber) {
       navigate('/pricing');
     }
@@ -32,7 +70,19 @@ const PaymentSuccess: React.FC = () => {
   };
 
   const handleViewOrders = () => {
-    navigate('/subscription');
+    navigate('/profile?tab=subscription'); // ✅ Go to subscription tab
+  };
+
+  // ✅ Get plan name from payType
+  const getPlanDisplayName = (planId: string): string => {
+    const names: Record<string, string> = {
+      'week': 'VIP Week',
+      'month': 'VIP Month',
+      'quarter': 'VIP Quarter',
+      'season': 'VIP Quarter',
+      'year': 'VIP Year'
+    };
+    return names[planId] || state.planName || 'Premium Plan';
   };
 
   return (
@@ -43,19 +93,27 @@ const PaymentSuccess: React.FC = () => {
         <div className="max-w-2xl mx-auto">
           {/* Success Icon */}
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-24 h-24 bg-green-100 rounded-full mb-6">
+            <div className="inline-flex items-center justify-center w-24 h-24 bg-green-100 rounded-full mb-6 animate-in zoom-in duration-500">
               <CheckCircleIcon className="w-16 h-16 text-green-600" />
             </div>
             <h1 className="text-4xl font-bold text-slate-900 mb-4">
-              {t('payment.success.title', 'Your Order Successfully Created')}
+              {t('payment.success.title', 'Payment Successful!')}
             </h1>
             <p className="text-lg text-slate-600">
               {t('payment.success.subtitle', 'Thank you for your purchase! Your subscription is now active.')}
             </p>
+            
+            {/* ✅ Show purchased plan */}
+            {state?.planId && (
+              <div className="mt-4 inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-full shadow-lg">
+                <span className="text-2xl">⭐</span>
+                <span className="font-bold text-lg">{getPlanDisplayName(state.planId)}</span>
+              </div>
+            )}
           </div>
 
           {/* Order Details Card */}
-          <div className="bg-white rounded-2xl shadow-lg p-8 mb-8">
+          <div className="bg-white rounded-2xl shadow-lg p-8 mb-8 animate-in slide-in-from-bottom-4 duration-700">
             <h2 className="text-xl font-semibold text-slate-900 mb-6">
               {t('payment.success.orderDetails', 'Order Details')}
             </h2>
@@ -130,19 +188,19 @@ const PaymentSuccess: React.FC = () => {
                 <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                 </svg>
-                <span>{t('payment.success.step1', 'A confirmation email has been sent to your inbox')}</span>
+                <span>{t('payment.success.step1', 'Your subscription has been activated automatically')}</span>
               </li>
               <li className="flex items-start gap-2">
                 <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                 </svg>
-                <span>{t('payment.success.step2', 'Your subscription is now active and ready to use')}</span>
+                <span>{t('payment.success.step2', 'All premium features are now unlocked')}</span>
               </li>
               <li className="flex items-start gap-2">
                 <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                 </svg>
-                <span>{t('payment.success.step3', 'Access all premium features from your dashboard')}</span>
+                <span>{t('payment.success.step3', 'Start exploring your new premium benefits!')}</span>
               </li>
             </ul>
           </div>
@@ -151,16 +209,16 @@ const PaymentSuccess: React.FC = () => {
           <div className="space-y-4">
             <button
               onClick={handleGoToDashboard}
-              className="w-full py-4 bg-teal-600 text-white rounded-xl font-semibold hover:bg-teal-700 transition-all shadow-lg"
+              className="w-full py-4 bg-teal-600 text-white rounded-xl font-semibold hover:bg-teal-700 transition-all shadow-lg hover:shadow-xl active:scale-95"
             >
               {t('payment.success.goToDashboard', 'Go to Dashboard')}
             </button>
 
             <button
               onClick={handleViewOrders}
-              className="w-full py-4 border-2 border-slate-300 text-slate-700 rounded-xl font-semibold hover:bg-slate-50 transition-all"
+              className="w-full py-4 border-2 border-slate-300 text-slate-700 rounded-xl font-semibold hover:bg-slate-50 transition-all active:scale-95"
             >
-              {t('payment.success.viewSubscription', 'View Subscription Details')}
+              {t('payment.success.viewSubscription', 'View My Subscription')}
             </button>
 
             <button

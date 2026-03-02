@@ -392,7 +392,7 @@ class FirebaseApiClient {
    */
   async updateUserProfile(userDto: UserDto): Promise<UserInfo> {
     try {
-      const response = await this.httpClient.put<ApiResponse<UserInfo>>('/user/profile', userDto);
+      const response = await this.httpClient.post<ApiResponse<UserInfo>>('/users/profile', userDto);
       if (response.data.code === 200 && response.data.data) {
         return response.data.data;
       }

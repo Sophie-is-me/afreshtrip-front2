@@ -1,5 +1,6 @@
 /**
  * UNIFIED SUBSCRIPTION SERVICE - Single Source of Truth
+ * ✅ UPDATED: Uses payType from localStorage instead of backend API
  * 
  * This service combines the functionality of both:
  * - src/services/subscriptionService.ts (Business Logic Layer)
@@ -12,6 +13,8 @@ import type { VipOrder as ApiVipOrder } from '../../types/api';
 import type { SubscriptionPlan, UserSubscription } from '../../types/subscription';
 import type { SubscriptionPlanResponse } from '../../types/api';
 import { HttpClient } from '../api/httpClient';
+import { getUserPayType, hasPremiumSubscription, getSubscriptionPlanName } from '../../utils/chineseLoginStorage';
+import { FEATURE_REGISTRY, FeatureId } from '../../types/features';
 
 export interface VipStatus {
   hasVip: boolean;
@@ -48,53 +51,146 @@ export class UnifiedSubscriptionService {
 
   /**
    * Get user's current subscription status
+   * ✅ Uses payType from localStorage
    */
   async getUserSubscription(userId: string): Promise<UserSubscription | null> {
-    const response = await this.httpClient.get<{
-      success: boolean;
-      status?: 'active' | 'expired';
-      planId?: string;
-      vipTypeId?: string;
-      expiresAt?: string;
-      autoRenew?: boolean;
-    }>('/api/v1/payments/subscription');
+    try {
+      // ✅ Get payType from localStorage (0 if not logged in)
+      const payType = getUserPayType() ?? 0;
+      const isPremium = hasPremiumSubscription(payType);
+      
+      console.log('📋 Getting subscription for user:', userId);
+      console.log('PayType:', payType, '(' + getSubscriptionPlanName(payType) + ')');
+      
+      // Free users have no subscription
+      if (!isPremium) {
+        return null;
+      }
 
-    // Safety check for response structure
-    if (!response || !response.success || response.status !== 'active') {
+      // Map payType to subscription
+      const planId = this.mapPayTypeToPlanId(payType);
+      
+      // Create subscription object
+      const subscription: UserSubscription = {
+        id: `sub_${userId}_${payType}`,
+        userId,
+        planId,
+        status: 'active',
+        startDate: new Date(),
+        endDate: this.calculateEndDate(payType),
+        autoRenew: false,
+        paymentMethodId: 'chinese_login'
+      };
+
+      console.log('✅ User subscription:', subscription);
+      return subscription;
+      
+    } catch (error) {
+      console.error('Error getting user subscription:', error);
       return null;
     }
-
-    // Map backend response to frontend UserSubscription model
-    const subscription: UserSubscription = {
-      id: `sub_${userId}_${response.vipTypeId || 'unknown'}`,
-      userId,
-      planId: this.mapBackendPlanIdToFrontend(response.planId) || 'month',
-      status: response.status,
-      startDate: new Date(),
-      endDate: response.expiresAt ? new Date(response.expiresAt) : new Date(),
-      autoRenew: response.autoRenew || false,
-      paymentMethodId: 'unified'
-    };
-
-    return subscription;
   }
 
   /**
-    * Get available subscription plans
-    */
-   async getSubscriptionPlans(): Promise<SubscriptionPlan[]> {
-     const response = await this.httpClient.get<{
-       code: number;
-       message: string;
-       data: SubscriptionPlanResponse[];
-     }>('/api/v1/features/subscription-plans', { requiresAuth: false });
+   * Calculate subscription end date based on payType
+   */
+  private calculateEndDate(payType: number): Date {
+    const now = new Date();
+    const daysMap: Record<number, number> = {
+      1: 7,    // Week
+      2: 30,   // Month
+      3: 90,   // Quarter
+      4: 365   // Year
+    };
+    
+    const days = daysMap[payType] || 0;
+    const endDate = new Date(now);
+    endDate.setDate(endDate.getDate() + days);
+    return endDate;
+  }
 
-    // Safety check for response structure
-    if (!response || !response.data || !Array.isArray(response.data)) {
+  /**
+   * Map payType to planId
+   */
+  private mapPayTypeToPlanId(payType: number): string {
+    const mapping: Record<number, string> = {
+      1: 'week',
+      2: 'month',
+      3: 'quarter',
+      4: 'year'
+    };
+    return mapping[payType] || 'free';
+  }
+
+  /**
+   * Get available subscription plans
+   * ✅ Returns hardcoded plans (no API call)
+   */
+  async getSubscriptionPlans(): Promise<SubscriptionPlan[]> {
+    try {
+      console.log('📦 Getting subscription plans from local data...');
+      
+      // ✅ Get all features from registry
+      const allFeatures = Object.keys(FEATURE_REGISTRY) as FeatureId[];
+      const allFeatureNames = Object.values(FEATURE_REGISTRY).map(f => f.name);
+      
+      // ✅ Hardcoded subscription plans
+      const plans: SubscriptionPlan[] = [
+        {
+          planId: 'week',
+          planName: 'VIP Week',
+          price: 19,
+          durationDays: 7,
+          features: allFeatures,
+          featureNames: allFeatureNames,
+          isPopular: false,
+          isBestValue: false,
+          isDisabled: false
+        },
+        {
+          planId: 'month',
+          planName: 'VIP Month',
+          price: 39,
+          durationDays: 30,
+          features: allFeatures,
+          featureNames: allFeatureNames,
+          isPopular: true, // ✅ Most popular
+          isBestValue: false,
+          isDisabled: false
+        },
+        {
+          planId: 'quarter',
+          planName: 'VIP Quarter',
+          price: 89,
+          durationDays: 90,
+          features: allFeatures,
+          featureNames: allFeatureNames,
+          isPopular: false,
+          isBestValue: true, // ✅ Best value
+          isDisabled: false,
+          originalPrice: 117 // 3 months * $39
+        },
+        {
+          planId: 'year',
+          planName: 'VIP Year',
+          price: 199,
+          durationDays: 365,
+          features: allFeatures,
+          featureNames: allFeatureNames,
+          isPopular: false,
+          isBestValue: false,
+          isDisabled: false,
+          originalPrice: 468 // 12 months * $39
+        }
+      ];
+
+      console.log('✅ Returning', plans.length, 'subscription plans');
+      return plans;
+      
+    } catch (error) {
+      console.error('Error getting subscription plans:', error);
       return [];
     }
-
-    return response.data.map(plan => this.transformBackendPlanToFrontend(plan));
   }
 
   /**
@@ -135,7 +231,6 @@ export class UnifiedSubscriptionService {
       console.log('Initiating payment with:', { vipType, paymentMethod: backendPaymentMethod });
       
       // Use unified payment initiation
-      
       const response = await this.httpClient.post<{
         code: number;
         message: string;
@@ -361,12 +456,7 @@ export class UnifiedSubscriptionService {
   /**
    * Calculate savings for subscription plans (UI Helper)
    */
-  calculateSavings(plan: SubscriptionPlan): number {
-    if (plan.originalPrice && plan.price) {
-      return Math.round(((plan.originalPrice - plan.price) / plan.originalPrice) * 100);
-    }
-    return 0;
-  }
+
 
   /**
    * Map frontend plan ID to backend VIP type

@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { type User, onAuthStateChanged, signInWithEmailAndPassword, signInWithPopup, signOut, createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth, googleProvider } from '../../lib/firebase/client';
-import { apiClient, type UserInfo } from '../services/apiClient';
+import { apiClient, type UserFeaturesResponse } from '../services/apiClient';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { QUERY_KEYS } from '../lib/react-query/queryKeys';
+import { updateUserPayType } from '../utils/chineseLoginStorage';
 
 // Custom user type for Chinese authentication
 interface CustomUser {
@@ -14,7 +15,9 @@ interface CustomUser {
   photoURL?: string;
   emailVerified: boolean;
   isCustomAuth: true;
-  payType?: number; // ✅ NEW: 0=Free, 1=Week, 2=Month, 3=Quarter, 4=Year
+  payType?: number;
+  startTime?: string | null;
+  endTime?: string | null;
   metadata?: {
     creationTime: string;
   };
@@ -25,11 +28,15 @@ export type AuthUser = User | CustomUser;
 
 interface AuthContextType {
   user: AuthUser | null;
-  userProfile: UserInfo | null;
+  userProfile: any | null;
+  userFeatures: UserFeaturesResponse['data'] | null; // ✅ NEW: Full user features from API
   loading: boolean;
   isCustomAuth: boolean;
-  payType: number; // ✅ NEW: Expose payType directly
-  isPremium: boolean; // ✅ NEW: Quick check for premium status
+  payType: number; // ✅ From API
+  startTime: string | null; // ✅ Subscription start
+  endTime: string | null; // ✅ Subscription end
+  isPremium: boolean; // ✅ Checks payType AND endTime
+  isExpired: boolean; // ✅ NEW: Check if subscription expired
   loginWithEmail: (email: string, password: string) => Promise<void>;
   registerWithEmail: (email: string, password: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
@@ -47,7 +54,8 @@ interface AuthContextType {
     birthDate?: string;
   }) => Promise<void>;
   refreshUserProfile: () => Promise<void>;
-  updatePayType: (payType: number) => void; // ✅ NEW: Update subscription status
+  refreshUserFeatures: () => Promise<void>; // ✅ NEW: Refresh from API
+  updatePayType: (payType: number) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -65,11 +73,54 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [customUser, setCustomUser] = useState<CustomUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [payType, setPayType] = useState<number>(0); // ✅ NEW: Track payType in state
   const queryClient = useQueryClient();
 
-  // React Query for User Profile
-  const { data: userProfileData, isLoading: isProfileLoading } = useQuery<UserInfo>({
+  // ✅ NEW: Fetch user features from API (includes payType, startTime, endTime)
+  const { data: userFeaturesData, refetch: refetchFeatures } = useQuery<UserFeaturesResponse['data']>({
+    queryKey: ['userFeatures', customUser?.uid || firebaseUser?.uid],
+    queryFn: async () => {
+      if (!customUser && !firebaseUser) throw new Error('No user');
+      
+      try {
+        console.log('🔍 Fetching user features from API...');
+        const response = await apiClient.getUserFeatures();
+        
+        // ✅ Update localStorage with API data
+        if (response.data.payType !== undefined) {
+          updateUserPayType(response.data.payType);
+        }
+        
+        console.log('✅ User features loaded:', {
+          nickname: response.data.nickname,
+          payType: response.data.payType,
+          startTime: response.data.startTime,
+          endTime: response.data.endTime
+        });
+        
+        return response.data;
+      } catch (error) {
+        console.error('Failed to fetch user features:', error);
+        throw error;
+      }
+    },
+    enabled: !!(customUser || firebaseUser),
+    retry: 1,
+    staleTime: 30 * 1000, // 30 seconds
+  });
+
+  // ✅ Extract payType, startTime, endTime from API
+  const payType = userFeaturesData?.payType ?? 0;
+  const startTime = userFeaturesData?.startTime ?? null;
+  const endTime = userFeaturesData?.endTime ?? null;
+
+  // ✅ Check if subscription is expired
+  const isExpired = endTime ? new Date(endTime) < new Date() : false;
+  
+  // ✅ isPremium: has VIP AND not expired
+  const isPremium = payType > 0 && !isExpired;
+
+  // React Query for User Profile (legacy)
+  const { data: userProfileData, isLoading: isProfileLoading } = useQuery<any>({
     queryKey: QUERY_KEYS.user.profile((firebaseUser?.uid || customUser?.uid) || ''),
     queryFn: async () => {
       if (!firebaseUser && !customUser) throw new Error('No user');
@@ -120,69 +171,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (isChineseVersion) {
       const customToken = localStorage.getItem('custom_auth_token');
       const customUserData = localStorage.getItem('custom_user_data');
-      const storedPayType = localStorage.getItem('payType'); // ✅ NEW: Restore payType
 
       if (customToken) {
         if (customUserData) {
           try {
             const parsedUser: CustomUser = JSON.parse(customUserData);
             setCustomUser(parsedUser);
-            
-            // ✅ NEW: Restore payType
-            if (storedPayType) {
-              const payTypeNum = parseInt(storedPayType, 10);
-              setPayType(payTypeNum);
-              parsedUser.payType = payTypeNum;
-            } else if (parsedUser.payType !== undefined) {
-              setPayType(parsedUser.payType);
-            }
-            
-            console.log('Restored custom auth state for Chinese user:', parsedUser.displayName || parsedUser.phone || parsedUser.email);
-            console.log('PayType:', parsedUser.payType);
+            console.log('Restored custom auth state:', parsedUser.displayName || parsedUser.phone);
           } catch (error) {
             console.error('Failed to parse stored custom user data:', error);
             localStorage.removeItem('custom_auth_token');
             localStorage.removeItem('custom_user_data');
-            localStorage.removeItem('payType');
           }
-        } else {
-          (async () => {
-            try {
-              const userInfo = await apiClient.getUserInfo();
-              if (userInfo.userId) {
-                const mockCustomUser: CustomUser = {
-                  uid: userInfo.userId.toString(),
-                  email: userInfo.email || undefined,
-                  phone: userInfo.phone || undefined,
-                  displayName: userInfo.nickname || undefined,
-                  emailVerified: true,
-                  isCustomAuth: true,
-                  payType: storedPayType ? parseInt(storedPayType, 10) : 0 // ✅ NEW
-                };
-                setCustomUser(mockCustomUser);
-                
-                // ✅ NEW: Set payType from storage or default to 0
-                if (storedPayType) {
-                  setPayType(parseInt(storedPayType, 10));
-                }
-                
-                localStorage.setItem('custom_user_data', JSON.stringify(mockCustomUser));
-                console.log('Fetched and restored custom auth state for Chinese user:', mockCustomUser.displayName || mockCustomUser.phone || mockCustomUser.email);
-                console.log('PayType:', mockCustomUser.payType);
-              } else {
-                throw new Error('Invalid user info');
-              }
-            } catch (error) {
-              console.error('Failed to fetch user info for restoration:', error);
-              if (error instanceof Error && (error.message.includes('401') || error.message.includes('Unauthorized'))) {
-                console.warn('Clearing invalid auth token due to authentication error');
-                localStorage.removeItem('custom_auth_token');
-                localStorage.removeItem('payType');
-              } else {
-                console.warn('Keeping auth token despite restoration failure - may be temporary issue');
-              }
-            }
-          })();
         }
       }
     }
@@ -204,51 +204,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       console.log('🔐 Starting SMS login...');
       const response = await apiClient.verifySmsCode(phone, code);
-      
-      console.log('📱 API Response:', response);
 
-      if (response.code !== 200) {
-        throw new Error(response.message || response.msg || 'SMS verification failed');
+      if (response.code !== 200 || !response.data?.token || !response.data?.userId) {
+        throw new Error(response.message || 'SMS verification failed');
       }
 
-      if (!response.data || !response.data.token || !response.data.userId) {
-        throw new Error('Invalid response from server - missing required data');
-      }
+      console.log('✅ SMS login successful');
 
-      console.log('✅ Valid response received');
-      console.log('Token:', response.data.token.substring(0, 30) + '...');
-      console.log('User ID:', response.data.userId);
-      console.log('PayType:', response.data.payType); // ✅ NEW
-
-      // Store the custom JWT token
+      // Store token
       localStorage.setItem('custom_auth_token', response.data.token);
 
-      // ✅ NEW: Store payType
-      const userPayType = response.data.payType || 0;
-      localStorage.setItem('payType', String(userPayType));
-      setPayType(userPayType);
-
-      // Create a mock Firebase user for compatibility
+      // Create custom user
       const mockCustomUser: CustomUser = {
         uid: response.data.userId.toString(),
         phone: response.data.phone || phone,
         displayName: response.data.nickname || phone,
         emailVerified: true,
         isCustomAuth: true,
-        payType: userPayType // ✅ NEW
+        payType: response.data.payType || 0,
+        startTime: response.data.startTime || null,
+        endTime: response.data.endTime || null
       };
 
-      // Store user data for persistence
       localStorage.setItem('custom_user_data', JSON.stringify(mockCustomUser));
-
       setCustomUser(mockCustomUser);
 
-      // Update user profile with the new user info
-      await queryClient.invalidateQueries({ 
-        queryKey: QUERY_KEYS.user.profile(response.data.userId.toString()) 
-      });
-
-      console.log('✅ SMS login successful!');
+      // ✅ Fetch features from API (happens automatically via React Query)
+      await refetchFeatures();
 
     } catch (error) {
       console.error('❌ SMS login error:', error);
@@ -260,46 +242,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const response = await apiClient.registerWithSms(phone, code, password);
 
-      if (response.code !== 200) {
-        throw new Error(response.message || response.msg || 'SMS registration failed');
+      if (response.code !== 200 || !response.data?.token || !response.data?.userId) {
+        throw new Error(response.message || 'SMS registration failed');
       }
 
-      if (!response.data || !response.data.token || !response.data.userId) {
-        throw new Error('Invalid response from server - missing required data');
-      }
-
-      // Store the custom JWT token
       localStorage.setItem('custom_auth_token', response.data.token);
 
-      // ✅ NEW: Store payType (default 0 for new users)
-      /*const userPayType = response.data.payType || 0;
-      localStorage.setItem('payType', String(userPayType));
-      setPayType(userPayType);
-*/
-      // Create a custom user
       const mockCustomUser: CustomUser = {
         uid: response.data.userId.toString(),
         phone: response.data.phone || phone,
         displayName: response.data.nickname || phone,
         emailVerified: true,
         isCustomAuth: true,
-       // payType: userPayType, // ✅ NEW
+        payType: response.data.payType || 0,
+        startTime: response.data.startTime || null,
+        endTime: response.data.endTime || null,
         metadata: {
           creationTime: new Date().toISOString(),
         }
       };
 
-      // Store user data for persistence
       localStorage.setItem('custom_user_data', JSON.stringify(mockCustomUser));
-
       setCustomUser(mockCustomUser);
 
-      // Fetch user profile
-      await queryClient.invalidateQueries({ 
-        queryKey: QUERY_KEYS.user.profile(response.data.userId.toString()) 
-      });
+      // ✅ Fetch features from API
+      await refetchFeatures();
 
-      console.log('SMS registration successful:', mockCustomUser.phone);
     } catch (error) {
       console.error('SMS registration error:', error);
       throw error;
@@ -310,41 +278,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const response = await apiClient.verifyEmailCode(email, code);
 
-      if (response.code !== 200) {
-        throw new Error(response.message || response.msg || 'Email verification failed');
+      if (response.code !== 200 || !response.data?.token || !response.data?.userId) {
+        throw new Error(response.message || 'Email verification failed');
       }
 
-      if (!response.data || !response.data.token || !response.data.userId) {
-        throw new Error('Invalid response from server - missing required data');
-      }
-
-      // Store the custom JWT token
       localStorage.setItem('custom_auth_token', response.data.token);
 
-      // ✅ NEW: Store payType
-      /*const userPayType = response.data.payType || 0;
-      localStorage.setItem('payType', String(userPayType));
-      setPayType(userPayType);
-*/
-      // Create a mock Firebase user for compatibility
       const mockCustomUser: CustomUser = {
         uid: response.data.userId.toString(),
         email: response.data.email || email,
         displayName: response.data.nickname || email,
         emailVerified: true,
-        isCustomAuth: true
-       // payType: userPayType // ✅ NEW
+        isCustomAuth: true,
+       
       };
 
-      // Store user data for persistence
       localStorage.setItem('custom_user_data', JSON.stringify(mockCustomUser));
-
       setCustomUser(mockCustomUser);
 
-      // Update user profile with the new user info
-      await queryClient.invalidateQueries({ 
-        queryKey: QUERY_KEYS.user.profile(response.data.userId.toString()) 
-      });
+      // ✅ Fetch features from API
+      await refetchFeatures();
 
     } catch (error) {
       console.error('Email login error:', error);
@@ -374,11 +327,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Clear custom auth
     localStorage.removeItem('custom_auth_token');
     localStorage.removeItem('custom_user_data');
-    localStorage.removeItem('payType'); // ✅ NEW
+    localStorage.removeItem('payType');
     setCustomUser(null);
-    setPayType(0); // ✅ NEW: Reset payType
 
-    // Clear user profile cache
+    // Clear cache
     queryClient.clear();
   };
 
@@ -391,66 +343,81 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
-  const updateUserProfile = async (profileData: {
-    nickname?: string;
-    gender?: string;
-    phone?: string;
-    imageUrl?: string;
-    birthDate?: string;
-  }) => {
-    try {
-      const userDto = {
-        nickname: profileData.nickname || '',
-        gender: profileData.gender,
-        phone: profileData.phone,
-        imageurl: profileData.imageUrl,
-        birthDate: profileData.birthDate,
-      };
-
-      console.log('Updating user profile with:', userDto);
-
-      const response = await apiClient.updateUserProfile(userDto);
-      if (response) {
-        await refreshUserProfile();
-      } else {
-        throw new Error('Failed to update profile');
-      }
-    } catch (error) {
-      console.error('Failed to update user profile:', error);
-      throw error;
-    }
+  // ✅ NEW: Refresh user features from API
+  const refreshUserFeatures = async () => {
+    console.log('🔄 Refreshing user features...');
+    await refetchFeatures();
   };
 
-  // ✅ NEW: Update payType after subscription change
+const updateUserProfile = async (profileData: {
+  nickname?: string;
+  gender?: string;
+  phone?: string;
+  imageUrl?: string;
+  birthDate?: string;
+}) => {
+  try {
+    // ✅ Build request data conditionally
+    const userDto: any = {
+      nickname: profileData.nickname || '',
+      gender: profileData.gender,
+      phone: profileData.phone,
+      imageurl: profileData.imageUrl,
+      birthDate: profileData.birthDate,
+    };
+
+    // ✅ Only include email if it exists and is not empty
+    const currentEmail = userFeaturesData?.email;
+    if (currentEmail && currentEmail.trim() !== '') {
+      userDto.email = currentEmail;
+    }
+    // If email is empty, don't send it at all to avoid unique constraint error!
+
+    console.log('📝 Updating user profile:', userDto);
+
+    const response = await apiClient.updateUserProfile(userDto);
+    
+    if (response) {
+      console.log('✅ Profile update complete');
+      
+      // ✅ Refresh both profile and features
+      await refreshUserProfile();
+      await refreshUserFeatures();
+    } else {
+      throw new Error('Failed to update profile');
+    }
+  } catch (error) {
+    console.error('Failed to update user profile:', error);
+    throw error;
+  }
+};
+
+  // ✅ Update payType (manual override, but API is source of truth)
   const updatePayType = (newPayType: number) => {
     console.log('📝 Updating payType to:', newPayType);
     
-    setPayType(newPayType);
-    localStorage.setItem('payType', String(newPayType));
-    sessionStorage.setItem('payType', String(newPayType));
+    // Update localStorage
+    updateUserPayType(newPayType);
     
-    // Update in customUser
-    if (customUser) {
-      const updatedUser = { ...customUser, payType: newPayType };
-      setCustomUser(updatedUser);
-      localStorage.setItem('custom_user_data', JSON.stringify(updatedUser));
-    }
-    
-    console.log('✅ PayType updated successfully');
+    // ✅ Refresh from API to get startTime and endTime
+    refreshUserFeatures();
   };
 
   const loading = authLoading || (!!firebaseUser && isProfileLoading);
   const user = customUser || firebaseUser;
   const isCustomAuth = !!customUser;
-  const isPremium = payType > 0; // ✅ NEW: Quick premium check
 
   const value = {
     user,
     userProfile,
+    userFeatures: userFeaturesData || null, // ✅ NEW
     loading,
     isCustomAuth,
-    payType, // ✅ NEW
-    isPremium, // ✅ NEW
+    payType, // ✅ From API
+    startTime, // ✅ From API
+    endTime, // ✅ From API
+    isPremium, // ✅ Checks expiry
+    isExpired, // ✅ NEW
     loginWithEmail,
     registerWithEmail,
     loginWithGoogle,
@@ -462,7 +429,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     logout,
     updateUserProfile,
     refreshUserProfile,
-    updatePayType, // ✅ NEW
+    refreshUserFeatures, // ✅ NEW
+    updatePayType,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

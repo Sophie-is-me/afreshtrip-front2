@@ -1,14 +1,16 @@
 // src/components/profile/SubscriptionTab.tsx
-// ✅ UPDATED: Shows subscription status based on payType from AuthContext
+// ✅ UPDATED: Navigate to /pricing on upgrade
 
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { CheckIcon, SparklesIcon } from '@heroicons/react/24/solid';
 import { useAuth } from '../../contexts/AuthContext';
 
 const SubscriptionTab: React.FC = () => {
   const { t } = useTranslation();
-  const { payType, isPremium } = useAuth(); // ✅ Get payType from context
+  const navigate = useNavigate();
+  const { payType, isPremium } = useAuth();
 
   // Map payType to plan ID
   const getCurrentPlanId = (payType: number): string => {
@@ -69,10 +71,10 @@ const SubscriptionTab: React.FC = () => {
     }
   ];
 
+  // ✅ Navigate to pricing page for upgrades
   const handleSelectPlan = (planId: string, planPayType: number) => {
-    console.log('Selected plan:', planId, 'PayType:', planPayType);
-    // TODO: Navigate to payment page with selected plan
-    alert(`Payment integration coming soon for ${planId} plan`);
+    console.log('Navigating to pricing for plan:', planId, 'PayType:', planPayType);
+    navigate('/pricing');
   };
 
   return (
@@ -88,7 +90,7 @@ const SubscriptionTab: React.FC = () => {
             </div>
             <div className="flex-1">
               <h3 className="text-xl font-bold mb-2">
-                {t('trips.freeTitle') || 'Free Plan - Limited Access'}
+                {t('trips.freeTitle') || '🆓 Free Plan - Limited Access'}
               </h3>
               <p className="text-white/90 text-sm mb-4">
                 {t('trips.freeDescription') || 'You are currently on the free plan with limited features. Upgrade to VIP to unlock premium benefits!'}
@@ -110,7 +112,7 @@ const SubscriptionTab: React.FC = () => {
             </div>
             <div className="flex-1">
               <h3 className="text-xl font-bold mb-2">
-                {t('subscription.premiumTitle') || 'VIP Member - Premium Access'}
+                {t('subscription.premiumTitle') || '⭐ VIP Member - Premium Access'}
               </h3>
               <p className="text-white/90 text-sm mb-4">
                 {t('subscription.premiumDescription') || 'You have full access to all premium features. Thank you for being a valued VIP member!'}
@@ -208,7 +210,6 @@ const SubscriptionTab: React.FC = () => {
           {/* Free Plan */}
           <div className="bg-white p-6 rounded-xl border-2 border-gray-200">
             <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-             
               <span>Free Plan</span>
             </h4>
             <ul className="space-y-2 text-sm text-gray-600">
@@ -234,7 +235,6 @@ const SubscriptionTab: React.FC = () => {
           {/* VIP Plan */}
           <div className="bg-gradient-to-br from-teal-50 to-teal-100 p-6 rounded-xl border-2 border-teal-500">
             <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-             
               <span>VIP Plans</span>
             </h4>
             <ul className="space-y-2 text-sm text-gray-700">
@@ -266,8 +266,6 @@ const SubscriptionTab: React.FC = () => {
           </div>
         </div>
       </div>
-
-  
     </div>
   );
 };

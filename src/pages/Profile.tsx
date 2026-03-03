@@ -1,8 +1,8 @@
 // src/pages/Profile.tsx
-// ✅ UPDATED: Tabbed interface matching the design
+// ✅ FIXED: Chinese backend only, no Firebase Storage
 
-import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   UserCircleIcon,
@@ -18,8 +18,6 @@ import Footer from '../components/Footer';
 import Breadcrumb from '../components/Breadcrumb';
 import { useAuth } from '../contexts/AuthContext';
 import { useSnackbar } from '../contexts/SnackbarContext';
-import { i18nErrorHandler } from '../utils/i18nErrorHandler';
-import { apiClient } from '../services/apiClient';
 
 // Tab Content Components
 import ProfileTab from '../components/profile/ProfileTab';
@@ -27,31 +25,20 @@ import SubscriptionTab from '../components/profile/SubscriptionTab';
 import MyTripsTab from '../components/profile/MyTripsTab';
 import NotificationTab from '../components/profile/NotificationTab';
 
-// Hooks
-import { useSubscription } from '../hooks/useSubscription';
-
 type TabId = 'profile' | 'subscription' | 'trips' | 'notification';
 
 const Profile: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { user, userProfile, updateUserProfile, logout } = useAuth();
+  const [searchParams] = useSearchParams();
+  
+  const { updateUserProfile, refreshUserFeatures, logout, userFeatures } = useAuth();
   const { showSuccess, showError } = useSnackbar();
   
-  // State
-  const [activeTab, setActiveTab] = useState<TabId>('profile');
+  // Get initial tab from URL
+  const initialTab = (searchParams.get('tab') as TabId) || 'profile';
+  const [activeTab, setActiveTab] = useState<TabId>(initialTab);
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
-  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
-
-  // Subscription Hook
-  const {
-    plans,
-    isUpdating: isUpdatingSubscription,
-    showPaymentMethodSelection,
-    pendingPlanId,
-    handlePaymentMethodSelect,
-    closePaymentMethodSelection,
-  } = useSubscription();
 
   // Tab configuration
   const tabs = [
@@ -77,55 +64,38 @@ const Profile: React.FC = () => {
     }
   ];
 
-  // --- Handlers ---
-
-  const handleAvatarUpdate = async (file: File) => {
-    if (!user) return;
-    setIsUploadingAvatar(true);
-
-    try {
-      const imageUrl = await apiClient.uploadFile(file);
-      await updateUserProfile({
-        nickname: userProfile?.nickname || user.displayName || '',
-        imageUrl: imageUrl
-      });
-      showSuccess(t('trips.updateSuccess'));
-    } catch (error) {
-      console.error('Avatar upload failed:', error);
-      showError(t('common.error.imageLoadError'));
-    } finally {
-      setIsUploadingAvatar(false);
-    }
-  };
-
+  // ✅ Handle profile update - Chinese backend API only
   const handleProfileUpdate = async (formData: any) => {
-    if (!user) return;
     setIsUpdatingProfile(true);
 
     try {
+      console.log('📝 Starting profile update with Chinese backend...');
+      console.log('Form data:', formData);
+      
+      // ✅ Call POST /users/profile via AuthContext
+      // This sends: nickname, gender, birthDate, phone, email, imageurl
       await updateUserProfile({
-        nickname: formData.username,
-        phone: formData.mobile?.replace(/\s+/g, ''),
-        gender: formData.gender?.toLowerCase(),
-        birthDate: formData.dob ? new Date(formData.dob).toISOString() : undefined,
+        nickname: formData.nickname,
+        phone: formData.phone?.replace(/\s+/g, ''),
+        gender: formData.gender,
+        birthDate: formData.birthDate,
+        imageUrl: formData.imageurl // ✅ Include base64 image
       });
-      showSuccess(t('trips.updateSuccess'));
+      
+      console.log('✅ Profile updated successfully');
+      showSuccess(t('trips.updateSuccess') || 'Profile updated successfully!');
+      
     } catch (error) {
-      const errorMessage = i18nErrorHandler.handleError(error, { component: 'Profile', action: 'update' }, t);
-      showError(errorMessage.description);
+      console.error('❌ Profile update failed:', error);
+      
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : 'Failed to update profile';
+      
+      showError(errorMessage);
     } finally {
       setIsUpdatingProfile(false);
     }
-  };
-
-  const handlePasswordUpdate = async (current: string, newPass: string) => {
-    console.log('Password update requested', { current, newPass });
-    return new Promise<void>((resolve) => {
-      setTimeout(() => {
-        showSuccess(t('trips.updateSuccess'));
-        resolve();
-      }, 1000);
-    });
   };
 
   const handleLogout = async () => {
@@ -133,20 +103,9 @@ const Profile: React.FC = () => {
       await logout();
       navigate('/');
     } catch (error) {
-      showError(t('common.error.logoutFailed'));
+      showError(t('common.error.logoutFailed') || 'Logout failed');
     }
   };
-
-  // Initial form data
-  const initialFormData = useMemo(() => ({
-    username: userProfile?.nickname || user?.displayName || '',
-    email: userProfile?.email || user?.email || '',
-    mobile: userProfile?.phone || (user && 'phone' in user ? user.phone : '') || '',
-    dob: userProfile?.birthDate ? userProfile.birthDate.split('T')[0] : '',
-    gender: userProfile?.gender && typeof userProfile.gender === 'string' 
-      ? userProfile.gender.charAt(0).toUpperCase() + userProfile.gender.slice(1).toLowerCase() 
-      : '',
-  }), [userProfile, user]);
 
   // Render tab content
   const renderTabContent = () => {
@@ -154,12 +113,8 @@ const Profile: React.FC = () => {
       case 'profile':
         return (
           <ProfileTab
-            initialData={initialFormData}
             onSubmit={handleProfileUpdate}
-            onAvatarUpdate={handleAvatarUpdate}
-            onPasswordUpdate={handlePasswordUpdate}
             isLoading={isUpdatingProfile}
-            isUploadingAvatar={isUploadingAvatar}
           />
         );
       case 'subscription':

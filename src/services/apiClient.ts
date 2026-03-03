@@ -150,6 +150,59 @@ export class ApiError extends Error {
     this.code = code;
     this.data = data;
   }
+
+
+  
+}
+
+export interface SmsCodeResponse {
+  token?: string;
+  userId?: number;
+  phone?: string;
+  nickname?: string;
+  email?: string;
+  payType?: number; // 0=Free, 1=Week, 2=Month, 3=Quarter, 4=Year
+  startTime?: string | null; // ✅ Subscription start
+  endTime?: string | null;   // ✅ Subscription end
+}
+
+export interface RegisterResponse {
+  token: string;
+  userId: number;
+  phone?: string;
+  email?: string;
+  nickname?: string;
+  payType?: number;          // ✅ Subscription status
+  startTime?: string | null; // ✅ Subscription start
+  endTime?: string | null;   // ✅ Subscription end
+}
+
+export interface UserFeaturesResponse {
+  code: number;
+  msg: string;
+  data: {
+    id: number;
+    nickname: string;
+    gender: string;
+    birthDate: string;
+    phone: string;
+    password: null;
+    email: string;
+    role: string;
+    createdAt: number;
+    isDeleted: boolean;
+    imageurl: string;
+    isLoginQq: number;
+    isActive: null;
+    smsCode: null;
+    smsCodeExpiry: null;
+    emailCode: null;
+    emailCodeExpiry: null;
+    payType: number; // 0=Free, 1=Week, 2=Month, 3=Quarter, 4=Year
+    startTime: string | null; // Subscription start date
+    endTime: string | null; // Subscription end date
+    lastLoginAt: number;
+  };
 }
 
 // ============================================================================
@@ -289,6 +342,28 @@ class FirebaseApiClient {
     }
   }
 
+  async getUserFeatures(): Promise<UserFeaturesResponse> {
+  try {
+    console.log('🔍 Fetching user features from API...');
+    
+    const response = await this.httpClient.get<UserFeaturesResponse>('/users/features');
+
+    console.log('✅ User features fetched:', {
+      nickname: response.data.data.nickname,
+      payType: response.data.data.payType,
+      startTime: response.data.data.startTime,
+      endTime: response.data.data.endTime
+    });
+
+    return response.data;
+  } catch (error) {
+    console.error('❌ Failed to fetch user features:', error);
+    throw this.handleError(error);
+  }
+}
+
+
+
   /**
    * Register new user with SMS verification
    * POST /sms/register
@@ -390,17 +465,36 @@ class FirebaseApiClient {
    * Update user profile
    * PUT /user/profile
    */
-  async updateUserProfile(userDto: UserDto): Promise<UserInfo> {
-    try {
-      const response = await this.httpClient.post<ApiResponse<UserInfo>>('/users/profile', userDto);
-      if (response.data.code === 200 && response.data.data) {
-        return response.data.data;
-      }
-      throw new ApiError('Failed to update user profile', response.data.code);
-    } catch (error) {
-      throw this.handleError(error);
+async updateUserProfile(data: UserDto & { email?: string }): Promise<ApiResponse> {
+  try {
+    console.log('📝 Updating profile with data:', data);
+    
+    // ✅ Build request body conditionally
+    const requestBody: any = {
+      nickname: data.nickname,
+      gender: data.gender,
+      birthDate: data.birthDate,
+      phone: data.phone,
+      imageurl: data.imageurl || ''
+    };
+
+    // ✅ Only include email if it exists and is not empty
+    // This prevents unique constraint errors when email is empty
+    if (data.email && data.email.trim() !== '') {
+      requestBody.email = data.email;
     }
+
+    console.log('📤 Sending to API:', requestBody);
+
+    const response = await this.httpClient.post<ApiResponse>('/users/profile', requestBody);
+
+    console.log('✅ Profile updated successfully:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Failed to update profile:', error);
+    throw this.handleError(error);
   }
+}
 
   // ==========================================================================
   // ERROR HANDLING
@@ -734,25 +828,60 @@ class FirebaseApiClient {
   /**
    * Upload image to Firebase Storage
    */
-  async uploadFile(file: File, userId?: string): Promise<string> {
-    try {
-      const timestamp = Date.now();
-      const safeUserId = userId || 'anonymous';
-      const fileName = `blogs/${safeUserId}/${timestamp}_${file.name}`;
-      const storageRef = ref(storage, fileName);
-
-      console.log('📤 Uploading image to Firebase Storage...');
-      await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(storageRef);
-
-      console.log('✅ Image uploaded:', downloadURL);
-      return downloadURL;
-    } catch (error) {
-      console.error('❌ Error uploading image:', error);
-      throw error;
+async uploadFile(file: File, userId?: string): Promise<string> {
+  try {
+    console.log('📤 Uploading file to backend:', file.name, 'Size:', file.size, 'bytes');
+    
+    // Create FormData for file upload
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    // Optional: Add userId if needed
+    if (userId) {
+      formData.append('userId', userId);
     }
-  }
 
+    console.log('⏳ Sending to POST /file/upload...');
+
+    // Upload to backend
+    const response = await this.httpClient.post('/file/upload', formData, {
+      headers: {
+        // Let browser set Content-Type with boundary
+        'Content-Type': 'multipart/form-data'
+      },
+      // Increase timeout for large files
+      timeout: 60000
+    });
+
+    console.log('📦 Upload response:', response.data);
+
+    // Extract URL from response (try multiple possible paths)
+    const imageUrl = 
+      response.data?.url ||           // Direct url field
+      response.data?.data?.url ||     // Nested in data.url
+      response.data?.imageUrl ||      // imageUrl field
+      response.data?.data?.imageUrl || // Nested in data.imageUrl
+      response.data?.imageurl ||      // imageurl field (lowercase)
+      response.data?.data?.imageurl;  // Nested in data.imageurl
+    
+    if (!imageUrl) {
+      console.error('❌ No URL found in response:', response.data);
+      throw new Error('Upload succeeded but no image URL in response');
+    }
+    
+    console.log('✅ File uploaded successfully! URL:', imageUrl);
+    return imageUrl;
+    
+  } catch (error) {
+    console.error('❌ Error uploading file:', error);
+    
+    if (error instanceof Error) {
+      throw new Error(`File upload failed: ${error.message}`);
+    }
+    
+    throw new Error('File upload failed');
+  }
+}
   /**
    * Get user's media library
    */

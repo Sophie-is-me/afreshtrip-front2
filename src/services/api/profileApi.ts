@@ -13,7 +13,7 @@ export interface ProfileUpdateRequest {
   gender: string;
   birthDate: string;
   phone: string;
-  email: string;
+
   imageurl?: string;
 }
 
@@ -29,7 +29,7 @@ export interface ProfileUpdateResponse {
     gender: string;
     birthDate: string;
     phone: string;
-    email: string;
+
     imageurl: string;
   };
 }
@@ -49,7 +49,6 @@ export const updateUserProfile = async (
       gender: data.gender,
       birthDate: data.birthDate,
       phone: data.phone,
-      email: data.email,
       imageurl: data.imageurl || ''
     });
 

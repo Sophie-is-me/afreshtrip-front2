@@ -8,9 +8,9 @@ export const CONTACT_PHONE = isChineseVersion
   : '+33 0662926877';
 
 
-export const PLAN_PRICES: Record<string, { usd: number; cny: number }> = {
-  week:   { usd: 19,  cny: 138 },
-  month:  { usd: 39,  cny: 288 },
-  season: { usd: 89,  cny: 648 },
-  year:   { usd: 199, cny: 1458 },
+export const PLAN_PRICES: Record<string, { usd: number; cny: number; eur: number }> = {
+  week:   { usd: 4,   cny: 28,   eur: 2.3 },
+  month:  { usd: 12,  cny: 68,   eur: 8.8 },
+  season: { usd: 28,  cny: 198,  eur: 26.8 },
+  year:   { usd: 88,  cny: 538,  eur: 76.8 },
 };
